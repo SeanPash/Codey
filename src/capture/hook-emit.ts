@@ -1,0 +1,29 @@
+import { pathToFileURL } from "node:url";
+import { normalizeHookEvent, type RawHookEvent } from "./normalize.js";
+import { SessionStore, defaultRoot } from "../store/session-store.js";
+
+export function handleHookInput(rawJson: string, root: string = defaultRoot()): void {
+  const text = rawJson.trim();
+  if (!text) return;
+  let raw: RawHookEvent;
+  try {
+    raw = JSON.parse(text) as RawHookEvent;
+  } catch {
+    return; // never break Claude's tool flow on bad input
+  }
+  const event = normalizeHookEvent(raw);
+  new SessionStore(event.sessionId, root).append(event);
+}
+
+// Process entry: read all of stdin, then handle. Always exit 0.
+function main(): void {
+  let raw = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (c) => (raw += c));
+  process.stdin.on("end", () => {
+    try { handleHookInput(raw); } catch { /* swallow */ }
+    process.exit(0);
+  });
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
