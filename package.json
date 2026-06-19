@@ -4,6 +4,7 @@
   "type": "module",
   "bin": { "codey": "src/cli/index.ts" },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "codey": "tsx src/cli/index.ts",
