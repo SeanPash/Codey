@@ -4,8 +4,8 @@ node_modules/
 # Build output
 dist/
 
-# Claude-related files and private design docs (never commit, repo is public)
-CLAUDE.md
+rules.md
+.rules/
 .claude/
 docs/
 
