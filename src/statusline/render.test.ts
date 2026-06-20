@@ -20,10 +20,10 @@ describe("renderStatus", () => {
   });
 
   it("wraps a long why onto extra lines and caps the height", () => {
-    const longWhy = Array(80).fill("word").join(" ");
+    const longWhy = Array(200).fill("word").join(" ");
     const out = renderStatus({ mode: "deep", action: { tag: "editing", target: "x" }, why: longWhy, warning: null, updatedAt: 1 }, 40);
     const lines = out.split("\n");
-    expect(lines.length).toBeLessThanOrEqual(2 + 3); // brand + now + at most 3 why lines
+    expect(lines.length).toBeLessThanOrEqual(2 + 5); // codey header + doing + at most 5 why lines
     expect(plain(out)).toContain("…");
   });
 

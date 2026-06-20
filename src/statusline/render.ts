@@ -5,27 +5,28 @@ const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
 const BRAND = "\x1b[38;5;75m"; // sky blue
+const LABEL = "\x1b[38;5;250m"; // section labels
 const GRAY = "\x1b[38;5;250m"; // action sentence
 const TEXT = "\x1b[38;5;253m"; // the specific target / why body
-const WHY = "\x1b[38;5;147m"; // lavender why marker
+const WHY = "\x1b[38;5;147m"; // lavender why label
 const RED = "\x1b[38;5;203m"; // warning
 
-const WRAP = 110; // wrap the why near this many characters
-const MAX_WHY_LINES = 3; // keep the block a glance, not a wall
-const LABEL = 5; // label column width so "codey" and "why" line up
+const WRAP = 120; // wrap the why near this many characters
+const MAX_WHY_LINES = 5; // enough to show a full explanation, not endless
+const COL = 5; // label column width so "doing" / "why" line up
 
 function rail(): string {
   return `${BRAND}▌${RESET} `;
 }
 
-// A rail row: a colored label padded to LABEL, then the body two spaces over.
+// A rail row: a colored, padded section label, then the body two spaces over.
 function row(label: string, labelStyle: string, body: string): string {
-  return `${rail()}${labelStyle}${label.padEnd(LABEL)}${RESET}  ${body}`;
+  return `${rail()}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
 }
 
 // Continuation line for a wrapped why: rail, then aligned under the why body.
 function cont(body: string): string {
-  return `${rail()}${" ".repeat(LABEL)}  ${body}`;
+  return `${rail()}${" ".repeat(COL)}  ${body}`;
 }
 
 // Word-wrap the why to a few lines; if it overflows the cap, end with an ellipsis.
@@ -55,18 +56,18 @@ function wrapWhy(text: string, width: number, maxLines: number): string[] {
 }
 
 export function renderStatus(snap: StatusSnapshot, width = WRAP): string {
-  // Line 1: the brand doubles as the label, with the action beside it.
+  const out: string[] = [`${rail()}${BOLD}${BRAND}codey${RESET}`];
+
   if (!snap.action) {
-    return row("codey", `${BOLD}${BRAND}`, `${DIM}waiting for Claude${RESET}`);
+    out.push(row("doing", `${BOLD}${LABEL}`, `${DIM}waiting for Claude${RESET}`));
+    return out.join("\n");
   }
 
   const { tag, target } = snap.action;
-  const out: string[] = [
-    row("codey", `${BOLD}${BRAND}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`),
-  ];
+  out.push(row("doing", `${BOLD}${LABEL}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
 
   if (snap.warning) {
-    out.push(row("!", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
+    out.push(row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
     return out.join("\n");
   }
 
