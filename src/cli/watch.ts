@@ -63,8 +63,15 @@ export function runWatch(sessionId: string, mode: Mode): void {
 
   const tick = async () => {
     if (!existsSync(store.path)) return;
-    const events = readFileSync(store.path, "utf8")
-      .split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l) as ToolEvent);
+    const events: ToolEvent[] = [];
+    for (const line of readFileSync(store.path, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        events.push(JSON.parse(line) as ToolEvent);
+      } catch {
+        // Skip a partial or malformed line (e.g. read while the hook is mid-write).
+      }
+    }
     const result = await processTick(events, state, Date.now());
     for (const line of result.lines) console.log(line);
   };
