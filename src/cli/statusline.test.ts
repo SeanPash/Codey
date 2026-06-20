@@ -8,8 +8,8 @@ import { writeStatus } from "../statusline/state.js";
 describe("statusLineFor", () => {
   it("renders the snapshot in a session dir", () => {
     const dir = mkdtempSync(join(tmpdir(), "codey-"));
-    writeStatus(dir, { mode: "deep", action: { tag: "editing", target: "auth.ts" }, why: "adding validation", warning: null, updatedAt: 1 });
-    expect(statusLineFor(dir)).toContain("[editing]");
+    writeStatus(dir, { mode: "deep", action: { tag: "editing", target: "the file auth.ts" }, why: "adding validation", warning: null, updatedAt: 1 });
+    expect(statusLineFor(dir)).toContain("Claude is editing");
     rmSync(dir, { recursive: true, force: true });
   });
 

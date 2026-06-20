@@ -3344,7 +3344,7 @@ function renderAction(label) {
 
 // src/statusline/labels.ts
 function basename(p) {
-  const parts = p.split(/[\\/]/);
+  const parts = p.replace(/["']/g, "").split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
 function str(input, key) {
@@ -3354,29 +3354,108 @@ function str(input, key) {
   }
   return null;
 }
+function shorten(s, n = 32) {
+  const line = s.trim().split("\n")[0];
+  return line.length > n ? line.slice(0, n - 1) + "\u2026" : line;
+}
+function pathArg(cmd) {
+  const quoted = cmd.match(/["']([^"']+)["']/);
+  if (quoted) return basename(quoted[1]);
+  const tokens = cmd.trim().split(/\s+/).slice(1).filter((t) => !t.startsWith("-"));
+  const last = tokens[tokens.length - 1];
+  return last ? basename(last) : null;
+}
+function describeBash(cmd) {
+  const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
+  const name = pathArg(cmd);
+  const file2 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
+  const folder = (verb, fallback) => ({ tag: verb, target: name ? `the folder ${name}` : fallback });
+  switch (word) {
+    case "rm":
+    case "del":
+    case "unlink":
+      return file2("removing", "a file");
+    case "rmdir":
+      return folder("removing", "a folder");
+    case "mkdir":
+      return folder("creating", "a folder");
+    case "touch":
+      return file2("creating", "a file");
+    case "cp":
+      return file2("copying", "a file");
+    case "mv":
+      return file2("moving", "a file");
+    case "cat":
+    case "less":
+    case "more":
+    case "head":
+    case "tail":
+      return file2("reading", "a file");
+    case "cd":
+      return folder("switching to", "a folder");
+    case "ls":
+    case "dir":
+      return { tag: "listing", target: "the files here" };
+    case "git": {
+      const sub = cmd.trim().split(/\s+/)[1] || "";
+      return { tag: "running", target: sub ? `git ${sub}` : "a git command" };
+    }
+    case "npm":
+    case "pnpm":
+    case "yarn":
+    case "npx": {
+      const rest = cmd.replace(/^\s*\S+\s*/, "");
+      if (/\b(test|vitest|jest)\b/.test(rest)) return { tag: "running", target: "the tests" };
+      if (/\b(install|ci)\b|^\s*i\b/.test(rest)) return { tag: "installing", target: "dependencies" };
+      if (/\bbuild\b/.test(rest)) return { tag: "running", target: "the build" };
+      const run = rest.match(/run\s+(\S+)/);
+      if (run) return { tag: "running", target: `the ${run[1]} script` };
+      return { tag: "running", target: `the command ${shorten(cmd)}` };
+    }
+    case "node":
+    case "python":
+    case "python3":
+    case "tsx":
+    case "ts-node":
+    case "deno":
+    case "bun":
+      return { tag: "running", target: name ?? "a script" };
+    case "curl":
+    case "wget":
+      return { tag: "fetching", target: "something from the web" };
+    case "grep":
+    case "rg":
+    case "find":
+      return { tag: "searching", target: "through the files" };
+    case "echo":
+      return { tag: "printing", target: "to the terminal" };
+  }
+  return { tag: "running", target: `the command ${shorten(cmd)}` };
+}
 function actionLabel(tool, input) {
   const file2 = str(input, "file_path") ?? str(input, "path");
+  const named = (verb) => ({ tag: verb, target: file2 ? `the file ${basename(file2)}` : "a file" });
   switch (tool) {
     case "Read":
-      return { tag: "reading", target: file2 ? basename(file2) : "a file" };
+      return named("reading");
     case "Edit":
     case "MultiEdit":
-      return { tag: "editing", target: file2 ? basename(file2) : "a file" };
+      return named("editing");
     case "Write":
-      return { tag: "writing", target: file2 ? basename(file2) : "a file" };
+      return named("writing");
     case "Bash": {
       const c = str(input, "command");
-      return { tag: "running", target: c ? c.split("\n")[0].slice(0, 40) : "a command" };
+      return c ? describeBash(c) : { tag: "running", target: "a command" };
     }
     case "Grep":
     case "Glob": {
       const p = str(input, "pattern");
-      return { tag: "searching", target: p ?? "the code" };
+      return { tag: "searching for", target: p ?? "something in the code" };
     }
   }
   const m = /^mcp__([^_]+)__(.+)$/.exec(tool);
-  if (m) return { tag: "running", target: `${m[2].replace(/_/g, " ")} (${m[1]})` };
-  return { tag: "working", target: tool };
+  if (m) return { tag: "using", target: `${m[2].replace(/_/g, " ")} (${m[1]})` };
+  return { tag: "using", target: tool };
 }
 
 // src/statusline/from-event.ts
@@ -3515,24 +3594,18 @@ import { join as join5 } from "node:path";
 var RESET = "\x1B[0m";
 var BOLD = "\x1B[1m";
 var DIM = "\x1B[2m";
-var GREEN = "\x1B[38;5;114m";
+var VIOLET = "\x1B[38;5;141m";
+var GRAY = "\x1B[38;5;250m";
 var TEXT = "\x1B[38;5;253m";
 var AMBER = "\x1B[38;5;215m";
 var RED = "\x1B[38;5;203m";
-var PHRASE = {
-  searching: "searching for",
-  working: "working on"
-};
-function phrase(tag) {
-  return PHRASE[tag] ?? tag;
-}
 function brand() {
-  return `${BOLD}${GREEN}codey${RESET}`;
+  return `${BOLD}${VIOLET}codey${RESET}`;
 }
 function actionLine(snap) {
   if (!snap.action) return `${brand()}  ${DIM}waiting for Claude${RESET}`;
   const { tag, target } = snap.action;
-  return `${brand()}  ${DIM}Claude is ${phrase(tag)}${RESET} ${TEXT}${target}${RESET}`;
+  return `${brand()}  ${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`;
 }
 function secondLine(snap) {
   if (snap.warning) return `  ${BOLD}${RED}!  ${snap.warning}${RESET}`;

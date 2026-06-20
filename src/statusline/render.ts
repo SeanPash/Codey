@@ -5,30 +5,21 @@ import type { StatusSnapshot } from "./state.js";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
-const GREEN = "\x1b[38;5;114m"; // calm green brand
-const TEXT = "\x1b[38;5;253m"; // near-white body text
+const VIOLET = "\x1b[38;5;141m"; // brand
+const GRAY = "\x1b[38;5;250m"; // readable body text for the action sentence
+const TEXT = "\x1b[38;5;253m"; // near-white, for the specific target
 const AMBER = "\x1b[38;5;215m"; // why marker
 const RED = "\x1b[38;5;203m"; // warning
 
-// Turn a gerund tag into a phrase that reads like a sentence next to its target.
-const PHRASE: Record<string, string> = {
-  searching: "searching for",
-  working: "working on",
-};
-
-function phrase(tag: string): string {
-  return PHRASE[tag] ?? tag;
-}
-
 function brand(): string {
-  return `${BOLD}${GREEN}codey${RESET}`;
+  return `${BOLD}${VIOLET}codey${RESET}`;
 }
 
-// "codey  Claude is running rm ..." - a plain sentence, no bracketed tag.
+// "codey  Claude is removing the file scratch-demo.txt" - a plain sentence.
 function actionLine(snap: StatusSnapshot): string {
   if (!snap.action) return `${brand()}  ${DIM}waiting for Claude${RESET}`;
   const { tag, target } = snap.action;
-  return `${brand()}  ${DIM}Claude is ${phrase(tag)}${RESET} ${TEXT}${target}${RESET}`;
+  return `${brand()}  ${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`;
 }
 
 // Second line carries the explanation (or a warning), made loud on purpose.

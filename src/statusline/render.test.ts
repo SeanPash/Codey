@@ -14,9 +14,9 @@ describe("renderStatus", () => {
     expect(out).toContain("adding validation so empty logins get rejected");
   });
 
-  it("reads searching as a natural phrase", () => {
-    const out = plain(renderStatus({ mode: "deep", action: { tag: "searching", target: "validateUser" }, why: null, warning: null, updatedAt: 1 }));
-    expect(out).toContain("Claude is searching for validateUser");
+  it("composes the action tag and target into a sentence", () => {
+    const out = plain(renderStatus({ mode: "deep", action: { tag: "removing", target: "the file scratch-demo.txt" }, why: null, warning: null, updatedAt: 1 }));
+    expect(out).toContain("Claude is removing the file scratch-demo.txt");
   });
 
   it("shows a warning in place of the why when one is active", () => {
