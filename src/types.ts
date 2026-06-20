@@ -67,3 +67,14 @@ export interface SessionSnapshot {
   priciestTaskName: string | null;
   chunks: TimelineChunk[];
 }
+
+// --- Plan 3: loop-breaker / intervention ---
+
+export type InterventionAction = "nudge" | "different" | "stop";
+
+export interface InterventionFile {
+  action: InterventionAction;
+  tool: string;          // the offending tool from the active warning; the hook matches on this
+  count: number;         // repetitions (loop/repeat_error) or seconds (hang), interpolated into the reason
+  createdAt: number;     // epoch ms, used for the TTL
+}
