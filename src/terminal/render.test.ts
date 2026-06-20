@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { renderNarration, renderHeader, renderAction } from "./render.js";
 
 describe("render", () => {
-  it("renders a narration line with a speech glyph", () => {
-    expect(renderNarration("Claude is testing the game.")).toBe("💬  Claude is testing the game.");
+  it("renders a narration line as an indented why", () => {
+    expect(renderNarration("Claude is testing the game.")).toBe("  why: Claude is testing the game.");
   });
 
   it("renders a header showing the mode", () => {
