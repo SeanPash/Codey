@@ -5,6 +5,7 @@ import { runNarrate } from "./narrate.js";
 import { runStatusLine } from "./statusline.js";
 import { runServe } from "./serve.js";
 import { latestSessionId } from "./sessions.js";
+import { turnOn, turnOff } from "./toggle.js";
 import type { Mode } from "../types.js";
 
 function parseMode(m: string): Mode {
@@ -54,5 +55,22 @@ program
   .command("statusline")
   .description("Print the Codey status line (called by Claude Code)")
   .action(() => runStatusLine());
+
+program
+  .command("on")
+  .description("Turn narration on in the status line")
+  .option("-m, --mode <mode>", "simple | deep | teach", "simple")
+  .action((opts: { mode: string }) => {
+    const mode = parseMode(opts.mode);
+    const session = latestSessionId();
+    if (!session) { console.error("No Codey sessions found yet."); process.exit(1); }
+    turnOn(mode, session);
+    console.log(`Codey narration on (${mode}).`);
+  });
+
+program
+  .command("off")
+  .description("Turn narration off and restore the plain status line")
+  .action(() => { turnOff(); console.log("Codey narration off."); });
 
 program.parseAsync(process.argv);
