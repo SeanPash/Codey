@@ -9,7 +9,9 @@ import { reconcileErrors } from "../warnings/reconcile.js";
 import { formatWarning } from "../warnings/format.js";
 import { NarrationEngine, type NarrateFn } from "../narration/engine.js";
 import { runClaude } from "../narration/claude-headless.js";
-import { renderNarration, renderHeader } from "../terminal/render.js";
+import { renderNarration, renderHeader, renderAction } from "../terminal/render.js";
+import { actionFromEvent } from "../statusline/from-event.js";
+import type { ActionLabel } from "../statusline/labels.js";
 
 const LOOP_THRESHOLD = 5;
 const REPEAT_ERROR_THRESHOLD = 3;
@@ -18,13 +20,14 @@ const HANG_MS = 45_000;
 export interface WatchState {
   engine: NarrationEngine;
   lastWarningKey: string | null;
+  lastActionKey: string | null;
 }
 
 export function createWatchState(mode: Mode, narrate: NarrateFn): WatchState {
-  return { engine: new NarrationEngine(mode, narrate), lastWarningKey: null };
+  return { engine: new NarrationEngine(mode, narrate), lastWarningKey: null, lastActionKey: null };
 }
 
-function activeWarning(events: ToolEvent[], now: number): Warning | null {
+export function activeWarning(events: ToolEvent[], now: number): Warning | null {
   return (
     detectLoop(events, LOOP_THRESHOLD) ??
     detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ??
@@ -40,6 +43,19 @@ export interface TickResult { lines: string[]; }
 
 export async function processTick(events: ToolEvent[], state: WatchState, now: number): Promise<TickResult> {
   const lines: string[] = [];
+
+  let action: ActionLabel | null = null;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const a = actionFromEvent(events[i]);
+    if (a) { action = a; break; }
+  }
+  if (action) {
+    const key = `${action.tag}|${action.target}`;
+    if (key !== state.lastActionKey) {
+      lines.push(renderAction(action));
+      state.lastActionKey = key;
+    }
+  }
 
   const w = activeWarning(events, now);
   if (w) {

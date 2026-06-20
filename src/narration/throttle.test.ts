@@ -18,3 +18,10 @@ describe("shouldNarrate", () => {
     expect(shouldNarrate("deep", { newEvents: 1, msSinceLast: 5000 })).toBe(false);
   });
 });
+
+describe("teach pacing", () => {
+  it("narrates teach less eagerly than deep but does narrate", () => {
+    expect(shouldNarrate("teach", { newEvents: 3, msSinceLast: 6000 })).toBe(true);
+    expect(shouldNarrate("teach", { newEvents: 1, msSinceLast: 1000 })).toBe(false);
+  });
+});

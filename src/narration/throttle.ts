@@ -8,6 +8,7 @@ interface ThrottleState {
 const PACING: Record<Mode, { everyN: number; minMs: number }> = {
   simple: { everyN: 5, minMs: 8000 },
   deep: { everyN: 2, minMs: 3000 },
+  teach: { everyN: 3, minMs: 5000 },
 };
 
 export function shouldNarrate(mode: Mode, state: ThrottleState): boolean {

@@ -7,6 +7,18 @@ function ev(over: Partial<ToolEvent>): ToolEvent {
     inputHash: "h", isError: false, errorText: null, timestamp: 0, sessionId: "s", ...over };
 }
 
+describe("processTick action line", () => {
+  it("emits the tagged action once and not again until it changes", async () => {
+    const state = createWatchState("simple", async () => null);
+    const a = ev({ id: "0", tool: "Edit", input: { file_path: "/x/auth.ts" }, inputHash: "h0" });
+    const first = await processTick([a], state, 100);
+    expect(first.lines.some((l) => l.includes("[editing]") && l.includes("auth.ts"))).toBe(true);
+
+    const second = await processTick([a], state, 200);
+    expect(second.lines.some((l) => l.includes("[editing]"))).toBe(false); // same action, deduped
+  });
+});
+
 describe("processTick", () => {
   it("emits a loop warning once and not again for the same run", async () => {
     const state = createWatchState("simple", async () => null);
