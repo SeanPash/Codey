@@ -3599,23 +3599,60 @@ var GRAY = "\x1B[38;5;250m";
 var TEXT = "\x1B[38;5;253m";
 var WHY = "\x1B[38;5;147m";
 var RED = "\x1B[38;5;203m";
-function brand() {
-  return `${BOLD}${BRAND}codey${RESET}`;
+var WRAP = 110;
+var MAX_WHY_LINES = 3;
+function rail() {
+  return `${BRAND}\u258C${RESET} `;
 }
-function actionLine(snap) {
-  if (!snap.action) return `${brand()}  ${DIM}waiting for Claude${RESET}`;
+function row(label, labelColor, body) {
+  return `${rail()}${labelColor}${label.padEnd(3)}${RESET}  ${body}`;
+}
+function cont(body) {
+  return `${rail()}     ${body}`;
+}
+function wrapWhy(text, width, maxLines) {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let cur = "";
+  let i = 0;
+  for (; i < words.length; i++) {
+    const next = cur ? `${cur} ${words[i]}` : words[i];
+    if (next.length > width && cur) {
+      lines.push(cur);
+      cur = words[i];
+      if (lines.length === maxLines) break;
+    } else {
+      cur = next;
+    }
+  }
+  if (i >= words.length) {
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  let last = lines[lines.length - 1];
+  while (last.length > Math.max(1, width - 1)) last = last.replace(/\s*\S+$/, "");
+  lines[lines.length - 1] = last.replace(/[ .,;:]+$/, "") + "\u2026";
+  return lines;
+}
+function renderStatus(snap, width = WRAP) {
+  const out = [`${rail()}${BOLD}${BRAND}codey${RESET}`];
+  if (!snap.action) {
+    out.push(row("now", DIM, `${DIM}waiting for Claude${RESET}`));
+    return out.join("\n");
+  }
   const { tag, target } = snap.action;
-  return `${brand()}  ${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`;
-}
-function secondLine(snap) {
-  if (snap.warning) return `  ${BOLD}${RED}!  ${snap.warning}${RESET}`;
-  if (snap.why) return `  ${BOLD}${WHY}\u21B3 why${RESET}  ${BOLD}${TEXT}${snap.why}${RESET}`;
-  return null;
-}
-function renderStatus(snap) {
-  const second = secondLine(snap);
-  return second ? `${actionLine(snap)}
-${second}` : actionLine(snap);
+  out.push(row("now", DIM, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
+  if (snap.warning) {
+    out.push(row("!", RED, `${BOLD}${RED}${snap.warning}${RESET}`));
+    return out.join("\n");
+  }
+  if (snap.why) {
+    wrapWhy(snap.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
+      const body = `${BOLD}${TEXT}${ln}${RESET}`;
+      out.push(idx === 0 ? row("why", `${BOLD}${WHY}`, body) : cont(body));
+    });
+  }
+  return out.join("\n");
 }
 
 // src/cli/sessions.ts

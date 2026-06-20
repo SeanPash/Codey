@@ -1,35 +1,80 @@
 import type { StatusSnapshot } from "./state.js";
 
 // ANSI palette. Terminals that ignore color still read the plain text fine.
-// The action line is kept calm so the "why" underneath is the thing that pops.
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
-const BRAND = "\x1b[38;5;75m"; // sky blue brand
-const GRAY = "\x1b[38;5;250m"; // readable body text for the action sentence
-const TEXT = "\x1b[38;5;253m"; // near-white, for the specific target
+const BRAND = "\x1b[38;5;75m"; // sky blue
+const GRAY = "\x1b[38;5;250m"; // action sentence
+const TEXT = "\x1b[38;5;253m"; // the specific target / why body
 const WHY = "\x1b[38;5;147m"; // lavender why marker
 const RED = "\x1b[38;5;203m"; // warning
 
-function brand(): string {
-  return `${BOLD}${BRAND}codey${RESET}`;
+const WRAP = 110; // wrap the why near this many characters
+const MAX_WHY_LINES = 3; // keep the block a glance, not a wall
+
+function rail(): string {
+  return `${BRAND}▌${RESET} `;
 }
 
-// "codey  Claude is removing the file scratch-demo.txt" - a plain sentence.
-function actionLine(snap: StatusSnapshot): string {
-  if (!snap.action) return `${brand()}  ${DIM}waiting for Claude${RESET}`;
+// A rail row with a short label (padded so values line up under each other).
+function row(label: string, labelColor: string, body: string): string {
+  return `${rail()}${labelColor}${label.padEnd(3)}${RESET}  ${body}`;
+}
+
+// Continuation line for a wrapped why: rail, then aligned under the why body.
+function cont(body: string): string {
+  return `${rail()}     ${body}`;
+}
+
+// Word-wrap the why to a few lines; if it overflows the cap, end with an ellipsis.
+function wrapWhy(text: string, width: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = "";
+  let i = 0;
+  for (; i < words.length; i++) {
+    const next = cur ? `${cur} ${words[i]}` : words[i];
+    if (next.length > width && cur) {
+      lines.push(cur);
+      cur = words[i];
+      if (lines.length === maxLines) break;
+    } else {
+      cur = next;
+    }
+  }
+  if (i >= words.length) {
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  let last = lines[lines.length - 1];
+  while (last.length > Math.max(1, width - 1)) last = last.replace(/\s*\S+$/, "");
+  lines[lines.length - 1] = last.replace(/[ .,;:]+$/, "") + "…";
+  return lines;
+}
+
+export function renderStatus(snap: StatusSnapshot, width = WRAP): string {
+  const out: string[] = [`${rail()}${BOLD}${BRAND}codey${RESET}`];
+
+  if (!snap.action) {
+    out.push(row("now", DIM, `${DIM}waiting for Claude${RESET}`));
+    return out.join("\n");
+  }
+
   const { tag, target } = snap.action;
-  return `${brand()}  ${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`;
-}
+  out.push(row("now", DIM, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
 
-// Second line carries the explanation (or a warning), made loud on purpose.
-function secondLine(snap: StatusSnapshot): string | null {
-  if (snap.warning) return `  ${BOLD}${RED}!  ${snap.warning}${RESET}`;
-  if (snap.why) return `  ${BOLD}${WHY}↳ why${RESET}  ${BOLD}${TEXT}${snap.why}${RESET}`;
-  return null;
-}
+  if (snap.warning) {
+    out.push(row("!", RED, `${BOLD}${RED}${snap.warning}${RESET}`));
+    return out.join("\n");
+  }
 
-export function renderStatus(snap: StatusSnapshot): string {
-  const second = secondLine(snap);
-  return second ? `${actionLine(snap)}\n${second}` : actionLine(snap);
+  if (snap.why) {
+    wrapWhy(snap.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
+      const body = `${BOLD}${TEXT}${ln}${RESET}`;
+      out.push(idx === 0 ? row("why", `${BOLD}${WHY}`, body) : cont(body));
+    });
+  }
+
+  return out.join("\n");
 }

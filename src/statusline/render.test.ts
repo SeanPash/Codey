@@ -19,6 +19,14 @@ describe("renderStatus", () => {
     expect(out).toContain("Claude is removing the file scratch-demo.txt");
   });
 
+  it("wraps a long why onto extra lines and caps the height", () => {
+    const longWhy = Array(80).fill("word").join(" ");
+    const out = renderStatus({ mode: "deep", action: { tag: "editing", target: "x" }, why: longWhy, warning: null, updatedAt: 1 }, 40);
+    const lines = out.split("\n");
+    expect(lines.length).toBeLessThanOrEqual(2 + 3); // brand + now + at most 3 why lines
+    expect(plain(out)).toContain("…");
+  });
+
   it("shows a warning in place of the why when one is active", () => {
     const out = plain(renderStatus({ mode: "simple", action: { tag: "editing", target: "auth.ts" }, why: "x", warning: "stuck: same edit x3", updatedAt: 1 }));
     expect(out).toContain("stuck: same edit x3");
