@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import { SessionStore, defaultRoot } from "../store/session-store.js";
 import { readMeta } from "../store/session-meta.js";
 import { readTranscriptTurns } from "../timeline/transcript.js";
-import { naiveSegment } from "../timeline/segment.js";
+import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import type { SessionSnapshot } from "../types.js";
 
@@ -26,7 +26,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
-  const rawChunks = naiveSegment(events);
+  const rawChunks = chunksFor(sessionId, events, root);
   return buildSnapshot({
     sessionId,
     sessionName: sessionNameFrom(meta?.cwd ?? null, sessionId),
