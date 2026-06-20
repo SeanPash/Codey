@@ -66,6 +66,7 @@ export interface SessionSnapshot {
   taskCount: number;
   priciestTaskName: string | null;
   chunks: TimelineChunk[];
+  activeWarning: Warning | null;   // Plan 3: the live "stuck" warning, or null; drives the bar
 }
 
 // --- Plan 3: loop-breaker / intervention ---

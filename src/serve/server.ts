@@ -7,16 +7,23 @@ export type RouteResult =
   | { type: "page" }
   | { type: "sessions" }
   | { type: "session"; id: string }
+  | { type: "intervene"; id: string }
   | { type: "notfound" };
 
 // Pure: map a request to an intent. Tested in isolation.
 export function resolveRoute(method: string | undefined, url: string | undefined): RouteResult {
-  if (method !== "GET" || !url) return { type: "notfound" };
+  if (!url) return { type: "notfound" };
   const path = url.split("?")[0];
-  if (path === "/" || path === "/index.html") return { type: "page" };
-  if (path === "/api/sessions") return { type: "sessions" };
-  const m = /^\/api\/session\/([^/]+)$/.exec(path);
-  if (m) return { type: "session", id: decodeURIComponent(m[1]) };
+  if (method === "GET") {
+    if (path === "/" || path === "/index.html") return { type: "page" };
+    if (path === "/api/sessions") return { type: "sessions" };
+    const m = /^\/api\/session\/([^/]+)$/.exec(path);
+    if (m) return { type: "session", id: decodeURIComponent(m[1]) };
+  }
+  if (method === "POST") {
+    const m = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
+    if (m) return { type: "intervene", id: decodeURIComponent(m[1]) };
+  }
   return { type: "notfound" };
 }
 
@@ -29,6 +36,16 @@ export interface ServerDeps {
   pagePath: string;
   listSessions: () => SessionListItem[];
   getSnapshot: (id: string) => SessionSnapshot;
+  intervene: (id: string, action: string) => boolean;
+}
+
+function readBody(req: import("node:http").IncomingMessage): Promise<string> {
+  return new Promise((resolve) => {
+    let data = "";
+    req.on("data", (c) => (data += c));
+    req.on("end", () => resolve(data));
+    req.on("error", () => resolve(""));
+  });
 }
 
 export function createServer(deps: ServerDeps): Server {
@@ -42,6 +59,13 @@ export function createServer(deps: ServerDeps): Server {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
         sendJson(res, 200, deps.getSnapshot(route.id));
+      } else if (route.type === "intervene") {
+        void readBody(req).then((body) => {
+          let action = "";
+          try { action = String((JSON.parse(body || "{}") as { action?: unknown }).action ?? ""); } catch { action = ""; }
+          const ok = deps.intervene(route.id, action);
+          sendJson(res, ok ? 200 : 400, { ok });
+        });
       } else {
         sendJson(res, 404, { error: "not found" });
       }

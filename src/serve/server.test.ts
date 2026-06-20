@@ -19,4 +19,12 @@ describe("resolveRoute", () => {
     expect(resolveRoute("POST", "/")).toEqual({ type: "notfound" });
     expect(resolveRoute("GET", "/nope")).toEqual({ type: "notfound" });
   });
+
+  it("routes a POST intervene and decodes the id", () => {
+    expect(resolveRoute("POST", "/api/session/abc/intervene")).toEqual({ type: "intervene", id: "abc" });
+  });
+
+  it("does not treat a GET on the intervene path as a snapshot", () => {
+    expect(resolveRoute("GET", "/api/session/abc/intervene")).toEqual({ type: "notfound" });
+  });
 });

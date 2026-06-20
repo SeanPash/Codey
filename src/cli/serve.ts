@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createServer } from "../serve/server.js";
 import { loadSnapshot } from "../serve/load-snapshot.js";
+import { recordIntervention } from "../intervene/record.js";
 import { listSessions } from "./sessions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -15,6 +16,7 @@ export function runServe(opts: { session?: string; port: number }): void {
     pagePath: pagePath(),
     listSessions: () => listSessions(),
     getSnapshot: (id) => loadSnapshot(id),
+    intervene: (id, action) => recordIntervention(id, action),
   });
   server.listen(opts.port, () => {
     console.log(`Codey timeline at http://localhost:${opts.port}`);

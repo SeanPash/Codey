@@ -59,5 +59,6 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     taskCount: chunks.length,
     priciestTaskName: priciest && priciest.tokenTotal > 0 ? priciest.name : null,
     chunks,
+    activeWarning: null,
   };
 }
