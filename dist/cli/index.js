@@ -3515,21 +3515,28 @@ import { join as join5 } from "node:path";
 var RESET = "\x1B[0m";
 var BOLD = "\x1B[1m";
 var DIM = "\x1B[2m";
-var CYAN = "\x1B[36m";
-var BRIGHT = "\x1B[96m";
-var RED = "\x1B[91m";
+var GREEN = "\x1B[38;5;114m";
+var TEXT = "\x1B[38;5;253m";
+var AMBER = "\x1B[38;5;215m";
+var RED = "\x1B[38;5;203m";
+var PHRASE = {
+  searching: "searching for",
+  working: "working on"
+};
+function phrase(tag) {
+  return PHRASE[tag] ?? tag;
+}
 function brand() {
-  return `${BRIGHT}\u258D${RESET}${BOLD}${CYAN}codey${RESET}`;
+  return `${BOLD}${GREEN}codey${RESET}`;
 }
 function actionLine(snap) {
-  if (!snap.action) return `${brand()}  ${DIM}waiting for activity${RESET}`;
-  const color = snap.warning ? RED : BRIGHT;
-  const tag = `[${snap.action.tag}]`;
-  return `${brand()}  ${BOLD}${color}${tag.padEnd(11)}${RESET} ${snap.action.target}`;
+  if (!snap.action) return `${brand()}  ${DIM}waiting for Claude${RESET}`;
+  const { tag, target } = snap.action;
+  return `${brand()}  ${DIM}Claude is ${phrase(tag)}${RESET} ${TEXT}${target}${RESET}`;
 }
 function secondLine(snap) {
-  if (snap.warning) return `  ${BOLD}${RED}${snap.warning}${RESET}`;
-  if (snap.why) return `  ${DIM}\u2514${RESET} why: ${snap.why}`;
+  if (snap.warning) return `  ${BOLD}${RED}!  ${snap.warning}${RESET}`;
+  if (snap.why) return `  ${BOLD}${AMBER}\u21B3 why${RESET}  ${BOLD}${TEXT}${snap.why}${RESET}`;
   return null;
 }
 function renderStatus(snap) {
