@@ -24,3 +24,10 @@ describe("buildNarrationPrompt", () => {
     expect(p.toLowerCase()).toContain("em dash");
   });
 });
+
+describe("teach prompt", () => {
+  it("asks the narrator to explain the underlying concepts", () => {
+    const p = buildNarrationPrompt([], "teach");
+    expect(p.toLowerCase()).toContain("concept");
+  });
+});
