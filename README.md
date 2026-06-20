@@ -39,14 +39,17 @@ Restart the session so the hooks load. No build step: Codey ships prebuilt.
 
 ## Use
 
-Turn narration on and pick a depth:
+Turn narration on and pick a depth. Type `/codey` and the picker lists these:
 
 ```
-/codey simple    one-line, near-zero tokens
-/codey deep      explains the why
-/codey teach     explains and teaches the concepts
-/codey off       stop narrating
+/codey:simple    one-line, near-zero tokens
+/codey:deep      explains the why
+/codey:teach     explains and teaches the concepts
+/codey:off       stop narrating
 ```
+
+Claude Code namespaces plugin commands as `plugin:command`, so the `codey:` prefix is
+the plugin name.
 
 Watch the status line at the bottom of your session. The top line is the current action;
 the second line is the plain-English reason (or a warning when Claude looks stuck).
