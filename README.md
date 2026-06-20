@@ -24,14 +24,27 @@ in your terminal.
 
 ## Install
 
-1. Install the plugin, pointing Claude Code at this folder (see the Claude Code plugin
-   docs for how to add a local plugin).
-2. Build it:
+The plugin runs from its built `dist/`, so build first, then install.
+
+1. Build it:
 
    ```
    npm install
    npm run build
    ```
+
+2. Add this folder as a plugin marketplace and install Codey, from any Claude Code session:
+
+   ```
+   /plugin marketplace add /path/to/codey
+   /plugin install codey@codey-local
+   ```
+
+   Restart the session afterwards so the hooks load.
+
+Installing copies the plugin into Claude Code's plugin cache, so rebuilding the source does
+not update the running plugin on its own. After changing code, run `npm run build` again and
+reinstall (or update) the plugin so the cache picks up the new `dist/`.
 
 ## Use
 
