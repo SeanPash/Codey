@@ -1,6 +1,5 @@
 {
   "name": "codey",
   "version": "0.1.0",
-  "description": "Live legibility for Claude Code: narrates what Claude is doing and warns when it's stuck.",
-  "hooks": "./hooks/hooks.json"
+  "description": "Live legibility for Claude Code: narrates what Claude is doing and warns when it's stuck."
 }

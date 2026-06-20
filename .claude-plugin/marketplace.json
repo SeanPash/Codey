@@ -1,0 +1,13 @@
+{
+  "name": "codey-local",
+  "owner": {
+    "name": "Sean Pashaev"
+  },
+  "plugins": [
+    {
+      "name": "codey",
+      "source": "./",
+      "description": "Live legibility for Claude Code: narrates what Claude is doing and warns when it's stuck."
+    }
+  ]
+}
