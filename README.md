@@ -1,14 +1,15 @@
 # Codey
 
 Live legibility for Claude Code. Codey watches what Claude is doing during a session,
-narrates it in plain English, and warns you when Claude looks stuck. The narration runs
-through your own Claude Code in headless mode, so there are no external API keys and no
-extra services to set up.
+narrates it in plain English right in your status line, and warns you when Claude looks
+stuck. The narration runs through your own Claude Code in headless mode, so there are no
+external API keys and no extra services to set up.
 
 ## What it does
 
-- **Live narration.** A plain-English story of what Claude is doing, as it happens. Pick
-  how much detail you want with Simple or Deep mode.
+- **Live narration in the status line.** A plain-English line at the bottom of your
+  session: the current action on top, the reason underneath, updated as Claude works.
+  Pick how much detail you want with simple, deep, or teach mode.
 - **Three warnings** (pure code, no tokens):
   - **Looping** - the same tool and input repeated several times.
   - **Hanging** - a single action running far past a time threshold.
@@ -17,54 +18,56 @@ extra services to set up.
 ## How it works
 
 Codey registers `PreToolUse` and `PostToolUse` hooks. A small hook script records each
-tool call as one line of JSON under `~/.codey/sessions/<session>/events.jsonl`. The
-`codey watch` process tails that file, runs the warning detectors, asks your own Claude
-Code (headless `claude -p --model haiku`) to narrate the recent activity, and prints both
-in your terminal.
+tool call as one line of JSON under `~/.codey/sessions/<session>/events.jsonl`, and
+writes the terse current action straight to the status line for free. A background
+narrator (`claude -p --model haiku`, on your own login) reads the recent activity, writes
+the plain-English "why" into the status line, and raises a warning when Claude looks
+stuck. The status line is the only surface an out-of-band process can update live, which
+is why narration lives there. The `codey watch` command shows the same thing in a roomy
+split pane with scrollback.
 
 ## Install
 
-The plugin runs from its built `dist/`, so build first, then install.
+From any Claude Code session:
 
-1. Build it:
+```
+/plugin marketplace add SeanPash/Codey
+/plugin install codey@codey
+```
 
-   ```
-   npm install
-   npm run build
-   ```
-
-2. Add this folder as a plugin marketplace and install Codey, from any Claude Code session:
-
-   ```
-   /plugin marketplace add /path/to/codey
-   /plugin install codey@codey-local
-   ```
-
-   Restart the session afterwards so the hooks load.
-
-Installing copies the plugin into Claude Code's plugin cache, so rebuilding the source does
-not update the running plugin on its own. After changing code, run `npm run build` again and
-reinstall (or update) the plugin so the cache picks up the new `dist/`.
+Restart the session so the hooks load. No build step: Codey ships prebuilt.
 
 ## Use
 
-In a second terminal, while a Claude Code session is running:
+Turn narration on and pick a depth:
 
 ```
-node dist/cli/index.js watch --mode simple   # short, infrequent narration
-node dist/cli/index.js watch --mode deep      # richer narration, explains the why
+/codey simple    one-line, near-zero tokens
+/codey deep      explains the why
+/codey teach     explains and teaches the concepts
+/codey off       stop narrating
 ```
 
-By default it watches the most recent session. Use `--session <id>` to pick a specific
-one.
+Watch the status line at the bottom of your session. The top line is the current action;
+the second line is the plain-English reason (or a warning when Claude looks stuck).
+Capture runs silently for free whether or not narration is on.
+
+For a bigger view with scrollback (and room for teach mode), open the watch pane in a
+separate terminal from a clone of this repo:
+
+```
+node dist/cli/index.js watch --mode deep
+```
 
 ## Modes
 
-- **simple** - narrates occasionally, in one sentence. Minimal token use.
-- **deep** - narrates more often and explains why it matters. Uses more of your Claude plan.
+- **simple** - one sentence, occasionally. Near-zero tokens.
+- **deep** - more often, explains why it matters. Uses more of your plan.
+- **teach** - explains and teaches the concepts behind the work, for someone learning.
+  The richest and most token-heavy; it gets the most room in the `codey watch` pane.
 
 Narration draws on your existing Claude plan (the same bucket as normal Claude Code work),
-so Deep mode costs more of your quota than Simple.
+so deeper modes cost more of your quota.
 
 ## Browser timeline (`codey serve`)
 
@@ -94,6 +97,9 @@ npm test           # run the test suite (vitest)
 npm run typecheck  # type-check without emitting
 npm run build      # compile to dist/
 ```
+
+This plugin ships its compiled `dist/`. After changing source, run `npm run build` and
+commit the updated `dist/` so installs stay current.
 
 ## What's next
 
