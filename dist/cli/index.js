@@ -3594,13 +3594,13 @@ import { join as join5 } from "node:path";
 var RESET = "\x1B[0m";
 var BOLD = "\x1B[1m";
 var DIM = "\x1B[2m";
-var VIOLET = "\x1B[38;5;141m";
+var BRAND = "\x1B[38;5;75m";
 var GRAY = "\x1B[38;5;250m";
 var TEXT = "\x1B[38;5;253m";
 var AMBER = "\x1B[38;5;215m";
 var RED = "\x1B[38;5;203m";
 function brand() {
-  return `${BOLD}${VIOLET}codey${RESET}`;
+  return `${BOLD}${BRAND}codey${RESET}`;
 }
 function actionLine(snap) {
   if (!snap.action) return `${brand()}  ${DIM}waiting for Claude${RESET}`;

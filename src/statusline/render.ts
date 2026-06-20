@@ -5,14 +5,14 @@ import type { StatusSnapshot } from "./state.js";
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
-const VIOLET = "\x1b[38;5;141m"; // brand
+const BRAND = "\x1b[38;5;75m"; // sky blue brand
 const GRAY = "\x1b[38;5;250m"; // readable body text for the action sentence
 const TEXT = "\x1b[38;5;253m"; // near-white, for the specific target
 const AMBER = "\x1b[38;5;215m"; // why marker
 const RED = "\x1b[38;5;203m"; // warning
 
 function brand(): string {
-  return `${BOLD}${VIOLET}codey${RESET}`;
+  return `${BOLD}${BRAND}codey${RESET}`;
 }
 
 // "codey  Claude is removing the file scratch-demo.txt" - a plain sentence.
