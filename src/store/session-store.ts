@@ -1,6 +1,6 @@
 import { appendFileSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import type { ToolEvent } from "../types.js";
 
 export function defaultRoot(): string {
@@ -30,5 +30,9 @@ export class SessionStore {
 
   get path(): string {
     return this.file;
+  }
+
+  get dir(): string {
+    return dirname(this.file);
   }
 }
