@@ -6,10 +6,20 @@ import { runStatusLine } from "./statusline.js";
 import { runServe } from "./serve.js";
 import { latestSessionId } from "./sessions.js";
 import { turnOn, turnOff } from "./toggle.js";
+import { readStatus } from "../statusline/state.js";
+import { defaultRoot } from "../store/session-store.js";
+import { join } from "node:path";
 import type { Mode } from "../types.js";
 
 function parseMode(m: string): Mode {
   return (["simple", "deep", "teach"].includes(m) ? m : "simple") as Mode;
+}
+
+// Use the depth the session was turned on with, unless the user passed --mode.
+function resolveWatchMode(opt: string | undefined, session: string): Mode {
+  if (opt) return parseMode(opt);
+  const snap = readStatus(join(defaultRoot(), session));
+  return snap?.mode ?? "simple";
 }
 
 const program = new Command();
@@ -18,16 +28,15 @@ program.name("codey").description("Live legibility for Claude Code");
 program
   .command("watch")
   .description("Watch the current Claude Code session and narrate what it's doing")
-  .option("-m, --mode <mode>", "narration depth: simple | deep | teach", "simple")
+  .option("-m, --mode <mode>", "narration depth: simple | deep | teach (defaults to the session's mode)")
   .option("-s, --session <id>", "session id to watch (defaults to most recent)")
-  .action((opts: { mode: string; session?: string }) => {
-    const mode = parseMode(opts.mode);
+  .action((opts: { mode?: string; session?: string }) => {
     const session = opts.session ?? latestSessionId();
     if (!session) {
       console.error("No Codey sessions found yet. Start a Claude Code session with the plugin enabled, then run `codey watch`.");
       process.exit(1);
     }
-    runWatch(session, mode);
+    runWatch(session, resolveWatchMode(opts.mode, session));
   });
 
 program

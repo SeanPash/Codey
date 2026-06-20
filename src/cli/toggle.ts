@@ -32,16 +32,23 @@ function writeSettings(s: Settings): void {
   writeFileSync(p, JSON.stringify(s, null, 2));
 }
 
-// The plugin runs from dist/, so the status-line command points at the built CLI.
-function statusLineCommand(): string {
-  const cliRoot = process.env.CLAUDE_PLUGIN_ROOT ?? join(homedir(), ".codey");
-  return `node "${join(cliRoot, "dist", "cli", "index.js")}" statusline`;
+// Point the status line at the exact CLI file that is running right now, rather
+// than guessing a plugin root from an env var that isn't set in this child process.
+function statusLineCommand(self: string): string {
+  return `node "${self}" statusline`;
 }
 
 export function turnOn(mode: Mode, session: string): void {
-  writeSettings(withStatusLine(readSettings(), statusLineCommand()));
   const self = process.argv[1];
-  const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], { detached: true, stdio: "ignore" });
+  writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
+  // On Windows, detached forces a new console window even with windowsHide, and a child
+  // survives the parent exiting anyway, so only detach off Windows. windowsHide keeps the
+  // narrator (and the claude calls it makes) from flashing a console.
+  const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
+    detached: process.platform !== "win32",
+    stdio: "ignore",
+    windowsHide: true,
+  });
   child.unref();
 }
 
