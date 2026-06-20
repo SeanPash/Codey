@@ -3601,14 +3601,15 @@ var WHY = "\x1B[38;5;147m";
 var RED = "\x1B[38;5;203m";
 var WRAP = 110;
 var MAX_WHY_LINES = 3;
+var LABEL = 5;
 function rail() {
   return `${BRAND}\u258C${RESET} `;
 }
-function row(label, labelColor, body) {
-  return `${rail()}${labelColor}${label.padEnd(3)}${RESET}  ${body}`;
+function row(label, labelStyle, body) {
+  return `${rail()}${labelStyle}${label.padEnd(LABEL)}${RESET}  ${body}`;
 }
 function cont(body) {
-  return `${rail()}     ${body}`;
+  return `${rail()}${" ".repeat(LABEL)}  ${body}`;
 }
 function wrapWhy(text, width, maxLines) {
   const words = text.split(/\s+/).filter(Boolean);
@@ -3635,15 +3636,15 @@ function wrapWhy(text, width, maxLines) {
   return lines;
 }
 function renderStatus(snap, width = WRAP) {
-  const out = [`${rail()}${BOLD}${BRAND}codey${RESET}`];
   if (!snap.action) {
-    out.push(row("now", DIM, `${DIM}waiting for Claude${RESET}`));
-    return out.join("\n");
+    return row("codey", `${BOLD}${BRAND}`, `${DIM}waiting for Claude${RESET}`);
   }
   const { tag, target } = snap.action;
-  out.push(row("now", DIM, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
+  const out = [
+    row("codey", `${BOLD}${BRAND}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`)
+  ];
   if (snap.warning) {
-    out.push(row("!", RED, `${BOLD}${RED}${snap.warning}${RESET}`));
+    out.push(row("!", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
     return out.join("\n");
   }
   if (snap.why) {

@@ -12,19 +12,20 @@ const RED = "\x1b[38;5;203m"; // warning
 
 const WRAP = 110; // wrap the why near this many characters
 const MAX_WHY_LINES = 3; // keep the block a glance, not a wall
+const LABEL = 5; // label column width so "codey" and "why" line up
 
 function rail(): string {
   return `${BRAND}▌${RESET} `;
 }
 
-// A rail row with a short label (padded so values line up under each other).
-function row(label: string, labelColor: string, body: string): string {
-  return `${rail()}${labelColor}${label.padEnd(3)}${RESET}  ${body}`;
+// A rail row: a colored label padded to LABEL, then the body two spaces over.
+function row(label: string, labelStyle: string, body: string): string {
+  return `${rail()}${labelStyle}${label.padEnd(LABEL)}${RESET}  ${body}`;
 }
 
 // Continuation line for a wrapped why: rail, then aligned under the why body.
 function cont(body: string): string {
-  return `${rail()}     ${body}`;
+  return `${rail()}${" ".repeat(LABEL)}  ${body}`;
 }
 
 // Word-wrap the why to a few lines; if it overflows the cap, end with an ellipsis.
@@ -54,18 +55,18 @@ function wrapWhy(text: string, width: number, maxLines: number): string[] {
 }
 
 export function renderStatus(snap: StatusSnapshot, width = WRAP): string {
-  const out: string[] = [`${rail()}${BOLD}${BRAND}codey${RESET}`];
-
+  // Line 1: the brand doubles as the label, with the action beside it.
   if (!snap.action) {
-    out.push(row("now", DIM, `${DIM}waiting for Claude${RESET}`));
-    return out.join("\n");
+    return row("codey", `${BOLD}${BRAND}`, `${DIM}waiting for Claude${RESET}`);
   }
 
   const { tag, target } = snap.action;
-  out.push(row("now", DIM, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
+  const out: string[] = [
+    row("codey", `${BOLD}${BRAND}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`),
+  ];
 
   if (snap.warning) {
-    out.push(row("!", RED, `${BOLD}${RED}${snap.warning}${RESET}`));
+    out.push(row("!", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
     return out.join("\n");
   }
 
