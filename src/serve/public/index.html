@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codey timeline</title>
+  <style>
+    :root {
+      --bg:#0c0e12; --card:#14171f; --line:#232a36; --ink:#eaedf3; --muted:#8b94a4;
+      --accent:#35c9a8; --coral:#f0654f; --amber:#e6a24e; --green:#6cc08a; --inset:#0c0f16;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--ink); margin: 0; padding: 24px; }
+    .wrap { max-width: 860px; margin: 0 auto; }
+    .header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:18px; gap:16px; flex-wrap:wrap; }
+    .eyebrow { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600; }
+    .title { font-size:19px; font-weight:600; margin-top:3px; display:flex; align-items:center; gap:10px; }
+    .live { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--amber); }
+    .live .dot { width:8px; height:8px; border-radius:50%; background:var(--amber); }
+    .chips { display:flex; gap:8px; }
+    .chip { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:7px 12px; text-align:right; }
+    .chip .k { font-size:11px; color:var(--muted); }
+    .chip .v { font-weight:600; }
+    .chip .v.accent { color:var(--accent); }
+    select { background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:13px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+    .card.warn { border-color:#3a3324; }
+    .card.open { border-color:#2b4a44; }
+    .row { display:flex; align-items:center; gap:12px; cursor:pointer; }
+    .chev { color:#5b6470; width:14px; }
+    .card.open .chev { color:var(--accent); }
+    .name { font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .sub { color:var(--muted); font-size:13px; margin-top:2px; }
+    .meta { text-align:right; min-width:120px; }
+    .meta .tok { font-size:13px; color:#c3c8d2; }
+    .bar { height:5px; width:110px; background:#1b2230; border-radius:3px; margin-top:5px; }
+    .bar > span { display:block; height:5px; background:var(--accent); border-radius:3px; }
+    .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
+    .pill.amber { background:#2a2113; color:var(--amber); }
+    .receipt { margin:14px 0 0 24px; background:var(--inset); border:1px solid #20283a; border-radius:10px; overflow:hidden; }
+    .receipt h4 { margin:0; padding:10px 14px; border-bottom:1px solid #1a2030; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+    .section { padding:10px 14px; }
+    .section + .section { border-top:1px solid #1a2030; }
+    .section .head { display:flex; align-items:center; gap:8px; color:#cdd3de; font-size:12.5px; font-weight:600; cursor:pointer; }
+    .section .head .total { margin-left:auto; color:var(--muted); font-weight:400; }
+    .tag { color:var(--green); font-weight:400; font-size:12px; }
+    .line { display:flex; align-items:center; gap:10px; padding:6px 0 6px 18px; border-bottom:1px solid #161c28; font-size:13.5px; }
+    .swatch { width:7px; height:7px; border-radius:2px; background:var(--accent); flex:none; }
+    .swatch.fail { background:var(--coral); }
+    .line .lbl { flex:1; }
+    .line .tool { width:120px; color:#6b7589; font-family:ui-monospace,monospace; font-size:12px; }
+    .line .n { width:56px; text-align:right; }
+    .line .st { width:34px; text-align:right; font-size:12px; color:#5b6470; }
+    .line .st.fail { color:var(--coral); font-weight:600; }
+    .err { margin:6px 0 2px 17px; border-left:2px solid var(--coral); background:#1c1416; border-radius:0 6px 6px 0; padding:6px 10px; font-size:12px; color:#e7b0a6; font-family:ui-monospace,monospace; }
+    .err .note { color:var(--muted); font-family:system-ui; margin-left:6px; }
+    .empty { color:var(--muted); padding:40px 0; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <div class="eyebrow">Codey timeline</div>
+        <div class="title"><span id="sname">…</span><span id="live" class="live" hidden><span class="dot"></span>live</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <select id="picker"></select>
+        <div class="chips">
+          <div class="chip"><div class="k">Total</div><div class="v" id="total">0</div></div>
+          <div class="chip"><div class="k">Tasks</div><div class="v" id="tasks">0</div></div>
+          <div class="chip"><div class="k">Priciest</div><div class="v accent" id="priciest">–</div></div>
+        </div>
+      </div>
+    </div>
+    <div id="list"></div>
+  </div>
+
+  <script>
+    const fmt = (n) => n.toLocaleString();
+    const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+    const open = new Set(); // chunk ids the user expanded
+
+    let currentId = new URLSearchParams(location.search).get("session");
+
+    function warningPill(ws) {
+      const rep = ws.find((w) => w.kind === "repeat_error");
+      if (rep) return `<span class="pill amber">&#9888; same error &times;${rep.count}</span>`;
+      const loop = ws.find((w) => w.kind === "loop");
+      if (loop) return `<span class="pill amber">&#9888; same step &times;${loop.count}</span>`;
+      return "";
+    }
+
+    function receiptHtml(r) {
+      const work = r.workLines.map((l) => {
+        const sw = l.status === "fail" ? "swatch fail" : "swatch";
+        const st = l.status === "fail" ? '<span class="st fail">fail</span>'
+          : l.status === "ok" ? '<span class="st">&#10003;</span>' : '<span class="st">&middot;</span>';
+        const err = l.status === "fail" && l.errorText
+          ? `<div class="err">${esc(l.errorText)}${l.resolved ? '<span class="note">&middot; resolved on the next try</span>' : ""}</div>` : "";
+        return `<div><div class="line"><span class="${sw}"></span><span class="lbl">${esc(l.label)}</span>`
+          + `<span class="tool">${esc(l.tool)}</span><span class="n">${fmt(l.tokens)}</span>${st}</div>${err}</div>`;
+      }).join("");
+      return `<div class="receipt"><h4>What your tokens paid for</h4>`
+        + `<div class="section"><div class="head">Work Claude did<span class="total">${fmt(r.workTotal)}</span></div>${work}</div>`
+        + `<div class="section"><div class="head">Context: reading &amp; memory <span class="tag">mostly cached, cheap</span>`
+        + `<span class="total">${fmt(r.contextTotal)}</span></div></div></div>`;
+    }
+
+    function cardHtml(c, max) {
+      const isOpen = open.has(c.id);
+      const pct = max > 0 ? Math.round((c.tokenTotal / max) * 100) : 0;
+      const cls = "card" + (isOpen ? " open" : "") + (c.warnings.length ? " warn" : "");
+      const chev = isOpen ? "&#9662;" : "&#9656;";
+      return `<div class="${cls}" data-id="${c.id}">`
+        + `<div class="row js-toggle"><span class="chev">${chev}</span>`
+        + `<div style="flex:1"><div class="name">${esc(c.name)} ${warningPill(c.warnings)}</div>`
+        + `<div class="sub">${esc(c.narration)}</div></div>`
+        + `<div class="meta"><div class="tok">${fmt(c.tokenTotal)}</div>`
+        + `<div class="bar"><span style="width:${pct}%"></span></div></div></div>`
+        + (isOpen ? receiptHtml(c.receipt) : "")
+        + `</div>`;
+    }
+
+    function render(snap) {
+      document.getElementById("sname").textContent = snap.sessionName;
+      document.getElementById("total").textContent = fmt(snap.totalTokens);
+      document.getElementById("tasks").textContent = snap.taskCount;
+      document.getElementById("priciest").textContent = snap.priciestTaskName || "–";
+      document.getElementById("live").hidden = !snap.live;
+      const max = Math.max(1, ...snap.chunks.map((c) => c.tokenTotal));
+      const list = document.getElementById("list");
+      list.innerHTML = snap.chunks.length
+        ? snap.chunks.map((c) => cardHtml(c, max)).join("")
+        : '<div class="empty">No activity recorded for this session yet.</div>';
+      list.querySelectorAll(".js-toggle").forEach((row) => {
+        row.addEventListener("click", () => {
+          const id = row.closest(".card").dataset.id;
+          open.has(id) ? open.delete(id) : open.add(id);
+          render(snap); // cheap re-render; state lives in `open`
+        });
+      });
+    }
+
+    async function refreshPicker() {
+      const list = await (await fetch("/api/sessions")).json();
+      if (!currentId && list[0]) currentId = list[0].id;
+      const sel = document.getElementById("picker");
+      sel.innerHTML = list.map((s) => `<option value="${esc(s.id)}"${s.id === currentId ? " selected" : ""}>${esc(s.id)}</option>`).join("");
+      sel.onchange = () => { currentId = sel.value; open.clear(); tick(); };
+    }
+
+    async function tick() {
+      if (!currentId) { await refreshPicker(); }
+      if (!currentId) { document.getElementById("list").innerHTML = '<div class="empty">No sessions found.</div>'; return; }
+      const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId))).json();
+      render(snap);
+    }
+
+    refreshPicker().then(tick);
+    setInterval(tick, 2000);
+  </script>
+</body>
+</html>

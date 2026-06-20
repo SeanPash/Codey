@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handleHookInput } from "./hook-emit.js";
 import { SessionStore } from "../store/session-store.js";
+import { readMeta } from "../store/session-meta.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -24,5 +25,18 @@ describe("handleHookInput", () => {
   it("ignores empty or unparseable input without throwing", () => {
     expect(() => handleHookInput("", dir)).not.toThrow();
     expect(() => handleHookInput("not json", dir)).not.toThrow();
+  });
+
+  it("writes a meta.json with the transcript path on the first event", () => {
+    handleHookInput(
+      JSON.stringify({
+        hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { path: "x" },
+        session_id: "metaSess", transcript_path: "/t/metaSess.jsonl", cwd: "/proj",
+      }),
+      dir,
+    );
+    const meta = readMeta("metaSess", dir);
+    expect(meta?.transcriptPath).toBe("/t/metaSess.jsonl");
+    expect(meta?.cwd).toBe("/proj");
   });
 });

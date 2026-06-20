@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { runWatch } from "./watch.js";
+import { runServe } from "./serve.js";
 import { latestSessionId } from "./sessions.js";
 import type { Mode } from "../types.js";
 
@@ -20,6 +21,15 @@ program
       process.exit(1);
     }
     runWatch(session, mode);
+  });
+
+program
+  .command("serve")
+  .description("Open the browser timeline for a Claude Code session")
+  .option("-s, --session <id>", "session id to open (defaults to most recent)")
+  .option("-p, --port <port>", "port to serve on", "4317")
+  .action((opts: { session?: string; port: string }) => {
+    runServe({ session: opts.session, port: Number(opts.port) || 4317 });
   });
 
 program.parseAsync(process.argv);
