@@ -53,6 +53,18 @@ one.
 Narration draws on your existing Claude plan (the same bucket as normal Claude Code work),
 so Deep mode costs more of your quota than Simple.
 
+## Browser timeline (`codey serve`)
+
+See a session as a visual storyboard with a per-task token breakdown, live or as replay:
+
+    node dist/cli/index.js serve            # newest session, opens on http://localhost:4317
+    node dist/cli/index.js serve --session <id> --port 4317
+
+Each task card shows a plain-English recap and where its tokens went: the costly "work" Claude did,
+separated from cheap cached "context". Failed steps show their error inline; loop and repeat-error
+warnings appear on the task where they happened. The page polls every ~2s, so the same view works
+live (with a "live" indicator) and for replaying any past session under `~/.codey/sessions/`.
+
 ## Development
 
 ```
@@ -63,5 +75,5 @@ npm run build      # compile to dist/
 
 ## What's next
 
-A browser timeline with a per-task token breakdown and session replay, built on the same
-JSONL store under `~/.codey/sessions/`.
+Acting on a stuck session from the timeline: an intervention bar that lets you nudge or
+redirect Claude when a warning fires, instead of only watching it happen.
