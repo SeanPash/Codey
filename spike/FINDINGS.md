@@ -39,11 +39,25 @@ The transcript JSONL contains per-message `usage` with `input_tokens`, `output_t
 `timestamp` and `sessionId`. So per-task token attribution (summing tokens inside a
 chunk's time window) is feasible for Plan 2. Not used in Plan 1.
 
-## Observation to keep in mind (hang detection)
+## Errored tools emit no PostToolUse (CONFIRMED 2026-06-20)
 
-In one sample, an errored `Read` (file not found) produced only a `PreToolUse` and **no**
-`PostToolUse`. A successful `Read` produced both. If some errored tools skip the post
-event, the open-call pairing (Task 7) could treat them as perpetually open and emit a
-false "hang" warning. Single sample, not conclusive, but worth watching when we test
-hang detection on real sessions. A future switch to `tool_use_id`-based pairing plus an
-upper bound on hang age would mitigate it.
+The earlier single-sample observation (an errored `Read` produced only a `PreToolUse`)
+is now confirmed across tools and reproduced deterministically:
+
+- A live session of six failing Bash calls (`node -e "process.exit(1)"`) recorded six
+  `pre` events and **zero** `post`.
+- A controlled headless run with one succeeding and one failing Bash call recorded
+  `pre`+`post` for the success and `pre` only for the failure.
+- A debug logger on the PostToolUse boundary fired exactly once, carrying only the
+  successful command. The failing call never reached the hook.
+
+Conclusion: Claude Code does **not** fire `PostToolUse` for a tool call that ends in
+error. Two consequences for the warning path:
+
+1. **Repeat-error is blind.** `normalize.ts` only reads error text from a `post` event,
+   and failed tools have no post, so the capture hook never even learns a tool failed.
+   Any error-aware feature must get its failure signal elsewhere - the transcript JSONL,
+   which carries `tool_result` blocks with `is_error: true` (see FINDINGS-plan2.md).
+2. **Hang false positives.** A failed call is an open `pre` with no `post`, so past the
+   threshold it looks like a permanent hang. Mitigate with `tool_use_id`-based pairing
+   plus an upper bound on hang age, and/or by reconciling against the transcript.
