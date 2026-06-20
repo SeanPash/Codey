@@ -65,6 +65,15 @@ separated from cheap cached "context". Failed steps show their error inline; loo
 warnings appear on the task where they happened. The page polls every ~2s, so the same view works
 live (with a "live" indicator) and for replaying any past session under `~/.codey/sessions/`.
 
+## Stepping in when Claude is stuck
+
+When a session is live and looping (or repeating an error), the timeline shows an amber bar on the
+stuck task with three choices: nudge it to move on, push it toward a different approach, or stop and
+hand control back to you. One click blocks Claude's next matching tool call and feeds it a short
+reason it reads and acts on. This is a strong nudge, not a guaranteed stop, so each click also shows
+you the guaranteed manual path: press Esc to interrupt, then paste the supplied one-line instruction.
+No tokens are spent on the intervention, and capture stays observe-only.
+
 ## Development
 
 ```
@@ -75,5 +84,5 @@ npm run build      # compile to dist/
 
 ## What's next
 
-Acting on a stuck session from the timeline: an intervention bar that lets you nudge or
-redirect Claude when a warning fires, instead of only watching it happen.
+Intervention from the terminal as well as the browser, so you can step in without leaving
+the watch view. Today the intervention bar is browser-only.

@@ -66,4 +66,16 @@ export interface SessionSnapshot {
   taskCount: number;
   priciestTaskName: string | null;
   chunks: TimelineChunk[];
+  activeWarning: Warning | null;   // Plan 3: the live "stuck" warning, or null; drives the bar
+}
+
+// --- Plan 3: loop-breaker / intervention ---
+
+export type InterventionAction = "nudge" | "different" | "stop";
+
+export interface InterventionFile {
+  action: InterventionAction;
+  tool: string;          // the offending tool from the active warning; the hook matches on this
+  count: number;         // repetitions (loop/repeat_error) or seconds (hang), interpolated into the reason
+  createdAt: number;     // epoch ms, used for the TTL
 }

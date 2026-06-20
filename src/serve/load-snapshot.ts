@@ -5,6 +5,7 @@ import { readMeta } from "../store/session-meta.js";
 import { readTranscriptTurns } from "../timeline/transcript.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
+import { resolveActiveWarning } from "../intervene/active-warning.js";
 import type { SessionSnapshot } from "../types.js";
 
 const LIVE_WINDOW_MS = 15_000; // file touched this recently => still live
@@ -27,12 +28,14 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
   const rawChunks = chunksFor(sessionId, events, root);
-  return buildSnapshot({
+  const live = isLive(store.path);
+  const snap = buildSnapshot({
     sessionId,
     sessionName: sessionNameFrom(meta?.cwd ?? null, sessionId),
-    live: isLive(store.path),
+    live,
     events,
     rawChunks,
     turns,
   });
+  return { ...snap, activeWarning: live ? resolveActiveWarning(events, Date.now()) : null };
 }
