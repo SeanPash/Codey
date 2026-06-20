@@ -24,7 +24,7 @@ export function createWatchState(mode: Mode, narrate: NarrateFn): WatchState {
   return { engine: new NarrationEngine(mode, narrate), lastWarningKey: null };
 }
 
-function activeWarning(events: ToolEvent[], now: number): Warning | null {
+export function activeWarning(events: ToolEvent[], now: number): Warning | null {
   return (
     detectLoop(events, LOOP_THRESHOLD) ??
     detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ??
