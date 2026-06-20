@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { runWatch } from "./watch.js";
 import { runNarrate } from "./narrate.js";
+import { runStatusLine } from "./statusline.js";
 import { runServe } from "./serve.js";
 import { latestSessionId } from "./sessions.js";
 import type { Mode } from "../types.js";
@@ -48,5 +49,10 @@ program
     if (!session) { console.error("No Codey sessions found yet."); process.exit(1); }
     runNarrate(session, mode);
   });
+
+program
+  .command("statusline")
+  .description("Print the Codey status line (called by Claude Code)")
+  .action(() => runStatusLine());
 
 program.parseAsync(process.argv);
