@@ -18,4 +18,9 @@ describe("buildNarrationPrompt", () => {
     const p = buildNarrationPrompt([ev({})], "deep");
     expect(p.toLowerCase()).toContain("why");
   });
+
+  it("tells the narrator to avoid em dashes", () => {
+    const p = buildNarrationPrompt([ev({})], "simple");
+    expect(p.toLowerCase()).toContain("em dash");
+  });
 });
