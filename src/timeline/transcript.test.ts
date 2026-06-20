@@ -34,6 +34,7 @@ describe("parseTranscript", () => {
     expect(turns).toHaveLength(2);
     expect(turns[0]).toMatchObject({ tool: "Write", outputTokens: 200, cacheReadTokens: 5000, isError: false });
     expect(turns[0].ts).toBe(Date.parse("2026-06-20T10:00:01.000Z"));
+    expect(turns[0].toolUseId).toBe("tu_1");
   });
 
   it("attaches the matching tool_result error to its turn", () => {
@@ -41,6 +42,7 @@ describe("parseTranscript", () => {
     expect(turns[1].tool).toBe("Bash");
     expect(turns[1].isError).toBe(true);
     expect(turns[1].errorText).toContain("CS0103");
+    expect(turns[1].toolUseId).toBe("tu_2");
   });
 
   it("ignores blank and unparseable lines", () => {

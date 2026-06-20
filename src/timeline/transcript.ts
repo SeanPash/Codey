@@ -10,6 +10,7 @@ export interface AssistantTurn {
   input: unknown;
   isError: boolean;              // from the matching tool_result
   errorText: string | null;
+  toolUseId: string | null;      // the tool_use block id, for pairing with hook events
 }
 
 interface ToolResult { isError: boolean; text: string | null; }
@@ -62,6 +63,7 @@ export function parseTranscript(text: string): AssistantTurn[] {
       input: toolUse?.input ?? null,
       isError: res?.isError ?? false,
       errorText: res?.isError ? res.text : null,
+      toolUseId: toolUse?.id ?? null,
     });
   }
   return turns;

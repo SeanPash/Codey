@@ -6,6 +6,7 @@ import { readTranscriptTurns } from "../timeline/transcript.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import { resolveActiveWarning } from "../intervene/active-warning.js";
+import { reconcileErrors } from "../warnings/reconcile.js";
 import type { SessionSnapshot } from "../types.js";
 
 const LIVE_WINDOW_MS = 15_000; // file touched this recently => still live
@@ -37,5 +38,6 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     rawChunks,
     turns,
   });
-  return { ...snap, activeWarning: live ? resolveActiveWarning(events, Date.now()) : null };
+  const reconciled = reconcileErrors(events, turns);
+  return { ...snap, activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null };
 }

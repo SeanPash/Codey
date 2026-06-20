@@ -12,6 +12,7 @@ export interface ToolEvent {
   errorText: string | null;
   timestamp: number;   // ms since epoch
   sessionId: string;
+  toolUseId?: string | null; // Claude's tool_use id, for exact pre/post and transcript pairing
 }
 
 export interface SessionMeta {

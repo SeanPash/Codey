@@ -10,7 +10,7 @@ function ev(over: Partial<ToolEvent>): ToolEvent {
 }
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
   return { ts: 0, outputTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
-    tool: null, input: null, isError: false, errorText: null, ...over };
+    tool: null, input: null, isError: false, errorText: null, toolUseId: null, ...over };
 }
 
 describe("buildSnapshot", () => {
