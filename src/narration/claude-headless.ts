@@ -14,3 +14,8 @@ export function runClaude(prompt: string, timeoutMs = 15000): Promise<string | n
     });
   });
 }
+
+// Segmentation is a one-shot headless pass; allow a longer budget than live narration.
+export function runSegmentation(prompt: string): Promise<string | null> {
+  return runClaude(prompt, 30_000);
+}
