@@ -41,9 +41,11 @@ function statusLineCommand(self: string): string {
 export function turnOn(mode: Mode, session: string): void {
   const self = process.argv[1];
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
-  // windowsHide stops the detached narrator from popping its own console window.
+  // On Windows, detached forces a new console window even with windowsHide, and a child
+  // survives the parent exiting anyway, so only detach off Windows. windowsHide keeps the
+  // narrator (and the claude calls it makes) from flashing a console.
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
-    detached: true,
+    detached: process.platform !== "win32",
     stdio: "ignore",
     windowsHide: true,
   });
