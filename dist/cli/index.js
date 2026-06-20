@@ -3979,7 +3979,7 @@ function turnOn(mode, session) {
   const self = process.argv[1];
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
-    detached: process.platform !== "win32",
+    detached: true,
     stdio: "ignore",
     windowsHide: true
   });

@@ -41,11 +41,11 @@ function statusLineCommand(self: string): string {
 export function turnOn(mode: Mode, session: string): void {
   const self = process.argv[1];
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
-  // On Windows, detached forces a new console window even with windowsHide, and a child
-  // survives the parent exiting anyway, so only detach off Windows. windowsHide keeps the
-  // narrator (and the claude calls it makes) from flashing a console.
+  // detached lets the narrator outlive the slash command's process tree (Claude Code kills
+  // that tree when the command returns). stdio "ignore" means no console handles, and
+  // windowsHide suppresses any console window; the claude calls it makes are hidden too.
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
-    detached: process.platform !== "win32",
+    detached: true,
     stdio: "ignore",
     windowsHide: true,
   });
