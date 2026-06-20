@@ -1,8 +1,11 @@
 import { existsSync, readFileSync, watchFile } from "node:fs";
 import type { ToolEvent, Mode, Warning } from "../types.js";
 import { SessionStore } from "../store/session-store.js";
+import { readMeta } from "../store/session-meta.js";
+import { readTranscriptTurns } from "../timeline/transcript.js";
 import { computeOpenCalls } from "../warnings/open-calls.js";
 import { detectLoop, detectRepeatError, detectHang } from "../warnings/detectors.js";
+import { reconcileErrors } from "../warnings/reconcile.js";
 import { formatWarning } from "../warnings/format.js";
 import { NarrationEngine, type NarrateFn } from "../narration/engine.js";
 import { runClaude } from "../narration/claude-headless.js";
@@ -72,7 +75,9 @@ export function runWatch(sessionId: string, mode: Mode): void {
         // Skip a partial or malformed line (e.g. read while the hook is mid-write).
       }
     }
-    const result = await processTick(events, state, Date.now());
+    // Errored tools never produce a PostToolUse, so fold their outcome in from the transcript.
+    const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
+    const result = await processTick(reconcileErrors(events, turns), state, Date.now());
     for (const line of result.lines) console.log(line);
   };
 

@@ -8,12 +8,19 @@ describe("normalizeHookEvent", () => {
       tool_name: "mcp__unity__execute_menu_item",
       tool_input: { menu: "GameObject/Light" },
       session_id: "s1",
+      tool_use_id: "toolu_abc",
     });
     expect(e.phase).toBe("pre");
     expect(e.tool).toBe("mcp__unity__execute_menu_item");
     expect(e.server).toBe("unity");
     expect(e.sessionId).toBe("s1");
     expect(e.inputHash.length).toBeGreaterThan(0);
+    expect(e.toolUseId).toBe("toolu_abc");
+  });
+
+  it("defaults toolUseId to null when the payload omits it", () => {
+    const e = normalizeHookEvent({ hook_event_name: "PreToolUse", tool_name: "Read", session_id: "s1" });
+    expect(e.toolUseId).toBeNull();
   });
 
   it("maps a PostToolUse payload and detects errors", () => {

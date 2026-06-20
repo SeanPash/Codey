@@ -10,6 +10,7 @@ export interface RawHookEvent {
   session_id?: string;
   transcript_path?: string;
   cwd?: string;
+  tool_use_id?: string;
 }
 
 // Extract the MCP server name from tool names like mcp__server__action
@@ -42,5 +43,6 @@ export function normalizeHookEvent(raw: RawHookEvent): ToolEvent {
     errorText,
     timestamp: Date.now(),
     sessionId: raw.session_id ?? "unknown",
+    toolUseId: raw.tool_use_id ?? null,
   };
 }

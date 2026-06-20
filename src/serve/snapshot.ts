@@ -3,16 +3,19 @@ import type { AssistantTurn } from "../timeline/transcript.js";
 import type { RawChunk } from "../timeline/segment.js";
 import { attributeChunk } from "../timeline/attribution.js";
 import { detectLoop, detectRepeatError } from "../warnings/detectors.js";
+import { reconcileErrors } from "../warnings/reconcile.js";
 
 const LOOP_THRESHOLD = 5;
 const REPEAT_ERROR_THRESHOLD = 3;
 
 // Warnings that are meaningful from history alone (hang is a live concept, so it is omitted here).
-function chunkWarnings(slice: ToolEvent[]): Warning[] {
+// Reconcile against the transcript first so repeat-error sees failures, which never reach the hook.
+function chunkWarnings(slice: ToolEvent[], turns: AssistantTurn[]): Warning[] {
+  const events = reconcileErrors(slice, turns);
   const out: Warning[] = [];
-  const loop = detectLoop(slice, LOOP_THRESHOLD);
+  const loop = detectLoop(events, LOOP_THRESHOLD);
   if (loop) out.push(loop);
-  const repeat = detectRepeatError(slice, REPEAT_ERROR_THRESHOLD);
+  const repeat = detectRepeatError(events, REPEAT_ERROR_THRESHOLD);
   if (repeat) out.push(repeat);
   return out;
 }
@@ -43,7 +46,7 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
       startTs,
       endTs,
       tokenTotal: receipt.workTotal + receipt.contextTotal,
-      warnings: chunkWarnings(slice),
+      warnings: chunkWarnings(slice, turns),
       receipt,
     };
   });
