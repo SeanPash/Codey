@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { normalizeHookEvent, type RawHookEvent } from "./normalize.js";
 import { SessionStore, defaultRoot } from "../store/session-store.js";
+import { writeMetaIfAbsent } from "../store/session-meta.js";
 
 export function handleHookInput(rawJson: string, root: string = defaultRoot()): void {
   const text = rawJson.trim();
@@ -13,6 +14,10 @@ export function handleHookInput(rawJson: string, root: string = defaultRoot()): 
   }
   const event = normalizeHookEvent(raw);
   new SessionStore(event.sessionId, root).append(event);
+  writeMetaIfAbsent(
+    { sessionId: event.sessionId, transcriptPath: raw.transcript_path ?? null, cwd: raw.cwd ?? null },
+    root,
+  );
 }
 
 // Process entry: read all of stdin, then handle. Always exit 0.

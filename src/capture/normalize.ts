@@ -8,6 +8,8 @@ export interface RawHookEvent {
   tool_input?: unknown;
   tool_response?: unknown;
   session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
 }
 
 // Extract the MCP server name from tool names like mcp__server__action

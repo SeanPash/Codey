@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Codey timeline</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0c0e12; color: #eaedf3; margin: 0; padding: 24px; }
+    pre { background: #14171f; border: 1px solid #232a36; border-radius: 10px; padding: 16px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>Codey timeline</h1>
+  <p id="status">Loading…</p>
+  <pre id="out"></pre>
+  <script>
+    const id = new URLSearchParams(location.search).get("session");
+    async function tick() {
+      const list = await (await fetch("/api/sessions")).json();
+      const sessionId = id || (list[0] && list[0].id);
+      if (!sessionId) { document.getElementById("status").textContent = "No sessions found."; return; }
+      const snap = await (await fetch("/api/session/" + encodeURIComponent(sessionId))).json();
+      document.getElementById("status").textContent = "Session: " + sessionId;
+      document.getElementById("out").textContent = JSON.stringify(snap, null, 2);
+    }
+    tick();
+    setInterval(tick, 2000);
+  </script>
+</body>
+</html>

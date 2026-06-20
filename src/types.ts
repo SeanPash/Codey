@@ -14,6 +14,12 @@ export interface ToolEvent {
   sessionId: string;
 }
 
+export interface SessionMeta {
+  sessionId: string;
+  transcriptPath: string | null;
+  cwd: string | null;
+}
+
 export type WarningKind = "loop" | "hang" | "repeat_error";
 
 export interface Warning {
@@ -22,4 +28,42 @@ export interface Warning {
   message: string;
   count: number;       // repetitions (loop/repeat_error) or seconds (hang)
   timestamp: number;
+}
+
+// --- Plan 2: browser timeline view model ---
+
+export interface ReceiptLine {
+  label: string;                 // plain-English: "Writing PlayerController.cs"
+  tool: string;                  // "Write" | "Bash" | "thinking" | ...
+  tokens: number;                // output tokens attributed to this action
+  status: "ok" | "fail" | "none"; // "none" = a non-tool turn (e.g. thinking)
+  errorText: string | null;      // the actual error, shown inline when status is "fail"
+  resolved: boolean;             // failed, but a later same-tool action in the chunk succeeded
+}
+
+export interface TokenBreakdown {
+  workTotal: number;             // sum of output tokens (the spend people care about)
+  workLines: ReceiptLine[];
+  contextTotal: number;          // input + cache tokens, the "mostly cached, cheap" line
+}
+
+export interface TimelineChunk {
+  id: string;
+  name: string;
+  narration: string;
+  startTs: number;
+  endTs: number;                 // exclusive upper bound (next chunk start, or open-ended)
+  tokenTotal: number;            // workTotal + contextTotal
+  warnings: Warning[];
+  receipt: TokenBreakdown;
+}
+
+export interface SessionSnapshot {
+  sessionId: string;
+  sessionName: string;
+  live: boolean;
+  totalTokens: number;
+  taskCount: number;
+  priciestTaskName: string | null;
+  chunks: TimelineChunk[];
 }

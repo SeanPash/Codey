@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { latestSessionId } from "./sessions.js";
+import { latestSessionId, listSessions } from "./sessions.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -18,5 +18,19 @@ describe("latestSessionId", () => {
     mkdirSync(join(dir, "new"));
     expect(["old", "new"]).toContain(latestSessionId(dir));
     expect(latestSessionId(dir)).toBe("new");
+  });
+});
+
+describe("listSessions", () => {
+  it("returns an empty array when there are no sessions", () => {
+    expect(listSessions(dir)).toEqual([]);
+  });
+
+  it("lists session ids newest first", () => {
+    mkdirSync(join(dir, "old"));
+    mkdirSync(join(dir, "new"));
+    const ids = listSessions(dir).map((s) => s.id);
+    expect(ids).toContain("old");
+    expect(ids[0]).toBe("new");
   });
 });
