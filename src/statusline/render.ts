@@ -8,7 +8,7 @@ const DIM = "\x1b[2m";
 const BRAND = "\x1b[38;5;75m"; // sky blue brand
 const GRAY = "\x1b[38;5;250m"; // readable body text for the action sentence
 const TEXT = "\x1b[38;5;253m"; // near-white, for the specific target
-const AMBER = "\x1b[38;5;215m"; // why marker
+const WHY = "\x1b[38;5;147m"; // lavender why marker
 const RED = "\x1b[38;5;203m"; // warning
 
 function brand(): string {
@@ -25,7 +25,7 @@ function actionLine(snap: StatusSnapshot): string {
 // Second line carries the explanation (or a warning), made loud on purpose.
 function secondLine(snap: StatusSnapshot): string | null {
   if (snap.warning) return `  ${BOLD}${RED}!  ${snap.warning}${RESET}`;
-  if (snap.why) return `  ${BOLD}${AMBER}↳ why${RESET}  ${BOLD}${TEXT}${snap.why}${RESET}`;
+  if (snap.why) return `  ${BOLD}${WHY}↳ why${RESET}  ${BOLD}${TEXT}${snap.why}${RESET}`;
   return null;
 }
 

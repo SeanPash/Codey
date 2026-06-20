@@ -3597,7 +3597,7 @@ var DIM = "\x1B[2m";
 var BRAND = "\x1B[38;5;75m";
 var GRAY = "\x1B[38;5;250m";
 var TEXT = "\x1B[38;5;253m";
-var AMBER = "\x1B[38;5;215m";
+var WHY = "\x1B[38;5;147m";
 var RED = "\x1B[38;5;203m";
 function brand() {
   return `${BOLD}${BRAND}codey${RESET}`;
@@ -3609,7 +3609,7 @@ function actionLine(snap) {
 }
 function secondLine(snap) {
   if (snap.warning) return `  ${BOLD}${RED}!  ${snap.warning}${RESET}`;
-  if (snap.why) return `  ${BOLD}${AMBER}\u21B3 why${RESET}  ${BOLD}${TEXT}${snap.why}${RESET}`;
+  if (snap.why) return `  ${BOLD}${WHY}\u21B3 why${RESET}  ${BOLD}${TEXT}${snap.why}${RESET}`;
   return null;
 }
 function renderStatus(snap) {
