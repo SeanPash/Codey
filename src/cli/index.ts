@@ -10,6 +10,7 @@ import { turnOn, turnOff } from "./toggle.js";
 import { runBudget } from "./budget.js";
 import { runExplain } from "./explain.js";
 import { runCosts } from "./costs.js";
+import { runTimeline } from "./timeline.js";
 import { readStatus } from "../statusline/state.js";
 import { defaultRoot } from "../store/session-store.js";
 import { join } from "node:path";
@@ -110,6 +111,11 @@ program
   .command("costs")
   .description("Show the token cost of each task in this session")
   .action(() => runCosts());
+
+program
+  .command("timeline")
+  .description("Open the browser timeline for this session, reusing a running one")
+  .action(() => runTimeline());
 
 program
   .command("off")
