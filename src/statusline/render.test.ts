@@ -117,7 +117,7 @@ describe("renderStatus", () => {
     expect(out).toContain("summary"); // the recap section rule
     expect(out).toContain("completed tasks"); // the checklist section rule
     expect(out).toContain("Opened PR #18 with the per-session fixes.");
-    expect(out).toContain("✓ #1 asking you a question");
+    expect(out).toContain("✓ #1 asked you a question");
     expect(out).toContain("✓ #2 pushing the branch");
     expect(out).not.toContain("Claude is removing"); // the live task is replaced by the summary
   });
@@ -131,7 +131,7 @@ describe("renderStatus", () => {
       },
     })).split("\n");
     const sentenceLine = lines.find((l) => l.includes("Opened PR #18"))!;
-    const taskLine = lines.find((l) => l.includes("asking you a question"))!;
+    const taskLine = lines.find((l) => l.includes("asked you a question"))!;
     // centered lines carry leading padding past the bar, not flush like the live rows
     expect(sentenceLine).toMatch(/│\s{3,}Opened/);
     expect(taskLine).toMatch(/│\s{3,}✓/);

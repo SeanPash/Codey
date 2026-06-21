@@ -183,8 +183,14 @@ const PAST: Record<string, string> = {
   "looking for": "looked for",
   "switching to": "switched to",
   using: "used",
+  asking: "asked",
 };
 
 export function pastTense(tag: string): string {
   return PAST[tag] ?? tag;
+}
+
+// Drop the friendly prefix so done rows read tight: "the file rules.md" -> "rules.md".
+export function shortTarget(target: string): string {
+  return target.replace(/^the (file|folder) /, "");
 }

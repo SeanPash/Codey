@@ -1,5 +1,6 @@
 import type { Card } from "../statusline/schedule.js";
 import type { WhyEntry } from "../narration/history.js";
+import { pastTense, shortTarget } from "../statusline/labels.js";
 
 // Small local palette so the feed reads like the status card without importing its internals.
 const RESET = "\x1b[0m";
@@ -74,7 +75,7 @@ function summaryBlock(items: FeedItem[]): string {
   const lines = [`${DIM}── summary ──${RESET}`];
   const last = [...items].reverse().find((it) => it.why);
   if (last?.why) lines.push(`  ${TEXT}${last.why}${RESET}`);
-  for (const it of items) lines.push(`  ${GREEN}✓${RESET} ${GOLD}#${it.seq}${RESET} ${TEXT}${it.tag} ${it.target}${RESET}`);
+  for (const it of items) lines.push(`  ${GREEN}✓${RESET} ${GOLD}#${it.seq}${RESET} ${TEXT}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET}`);
   return lines.join("\n");
 }
 

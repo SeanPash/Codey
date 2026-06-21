@@ -54,6 +54,7 @@ describe("advanceFeed turns", () => {
     const out = plain(advanceFeed(items, fresh(), [10, 150]).text);
     expect(out).toContain("summary");
     expect(out).toContain("✓ #1");
+    expect(out).toContain("✓ #1 wrote f1.ts");
   });
 
   it("does not repeat a header or summary across calls", () => {

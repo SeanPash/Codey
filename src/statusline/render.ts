@@ -1,6 +1,6 @@
 import type { StatusView } from "./view.js";
 import type { Mode } from "../types.js";
-import { pastTense } from "./labels.js";
+import { pastTense, shortTarget } from "./labels.js";
 
 // ANSI palette. Terminals that ignore color still read the plain text fine.
 const RESET = "\x1b[0m";
@@ -34,11 +34,6 @@ const RAW_MAX = 64; // raw detail is clamped to one line so a heredoc can't blow
 function clampRaw(raw: string): string {
   const line = raw.split("\n")[0].trim();
   return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "…" : line;
-}
-
-// Drop the friendly prefix so rows read tight: "the file rules.md" -> "rules.md".
-function shortTarget(target: string): string {
-  return target.replace(/^the (file|folder) /, "");
 }
 
 // Visible width of a line, ignoring ANSI color codes, so we can center it.
@@ -149,7 +144,7 @@ export function renderStatus(view: StatusView, width = WRAP): string {
     if (s.items.length) {
       out.push(f.divider("completed tasks"));
       for (const it of s.items) {
-        out.push(f.centered(`${GREEN}✓${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`, width));
+        out.push(f.centered(`${GREEN}✓${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET}`, width));
       }
     }
     out.push(f.bottom());
