@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createServer } from "../serve/server.js";
-import { loadSnapshot } from "../serve/load-snapshot.js";
+import { loadSnapshot, loadLive } from "../serve/load-snapshot.js";
 import { recordIntervention } from "../intervene/record.js";
 import { listSessions } from "./sessions.js";
 
@@ -17,7 +17,7 @@ export function runServe(opts: { session?: string; port: number }): void {
     fontsDir: join(publicDir(), "fonts"),
     listSessions: () => listSessions(),
     getSnapshot: (id) => loadSnapshot(id),
-    getLive: () => ({ sessions: [], liveCount: 0 }), // real impl wired in Task 12
+    getLive: () => loadLive(),
     intervene: (id, action) => recordIntervention(id, action),
   });
   server.listen(opts.port, () => {

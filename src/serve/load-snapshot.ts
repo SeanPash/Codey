@@ -7,7 +7,9 @@ import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import { resolveActiveWarning } from "../intervene/active-warning.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
-import type { SessionSnapshot } from "../types.js";
+import { listSessions } from "../cli/sessions.js";
+import { selectActive } from "./active.js";
+import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
 
 const LIVE_WINDOW_MS = 15_000; // file touched this recently => still live
 
@@ -44,4 +46,26 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   });
   const reconciled = reconcileErrors(events, turns);
   return { ...snap, activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null };
+}
+
+// Compact snapshot for Live Split: one entry per active session, already ordered most
+// recent prompt first. runningTool is the tool of a still-open pre-event (Claude is mid-call).
+export function loadLive(root: string = defaultRoot()): LiveSnapshot {
+  const active = selectActive(listSessions(root));
+  const sessions: LiveSession[] = active.map((s) => {
+    const snap = loadSnapshot(s.id, root);
+    const events = new SessionStore(s.id, root).readAll();
+    const last = events[events.length - 1];
+    const runningTool = last && last.phase === "pre" ? last.tool : null;
+    return {
+      sessionId: s.id,
+      name: s.name,
+      workTotal: snap.workTotal,
+      live: s.live,
+      lastPromptTs: s.lastPromptTs,
+      chunks: snap.chunks,
+      runningTool,
+    };
+  });
+  return { sessions, liveCount: sessions.length };
 }
