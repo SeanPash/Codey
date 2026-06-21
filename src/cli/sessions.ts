@@ -1,6 +1,11 @@
 import { readdirSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { defaultRoot } from "../store/session-store.js";
+import { readCache } from "../timeline/segment-cache.js";
+import { readPrompts } from "../capture/prompts.js";
+import { readMeta } from "../store/session-meta.js";
+import { readFirstPrompt } from "../timeline/transcript.js";
+import { sessionDisplayName } from "../timeline/session-name.js";
 
 // The mtime of a session's events.jsonl, or null if it has none. This is the real
 // activity signal: the capture hook appends to it on every tool call. We can't use the
@@ -35,12 +40,40 @@ export function latestSessionId(root: string = defaultRoot()): string | null {
 export interface SessionListItem {
   id: string;
   mtime: number;
+  name: string;
+  taskCount: number;
+  lastPromptTs: number;
+  live: boolean;
 }
+
+const LIVE_WINDOW_MS = 15_000; // events file touched this recently => still live
 
 export function listSessions(root: string = defaultRoot()): SessionListItem[] {
   if (!existsSync(root)) return [];
+  const now = Date.now();
   return readdirSync(root)
     .filter((name) => statSync(join(root, name)).isDirectory())
-    .map((name) => ({ id: name, mtime: statSync(join(root, name)).mtimeMs }))
+    .map((id) => {
+      const dir = join(root, id);
+      const evMtime = eventsMtime(dir);
+      const mtime = evMtime ?? statSync(dir).mtimeMs;
+      const cache = readCache(id, root);
+      const prompts = readPrompts(dir);
+      const meta = readMeta(id, root);
+      const name = sessionDisplayName({
+        firstChunkName: cache?.chunks?.[0]?.name ?? null,
+        firstPrompt: readFirstPrompt(meta?.transcriptPath ?? null),
+        sessionId: id,
+        mtimeMs: mtime,
+      });
+      return {
+        id,
+        mtime,
+        name,
+        taskCount: cache?.chunks?.length ?? 0,
+        lastPromptTs: prompts.length ? prompts[prompts.length - 1] : 0,
+        live: evMtime != null && now - evMtime < LIVE_WINDOW_MS,
+      };
+    })
     .sort((a, b) => b.mtime - a.mtime);
 }

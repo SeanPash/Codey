@@ -58,4 +58,20 @@ describe("listSessions", () => {
     expect(ids).toContain("old");
     expect(ids[0]).toBe("new");
   });
+
+  it("enriches each session with name, taskCount, lastPromptTs and live flag", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const s = join(dir, "sess1");
+    mkdirSync(s);
+    writeFileSync(join(s, "events.jsonl"), '{"phase":"pre"}\n');           // fresh -> live
+    writeFileSync(join(s, "timeline.json"), JSON.stringify({ eventCount: 1, chunks: [{ startIndex: 0, name: "Fix the timeline", narration: "" }] }));
+    writeFileSync(join(s, "prompts.jsonl"), JSON.stringify({ ts: 1782070000000 }) + "\n");
+    setMtime(join(s, "events.jsonl"), base);
+
+    const item = listSessions(dir).find((x) => x.id === "sess1")!;
+    expect(item.name).toBe("Fix the timeline");
+    expect(item.taskCount).toBe(1);
+    expect(item.lastPromptTs).toBe(1782070000000);
+    expect(item.live).toBe(true);
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTranscript } from "./transcript.js";
+import { parseTranscript, firstUserPrompt } from "./transcript.js";
 
 // One assistant turn that calls Write, then a user turn carrying its tool_result (success),
 // then an assistant turn that calls Bash, then a failing tool_result for it.
@@ -55,5 +55,24 @@ describe("parseTranscript", () => {
       message: { usage: { output_tokens: 50 }, content: [{ type: "thinking", thinking: "hmm" }] },
     }));
     expect(t[0].tool).toBe("thinking");
+  });
+});
+
+describe("firstUserPrompt", () => {
+  it("returns the first human user message text", () => {
+    const text = [
+      JSON.stringify({ type: "user", message: { role: "user", content: "fix the timeline please" }, timestamp: "2026-06-21T00:00:00Z" }),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [] } }),
+    ].join("\n");
+    expect(firstUserPrompt(text)).toBe("fix the timeline please");
+  });
+
+  it("reads text from a content-array user message", () => {
+    const text = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "hello there" }] } });
+    expect(firstUserPrompt(text)).toBe("hello there");
+  });
+
+  it("returns null when there is no user message", () => {
+    expect(firstUserPrompt("")).toBeNull();
   });
 });

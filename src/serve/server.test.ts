@@ -27,4 +27,14 @@ describe("resolveRoute", () => {
   it("does not treat a GET on the intervene path as a snapshot", () => {
     expect(resolveRoute("GET", "/api/session/abc/intervene")).toEqual({ type: "notfound" });
   });
+
+  it("routes the live endpoint", () => {
+    expect(resolveRoute("GET", "/api/live")).toEqual({ type: "live" });
+  });
+
+  it("routes font requests and rejects traversal", () => {
+    expect(resolveRoute("GET", "/fonts/Inter-400.woff2")).toEqual({ type: "font", file: "Inter-400.woff2" });
+    expect(resolveRoute("GET", "/fonts/W95FA.woff")).toEqual({ type: "font", file: "W95FA.woff" });
+    expect(resolveRoute("GET", "/fonts/../secret")).toEqual({ type: "notfound" });
+  });
 });
