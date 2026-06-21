@@ -11,6 +11,9 @@ const PACING: Record<Mode, { everyN: number; minMs: number }> = {
   simple: { everyN: 1, minMs: 7000 },
   deep: { everyN: 2, minMs: 5000 },
   teach: { everyN: 3, minMs: 5000 },
+  // ask never auto-narrates: thresholds that can't be met. The user pulls a why with
+  // /codey:explain instead, so no narration tokens are spent unless asked.
+  ask: { everyN: Infinity, minMs: Infinity },
 };
 
 export function shouldNarrate(mode: Mode, state: ThrottleState): boolean {
