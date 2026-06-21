@@ -149,6 +149,9 @@ export function renderStatus(view: StatusView, width = WRAP): string {
         out.push(f.centered(`${GREEN}✓${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET}`, width));
       }
     }
+    // At the end of a turn, point to where the fuller views live without nagging.
+    out.push(f.divider("more"));
+    out.push(f.centered(`${LABEL}See more:${RESET} ${GRAY}/codey:timeline${RESET} ${DOT}·${RESET} ${GRAY}/codey:costs${RESET}`, width));
     out.push(f.bottom());
     return out.join("\n");
   }

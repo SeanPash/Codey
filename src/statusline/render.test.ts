@@ -159,4 +159,13 @@ describe("renderStatus", () => {
     const out = plain(renderStatus({ ...base, budgetLeft: "3.8k left" }));
     expect(out).toContain("3.8k left");
   });
+
+  it("shows the timeline and costs affordances on the finished-turn summary", () => {
+    const out = plain(renderStatus({
+      ...base,
+      summary: { sentence: "Refactored the parser.", items: [] },
+    }));
+    expect(out).toContain("/codey:timeline");
+    expect(out).toContain("/codey:costs");
+  });
 });
