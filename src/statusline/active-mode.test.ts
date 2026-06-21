@@ -22,6 +22,12 @@ describe("per-session mode store", () => {
     clearSessionMode(dir);
     expect(readSessionMode(dir)).toBeNull();
   });
+
+  it("writes and reads back ask", () => {
+    const dir = mkdtempSync(join(tmpdir(), "codey-mode-"));
+    writeSessionMode("ask", dir);
+    expect(readSessionMode(dir)).toBe("ask");
+  });
 });
 
 describe("anyActiveSession", () => {

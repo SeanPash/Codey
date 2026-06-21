@@ -22,6 +22,7 @@ const MODE_COLOR: Record<Mode, string> = {
   simple: "\x1b[38;5;75m",
   deep: "\x1b[38;5;141m",
   teach: "\x1b[38;5;150m",
+  ask: "\x1b[38;5;180m", // warm sand, distinct from the narration styles
 };
 
 const WRAP = 120;
@@ -49,9 +50,10 @@ function modeLabel(mode: Mode): string {
 function frame(rail: string) {
   const edge = (ch: string) => `${rail}${ch}${RESET} `;
   return {
-    header(mode: Mode): string {
+    header(mode: Mode, budgetLeft: string | null): string {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
-      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}·${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}`;
+      const suffix = budgetLeft ? ` ${DOT}·${RESET} ${GRAY}${budgetLeft}${RESET}` : "";
+      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}·${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}${suffix}`;
       return `${edge("╭")}${title} ${rail}${"─".repeat(8)}${RESET}`;
     },
     row(label: string, labelStyle: string, body: string): string {
@@ -124,7 +126,7 @@ function tasknum(c: { seq: number; endSeq?: number }): string {
 export function renderStatus(view: StatusView, width = WRAP): string {
   const accent = MODE_COLOR[view.mode] ?? MODE_COLOR.simple;
   const f = frame(accent);
-  const out: string[] = [f.header(view.mode)];
+  const out: string[] = [f.header(view.mode, view.budgetLeft)];
 
   if (view.thinking) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${LAV}Claude is thinking through your request…${RESET}`));
@@ -147,6 +149,9 @@ export function renderStatus(view: StatusView, width = WRAP): string {
         out.push(f.centered(`${GREEN}✓${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET}`, width));
       }
     }
+    // At the end of a turn, point to where the fuller views live without nagging.
+    out.push(f.divider("more"));
+    out.push(f.centered(`${LABEL}See more:${RESET} ${GRAY}/codey:timeline${RESET} ${DOT}·${RESET} ${GRAY}/codey:costs${RESET}`, width));
     out.push(f.bottom());
     return out.join("\n");
   }

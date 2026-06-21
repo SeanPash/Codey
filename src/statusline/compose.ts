@@ -5,6 +5,7 @@ import { readMs, scheduleWhy } from "./read-time.js";
 import type { StatusSnapshot } from "./state.js";
 import type { CardView, StatusView, SummaryView } from "./view.js";
 import type { WhyEntry } from "../narration/history.js";
+import { budgetLeftLabel, budgetPausedMessage, type Budget } from "../budget/budget.js";
 
 // How many finished steps the summary checklist shows. Enough to recap the turn
 // without growing the box back into the wall of text we are trying to avoid.
@@ -18,6 +19,10 @@ const GROUP_WINDOW_MS = 2500;
 // Extra dwell per action folded into a burst, so a card that stands for ten reads
 // lingers longer than a single read instead of flashing past in one read-time.
 const GROUP_STEP_MS = 600;
+
+// In ask mode nothing is narrated automatically, so the why slot points the user at the
+// pull command instead of sitting empty.
+const ASK_HINT = "Run /codey:explain for the why";
 
 // Strip the friendly prefix so a group can list bare names: "the file a.ts" -> "a.ts".
 function shortName(target: string): string {
@@ -93,7 +98,10 @@ export function composeView(
   snap: StatusSnapshot,
   now: number,
   whys: WhyEntry[] = [],
+  budget: Budget | null = null,
 ): StatusView {
+  const budgetLeft = budgetLeftLabel(budget);
+  const paused = budgetPausedMessage(budget);
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
   // Claude is between turns: a prompt arrived after the last tool finished, so nothing
   // new is running yet.
@@ -115,7 +123,7 @@ export function composeView(
     const summary: SummaryView | null = done
       ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) }
       : null;
-    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary };
+    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft };
   }
 
   const { current, prev, isLatest } = schedule(cards, now, cardDwell);
@@ -124,9 +132,11 @@ export function composeView(
     mode: snap.mode,
     current: current ? toView(current) : null,
     prev: prev.map(toView),
-    why: isLatest ? heldWhy : null,
+    // why precedence: the ask hint, then a budget-paused notice, then the real why.
+    why: snap.mode === "ask" ? ASK_HINT : (paused ?? (isLatest ? heldWhy : null)),
     warning: isLatest ? snap.warning : null,
     thinking: false,
     summary: null,
+    budgetLeft,
   };
 }

@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { narrateTick } from "./narrate.js";
+import { narrateTick, makeBudgetedNarrate } from "./narrate.js";
 import { readStatus } from "../statusline/state.js";
 import { createWatchState } from "./watch.js";
 import { readWhys } from "../narration/history.js";
@@ -31,5 +31,40 @@ describe("narrateTick", () => {
     await narrateTick(dir, events, state, 1234);
     expect(readWhys(dir)).toEqual([{ ts: 1234, why: "because reasons" }]);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("makeBudgetedNarrate", () => {
+  it("skips the call and returns null when the budget is exhausted", async () => {
+    const meter = vi.fn();
+    const fn = makeBudgetedNarrate(
+      () => ({ cap: 100, spent: 100 }),
+      async () => ({ text: "why", tokens: 10 }),
+      meter,
+    );
+    expect(await fn("prompt")).toBeNull();
+    expect(meter).not.toHaveBeenCalled();
+  });
+
+  it("calls through and records spend when under budget", async () => {
+    const meter = vi.fn();
+    const fn = makeBudgetedNarrate(
+      () => ({ cap: 100, spent: 0 }),
+      async () => ({ text: "why", tokens: 10 }),
+      meter,
+    );
+    expect(await fn("prompt")).toBe("why");
+    expect(meter).toHaveBeenCalledWith(10);
+  });
+
+  it("uncapped sessions narrate and still record spend (no-op meter)", async () => {
+    const meter = vi.fn();
+    const fn = makeBudgetedNarrate(
+      () => null,
+      async () => ({ text: "why", tokens: 7 }),
+      meter,
+    );
+    expect(await fn("prompt")).toBe("why");
+    expect(meter).toHaveBeenCalledWith(7);
   });
 });

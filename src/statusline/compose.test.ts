@@ -180,4 +180,17 @@ describe("composeView", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     expect(composeView(events, snap(), 1000, []).why).toBe("the live why");
   });
+
+  it("ask mode shows the explain hint instead of a why", () => {
+    const events = [pre("1", "Read", { file_path: "a.ts" }, 10)];
+    const view = composeView(events, snap({ mode: "ask" }), 1000, []);
+    expect(view.why).toBe("Run /codey:explain for the why");
+  });
+
+  it("threads the budget-left label and pauses the why when the cap is reached", () => {
+    const events = [pre("1", "Read", { file_path: "a.ts" }, 10)];
+    const view = composeView(events, snap({ mode: "deep", why: "old why" }), 1000, [], { cap: 5000, spent: 5000 });
+    expect(view.budgetLeft).toBe("budget reached");
+    expect(view.why).toContain("Auto-explaining paused");
+  });
 });

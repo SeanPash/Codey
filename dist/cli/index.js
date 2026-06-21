@@ -3090,10 +3090,10 @@ function metaPath(sessionId, root) {
   return join2(root, sessionId, "meta.json");
 }
 function readMeta(sessionId, root = defaultRoot()) {
-  const file4 = metaPath(sessionId, root);
-  if (!existsSync2(file4)) return null;
+  const file6 = metaPath(sessionId, root);
+  if (!existsSync2(file6)) return null;
   try {
-    return JSON.parse(readFileSync2(file4, "utf8"));
+    return JSON.parse(readFileSync2(file6, "utf8"));
   } catch {
     return null;
   }
@@ -3312,7 +3312,10 @@ Use plain hyphens, not em dashes. Reply with only the explanation, no preamble.`
 var PACING = {
   simple: { everyN: 1, minMs: 7e3 },
   deep: { everyN: 2, minMs: 5e3 },
-  teach: { everyN: 3, minMs: 5e3 }
+  teach: { everyN: 3, minMs: 5e3 },
+  // ask never auto-narrates: thresholds that can't be met. The user pulls a why with
+  // /codey:explain instead, so no narration tokens are spent unless asked.
+  ask: { everyN: Infinity, minMs: Infinity }
 };
 function shouldNarrate(mode, state) {
   const p = PACING[mode];
@@ -3404,29 +3407,29 @@ function describeBash(cmd) {
   }
   const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
   const name = pathArg(cmd);
-  const file4 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
+  const file6 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
   const folder = (verb, fallback) => ({ tag: verb, target: name ? `the folder ${name}` : fallback });
   switch (word) {
     case "rm":
     case "del":
     case "unlink":
-      return file4("removing", "a file");
+      return file6("removing", "a file");
     case "rmdir":
       return folder("removing", "a folder");
     case "mkdir":
       return folder("creating", "a folder");
     case "touch":
-      return file4("creating", "a file");
+      return file6("creating", "a file");
     case "cp":
-      return file4("copying", "a file");
+      return file6("copying", "a file");
     case "mv":
-      return file4("moving", "a file");
+      return file6("moving", "a file");
     case "cat":
     case "less":
     case "more":
     case "head":
     case "tail":
-      return file4("reading", "a file");
+      return file6("reading", "a file");
     case "cd":
       return folder("switching to", "a folder");
     case "ls":
@@ -3469,13 +3472,13 @@ function describeBash(cmd) {
   return word ? { tag: "running", target: `the ${word} command` } : { tag: "running", target: "a shell command" };
 }
 function rawTarget(tool, input) {
-  const file4 = str(input, "file_path") ?? str(input, "path");
+  const file6 = str(input, "file_path") ?? str(input, "path");
   switch (tool) {
     case "Read":
     case "Edit":
     case "MultiEdit":
     case "Write":
-      return file4;
+      return file6;
     case "Bash":
       return str(input, "command");
     case "Grep":
@@ -3485,8 +3488,8 @@ function rawTarget(tool, input) {
   return null;
 }
 function actionLabel(tool, input) {
-  const file4 = str(input, "file_path") ?? str(input, "path");
-  const named = (verb) => ({ tag: verb, target: file4 ? `the file ${basename(file4)}` : "a file" });
+  const file6 = str(input, "file_path") ?? str(input, "path");
+  const named = (verb) => ({ tag: verb, target: file6 ? `the file ${basename(file6)}` : "a file" });
   switch (tool) {
     case "Read":
       return named("reading");
@@ -3610,7 +3613,7 @@ function runWatch(sessionId, mode) {
 }
 
 // src/cli/narrate.ts
-import { existsSync as existsSync7, readFileSync as readFileSync7, watchFile as watchFile2 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync8, watchFile as watchFile2 } from "node:fs";
 
 // src/statusline/state.ts
 import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, existsSync as existsSync5 } from "node:fs";
@@ -3658,6 +3661,85 @@ function readWhys(dir) {
   return out;
 }
 
+// src/narration/claude-metered.ts
+import { execFile as execFile2 } from "node:child_process";
+function buildMeteredArgs(prompt) {
+  return ["-p", prompt, "--model", "haiku", "--output-format", "json"];
+}
+function estimateTokens(s) {
+  return Math.ceil(s.length / 4);
+}
+function parseMetered(stdout, prompt) {
+  const out = stdout.trim();
+  if (!out) return null;
+  try {
+    const o = JSON.parse(out);
+    const text = typeof o.result === "string" ? o.result.trim() : "";
+    if (!text) return null;
+    const u = o.usage ?? {};
+    const tokens = (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text) };
+  } catch {
+    return { text: out, tokens: estimateTokens(prompt + out) };
+  }
+}
+function runClaudeMetered(prompt, timeoutMs = 15e3) {
+  return new Promise((resolve) => {
+    execFile2("claude", buildMeteredArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true }, (err, stdout) => {
+      if (err) return resolve(null);
+      resolve(parseMetered(stdout, prompt));
+    });
+  });
+}
+
+// src/budget/budget.ts
+import { readFileSync as readFileSync7, writeFileSync as writeFileSync3, existsSync as existsSync7, rmSync, mkdirSync as mkdirSync3 } from "node:fs";
+import { join as join5 } from "node:path";
+function file3(dir) {
+  return join5(dir, "budget.json");
+}
+function readBudget(dir) {
+  const p = file3(dir);
+  if (!existsSync7(p)) return null;
+  try {
+    const o = JSON.parse(readFileSync7(p, "utf8"));
+    if (typeof o.cap === "number" && typeof o.spent === "number") return { cap: o.cap, spent: o.spent };
+    return null;
+  } catch {
+    return null;
+  }
+}
+function armBudget(dir, cap) {
+  mkdirSync3(dir, { recursive: true });
+  writeFileSync3(file3(dir), JSON.stringify({ cap, spent: 0 }));
+}
+function clearBudget(dir) {
+  rmSync(file3(dir), { force: true });
+}
+function addSpend(dir, tokens) {
+  const b = readBudget(dir);
+  if (!b) return;
+  writeFileSync3(file3(dir), JSON.stringify({ cap: b.cap, spent: b.spent + Math.max(0, tokens) }));
+}
+function formatTokens(n) {
+  if (n >= 1e3) return `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k`;
+  return String(n);
+}
+function budgetLeftLabel(b) {
+  if (!b) return null;
+  const left = Math.max(0, b.cap - b.spent);
+  return left > 0 ? `${formatTokens(left)} left` : "budget reached";
+}
+function budgetPausedMessage(b) {
+  if (!b || b.spent < b.cap) return null;
+  return `Budget reached (${formatTokens(b.spent)} / ${formatTokens(b.cap)}). Auto-explaining paused - /codey:budget <n> to raise it, or /codey:explain for one on demand.`;
+}
+function budgetStatusLine(b) {
+  if (!b) return "No budget set. Codey explains as usual. Set one with /codey:budget <tokens>.";
+  const left = Math.max(0, b.cap - b.spent);
+  return `Budget: ${formatTokens(b.spent)} spent of ${formatTokens(b.cap)} (${formatTokens(left)} left).`;
+}
+
 // src/cli/narrate.ts
 async function narrateTick(dir, events, state, now) {
   const w = activeWarning(events, now);
@@ -3668,14 +3750,29 @@ async function narrateTick(dir, events, state, now) {
     appendWhy(dir, { ts: now, why });
   }
 }
+function makeBudgetedNarrate(getBudget, metered, meter) {
+  return async (prompt) => {
+    const b = getBudget();
+    if (b && b.spent >= b.cap) return null;
+    const r = await metered(prompt);
+    if (!r) return null;
+    meter(r.tokens);
+    return r.text;
+  };
+}
 function runNarrate(sessionId, mode) {
   const store = new SessionStore(sessionId);
-  const state = createWatchState(mode, (p) => runClaude(p));
+  const narrate = makeBudgetedNarrate(
+    () => readBudget(store.dir),
+    (p) => runClaudeMetered(p),
+    (tokens) => addSpend(store.dir, tokens)
+  );
+  const state = createWatchState(mode, narrate);
   patchStatus(store.dir, { mode });
   const tick = async () => {
-    if (!existsSync7(store.path)) return;
+    if (!existsSync8(store.path)) return;
     const events = [];
-    for (const line of readFileSync7(store.path, "utf8").split("\n")) {
+    for (const line of readFileSync8(store.path, "utf8").split("\n")) {
       if (!line.trim()) continue;
       try {
         events.push(JSON.parse(line));
@@ -3692,8 +3789,8 @@ function runNarrate(sessionId, mode) {
 }
 
 // src/cli/statusline.ts
-import { join as join7 } from "node:path";
-import { existsSync as existsSync10, readFileSync as readFileSync9 } from "node:fs";
+import { join as join8 } from "node:path";
+import { existsSync as existsSync11, readFileSync as readFileSync10 } from "node:fs";
 
 // src/statusline/schedule.ts
 function schedule(cards, now, dwellFor) {
@@ -3738,6 +3835,7 @@ function scheduleWhy(whys, now) {
 var SUMMARY_ITEMS = 3;
 var GROUP_WINDOW_MS = 2500;
 var GROUP_STEP_MS = 600;
+var ASK_HINT = "Run /codey:explain for the why";
 function shortName(target) {
   return target.replace(/^the (file|folder) /, "");
 }
@@ -3791,7 +3889,9 @@ function cardDwell(c) {
   const count = c.endSeq && c.endSeq > c.seq ? c.endSeq - c.seq + 1 : 1;
   return base + (count - 1) * GROUP_STEP_MS;
 }
-function composeView(events, snap, now, whys = []) {
+function composeView(events, snap, now, whys = [], budget = null) {
+  const budgetLeft = budgetLeftLabel(budget);
+  const paused = budgetPausedMessage(budget);
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
   const thinking = snap.promptAt != null && snap.promptAt > newestTs;
   const done = !thinking && snap.doneAt != null && snap.doneAt >= newestTs;
@@ -3799,7 +3899,7 @@ function composeView(events, snap, now, whys = []) {
   const cards = cardsFromEvents(events.filter((e) => e.timestamp >= turnStart));
   if (thinking || done) {
     const summary = done ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) } : null;
-    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary };
+    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft };
   }
   const { current, prev, isLatest } = schedule(cards, now, cardDwell);
   const heldWhy = scheduleWhy(whys, now) ?? snap.why;
@@ -3807,10 +3907,12 @@ function composeView(events, snap, now, whys = []) {
     mode: snap.mode,
     current: current ? toView(current) : null,
     prev: prev.map(toView),
-    why: isLatest ? heldWhy : null,
+    // why precedence: the ask hint, then a budget-paused notice, then the real why.
+    why: snap.mode === "ask" ? ASK_HINT : paused ?? (isLatest ? heldWhy : null),
     warning: isLatest ? snap.warning : null,
     thinking: false,
-    summary: null
+    summary: null,
+    budgetLeft
   };
 }
 
@@ -3830,7 +3932,9 @@ var RED = "\x1B[38;5;203m";
 var MODE_COLOR = {
   simple: "\x1B[38;5;75m",
   deep: "\x1B[38;5;141m",
-  teach: "\x1B[38;5;150m"
+  teach: "\x1B[38;5;150m",
+  ask: "\x1B[38;5;180m"
+  // warm sand, distinct from the narration styles
 };
 var WRAP = 120;
 var MAX_WHY_LINES = 5;
@@ -3850,9 +3954,10 @@ function modeLabel(mode) {
 function frame(rail) {
   const edge = (ch) => `${rail}${ch}${RESET} `;
   return {
-    header(mode) {
+    header(mode, budgetLeft) {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
-      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}`;
+      const suffix = budgetLeft ? ` ${DOT}\xB7${RESET} ${GRAY}${budgetLeft}${RESET}` : "";
+      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}${suffix}`;
       return `${edge("\u256D")}${title} ${rail}${"\u2500".repeat(8)}${RESET}`;
     },
     row(label, labelStyle, body) {
@@ -3920,7 +4025,7 @@ function tasknum(c) {
 function renderStatus(view, width = WRAP) {
   const accent = MODE_COLOR[view.mode] ?? MODE_COLOR.simple;
   const f = frame(accent);
-  const out = [f.header(view.mode)];
+  const out = [f.header(view.mode, view.budgetLeft)];
   if (view.thinking) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${LAV}Claude is thinking through your request\u2026${RESET}`));
     out.push(f.bottom());
@@ -3938,6 +4043,8 @@ function renderStatus(view, width = WRAP) {
         out.push(f.centered(`${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET}`, width));
       }
     }
+    out.push(f.divider("more"));
+    out.push(f.centered(`${LABEL}See more:${RESET} ${GRAY}/codey:timeline${RESET} ${DOT}\xB7${RESET} ${GRAY}/codey:costs${RESET}`, width));
     out.push(f.bottom());
     return out.join("\n");
   }
@@ -3979,58 +4086,58 @@ function renderStatus(view, width = WRAP) {
 }
 
 // src/cli/sessions.ts
-import { readdirSync, statSync, existsSync as existsSync8 } from "node:fs";
-import { join as join5 } from "node:path";
+import { readdirSync, statSync, existsSync as existsSync9 } from "node:fs";
+import { join as join6 } from "node:path";
 function eventsMtime(sessionDir) {
-  const p = join5(sessionDir, "events.jsonl");
-  return existsSync8(p) ? statSync(p).mtimeMs : null;
+  const p = join6(sessionDir, "events.jsonl");
+  return existsSync9(p) ? statSync(p).mtimeMs : null;
 }
 function latestSessionId(root = defaultRoot()) {
-  if (!existsSync8(root)) return null;
+  if (!existsSync9(root)) return null;
   const names = readdirSync(root);
   if (names.length === 0) return null;
-  const active = names.map((name) => ({ name, mtime: eventsMtime(join5(root, name)) })).filter((s) => s.mtime !== null).sort((a, b) => b.mtime - a.mtime);
+  const active = names.map((name) => ({ name, mtime: eventsMtime(join6(root, name)) })).filter((s) => s.mtime !== null).sort((a, b) => b.mtime - a.mtime);
   if (active.length > 0) return active[0].name;
-  return names.map((name) => ({ name, mtime: statSync(join5(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
+  return names.map((name) => ({ name, mtime: statSync(join6(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
 }
 function listSessions(root = defaultRoot()) {
-  if (!existsSync8(root)) return [];
-  return readdirSync(root).filter((name) => statSync(join5(root, name)).isDirectory()).map((name) => ({ id: name, mtime: statSync(join5(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
+  if (!existsSync9(root)) return [];
+  return readdirSync(root).filter((name) => statSync(join6(root, name)).isDirectory()).map((name) => ({ id: name, mtime: statSync(join6(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
 }
 
 // src/statusline/active-mode.ts
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync3, existsSync as existsSync9, rmSync, mkdirSync as mkdirSync3, readdirSync as readdirSync2 } from "node:fs";
-import { join as join6 } from "node:path";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync4, existsSync as existsSync10, rmSync as rmSync2, mkdirSync as mkdirSync4, readdirSync as readdirSync2 } from "node:fs";
+import { join as join7 } from "node:path";
 function modeFile(sessionDir) {
-  return join6(sessionDir, "mode");
+  return join7(sessionDir, "mode");
 }
 function writeSessionMode(mode, sessionDir) {
-  mkdirSync3(sessionDir, { recursive: true });
-  writeFileSync3(modeFile(sessionDir), mode);
+  mkdirSync4(sessionDir, { recursive: true });
+  writeFileSync4(modeFile(sessionDir), mode);
 }
 function clearSessionMode(sessionDir) {
-  rmSync(modeFile(sessionDir), { force: true });
+  rmSync2(modeFile(sessionDir), { force: true });
 }
 function readSessionMode(sessionDir) {
   const p = modeFile(sessionDir);
-  if (!existsSync9(p)) return null;
-  const raw = readFileSync8(p, "utf8").trim();
-  return raw === "simple" || raw === "deep" || raw === "teach" ? raw : null;
+  if (!existsSync10(p)) return null;
+  const raw = readFileSync9(p, "utf8").trim();
+  return raw === "simple" || raw === "deep" || raw === "teach" || raw === "ask" ? raw : null;
 }
 function anyActiveSession(root) {
-  if (!existsSync9(root)) return false;
+  if (!existsSync10(root)) return false;
   for (const name of readdirSync2(root)) {
-    if (existsSync9(modeFile(join6(root, name)))) return true;
+    if (existsSync10(modeFile(join7(root, name)))) return true;
   }
   return false;
 }
 
 // src/cli/statusline.ts
 function readEvents(dir) {
-  const p = join7(dir, "events.jsonl");
-  if (!existsSync10(p)) return [];
+  const p = join8(dir, "events.jsonl");
+  if (!existsSync11(p)) return [];
   const out = [];
-  for (const line of readFileSync9(p, "utf8").split("\n")) {
+  for (const line of readFileSync10(p, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
       out.push(JSON.parse(line));
@@ -4040,9 +4147,9 @@ function readEvents(dir) {
   return out;
 }
 function statusLineFor(dir, now = Date.now(), mode) {
-  if (!existsSync10(dir)) return "";
+  if (!existsSync11(dir)) return "";
   const snap = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
-  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir)));
+  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir), readBudget(dir)));
 }
 function sessionFromPayload(payload) {
   try {
@@ -4054,7 +4161,7 @@ function sessionFromPayload(payload) {
 }
 function lineForSession(session, root, now) {
   if (!session) return "";
-  const dir = join7(root, session);
+  const dir = join8(root, session);
   const mode = readSessionMode(dir);
   if (!mode) return "";
   return statusLineFor(dir, now, mode);
@@ -4075,11 +4182,11 @@ function runStatusLine() {
 
 // src/cli/serve.ts
 import { fileURLToPath } from "node:url";
-import { dirname as dirname2, join as join10 } from "node:path";
+import { dirname as dirname2, join as join11 } from "node:path";
 
 // src/serve/server.ts
 import { createServer as createHttpServer } from "node:http";
-import { readFileSync as readFileSync10 } from "node:fs";
+import { readFileSync as readFileSync11 } from "node:fs";
 function resolveRoute(method, url) {
   if (!url) return { type: "notfound" };
   const path = url.split("?")[0];
@@ -4113,7 +4220,7 @@ function createServer(deps) {
     try {
       if (route.type === "page") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(readFileSync10(deps.pagePath, "utf8"));
+        res.end(readFileSync11(deps.pagePath, "utf8"));
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
@@ -4143,8 +4250,8 @@ import { statSync as statSync2 } from "node:fs";
 import { basename as basename3 } from "node:path";
 
 // src/timeline/segment-cache.ts
-import { writeFileSync as writeFileSync4, readFileSync as readFileSync11, existsSync as existsSync11, mkdirSync as mkdirSync4 } from "node:fs";
-import { join as join8 } from "node:path";
+import { writeFileSync as writeFileSync5, readFileSync as readFileSync12, existsSync as existsSync12, mkdirSync as mkdirSync5 } from "node:fs";
+import { join as join9 } from "node:path";
 
 // src/timeline/segment.ts
 var GAP_MS = 6e4;
@@ -4201,20 +4308,20 @@ function parseSegmentation(text, eventCount) {
 // src/timeline/segment-cache.ts
 var STALE_SLACK = 5;
 function cachePath(sessionId, root) {
-  return join8(root, sessionId, "timeline.json");
+  return join9(root, sessionId, "timeline.json");
 }
 function readCache(sessionId, root = defaultRoot()) {
-  const file4 = cachePath(sessionId, root);
-  if (!existsSync11(file4)) return null;
+  const file6 = cachePath(sessionId, root);
+  if (!existsSync12(file6)) return null;
   try {
-    return JSON.parse(readFileSync11(file4, "utf8"));
+    return JSON.parse(readFileSync12(file6, "utf8"));
   } catch {
     return null;
   }
 }
 function writeCache(sessionId, cache, root = defaultRoot()) {
-  mkdirSync4(join8(root, sessionId), { recursive: true });
-  writeFileSync4(cachePath(sessionId, root), JSON.stringify(cache));
+  mkdirSync5(join9(root, sessionId), { recursive: true });
+  writeFileSync5(cachePath(sessionId, root), JSON.stringify(cache));
 }
 function isStale(cache, eventCount) {
   if (!cache) return true;
@@ -4264,15 +4371,15 @@ function prettify(s) {
 }
 function describeAction(tool, input) {
   if (!tool || tool === "thinking") return "Thinking it through";
-  const file4 = fileFrom(input);
+  const file6 = fileFrom(input);
   switch (tool) {
     case "Write":
-      return file4 ? `Writing ${file4}` : "Writing a file";
+      return file6 ? `Writing ${file6}` : "Writing a file";
     case "Edit":
     case "MultiEdit":
-      return file4 ? `Editing ${file4}` : "Editing a file";
+      return file6 ? `Editing ${file6}` : "Editing a file";
     case "Read":
-      return file4 ? `Reading ${file4}` : "Reading a file";
+      return file6 ? `Reading ${file6}` : "Reading a file";
     case "Bash": {
       const c = commandFrom(input);
       return c ? `Running: ${c}` : "Running a command";
@@ -4403,14 +4510,14 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
 }
 
 // src/intervene/file-io.ts
-import { writeFileSync as writeFileSync5, readFileSync as readFileSync12, existsSync as existsSync12, rmSync as rmSync2, mkdirSync as mkdirSync5 } from "node:fs";
-import { join as join9 } from "node:path";
+import { writeFileSync as writeFileSync6, readFileSync as readFileSync13, existsSync as existsSync13, rmSync as rmSync3, mkdirSync as mkdirSync6 } from "node:fs";
+import { join as join10 } from "node:path";
 function interventionPath(sessionId, root = defaultRoot()) {
-  return join9(root, sessionId, "intervene.json");
+  return join10(root, sessionId, "intervene.json");
 }
-function writeInterventionFile(sessionId, file4, root = defaultRoot()) {
-  mkdirSync5(join9(root, sessionId), { recursive: true });
-  writeFileSync5(interventionPath(sessionId, root), JSON.stringify(file4));
+function writeInterventionFile(sessionId, file6, root = defaultRoot()) {
+  mkdirSync6(join10(root, sessionId), { recursive: true });
+  writeFileSync6(interventionPath(sessionId, root), JSON.stringify(file6));
 }
 
 // src/intervene/record.ts
@@ -4434,7 +4541,7 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 // src/cli/serve.ts
 var here = dirname2(fileURLToPath(import.meta.url));
 function pagePath() {
-  return join10(here, "..", "serve", "public", "index.html");
+  return join11(here, "..", "serve", "public", "index.html");
 }
 function runServe(opts) {
   const server = createServer({
@@ -4450,20 +4557,20 @@ function runServe(opts) {
 }
 
 // src/cli/feed.ts
-import { existsSync as existsSync14, watchFile as watchFile3 } from "node:fs";
-import { join as join12 } from "node:path";
+import { existsSync as existsSync15, watchFile as watchFile3 } from "node:fs";
+import { join as join13 } from "node:path";
 
 // src/capture/prompts.ts
-import { appendFileSync as appendFileSync3, readFileSync as readFileSync13, existsSync as existsSync13 } from "node:fs";
-import { join as join11 } from "node:path";
-function file3(dir) {
-  return join11(dir, "prompts.jsonl");
+import { appendFileSync as appendFileSync3, readFileSync as readFileSync14, existsSync as existsSync14 } from "node:fs";
+import { join as join12 } from "node:path";
+function file4(dir) {
+  return join12(dir, "prompts.jsonl");
 }
 function readPrompts(dir) {
-  const p = file3(dir);
-  if (!existsSync13(p)) return [];
+  const p = file4(dir);
+  if (!existsSync14(p)) return [];
   const out = [];
-  for (const line of readFileSync13(p, "utf8").split("\n")) {
+  for (const line of readFileSync14(p, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
       const o = JSON.parse(line);
@@ -4568,12 +4675,12 @@ function advanceFeed(items, cursor, prompts) {
 // src/cli/feed.ts
 function runFeed(sessionId) {
   const store = new SessionStore(sessionId);
-  const narrationPath = join12(store.dir, "narration.jsonl");
-  const promptsPath = join12(store.dir, "prompts.jsonl");
+  const narrationPath = join13(store.dir, "narration.jsonl");
+  const promptsPath = join13(store.dir, "prompts.jsonl");
   let cursor = { lastSeq: 0, whysShownFor: /* @__PURE__ */ new Set(), turnsHeadered: /* @__PURE__ */ new Set(), turnsSummarized: /* @__PURE__ */ new Set() };
   const build = () => feedItems(cardsFromEvents(store.readAll()), readWhys(store.dir));
   const flush = () => {
-    if (!existsSync14(store.path)) return;
+    if (!existsSync15(store.path)) return;
     const r = advanceFeed(build(), cursor, readPrompts(store.dir));
     cursor = r.cursor;
     if (r.text) process.stdout.write(r.text + "\n");
@@ -4586,9 +4693,9 @@ function runFeed(sessionId) {
 }
 
 // src/cli/toggle.ts
-import { readFileSync as readFileSync14, writeFileSync as writeFileSync6, existsSync as existsSync15, mkdirSync as mkdirSync6, rmSync as rmSync3 } from "node:fs";
+import { readFileSync as readFileSync15, writeFileSync as writeFileSync7, existsSync as existsSync16, mkdirSync as mkdirSync7, rmSync as rmSync4 } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join13, dirname as dirname3 } from "node:path";
+import { join as join14, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
 function withStatusLine(s, command) {
   return { ...s, statusLine: { type: "command", command } };
@@ -4599,43 +4706,43 @@ function withoutStatusLine(s) {
   return next;
 }
 function settingsPath() {
-  return join13(homedir2(), ".claude", "settings.json");
+  return join14(homedir2(), ".claude", "settings.json");
 }
 function readSettings() {
   const p = settingsPath();
-  if (!existsSync15(p)) return {};
+  if (!existsSync16(p)) return {};
   try {
-    return JSON.parse(readFileSync14(p, "utf8"));
+    return JSON.parse(readFileSync15(p, "utf8"));
   } catch {
     return {};
   }
 }
 function writeSettings(s) {
   const p = settingsPath();
-  mkdirSync6(dirname3(p), { recursive: true });
-  writeFileSync6(p, JSON.stringify(s, null, 2));
+  mkdirSync7(dirname3(p), { recursive: true });
+  writeFileSync7(p, JSON.stringify(s, null, 2));
 }
 function statusLineCommand(self) {
   return `node "${self}" statusline`;
 }
 function pidPath(sessionDir) {
-  return join13(sessionDir, "narrator.pid");
+  return join14(sessionDir, "narrator.pid");
 }
 function stopNarrator(path, kill = (pid) => process.kill(pid)) {
-  if (!existsSync15(path)) return;
-  const pid = Number(readFileSync14(path, "utf8").trim());
+  if (!existsSync16(path)) return;
+  const pid = Number(readFileSync15(path, "utf8").trim());
   if (pid > 0) {
     try {
       kill(pid);
     } catch {
     }
   }
-  rmSync3(path, { force: true });
+  rmSync4(path, { force: true });
 }
 function turnOn(mode, session) {
   const self = process.argv[1];
-  const dir = join13(defaultRoot(), session);
-  mkdirSync6(dir, { recursive: true });
+  const dir = join14(defaultRoot(), session);
+  mkdirSync7(dir, { recursive: true });
   stopNarrator(pidPath(dir));
   writeSessionMode(mode, dir);
   patchStatus(dir, { mode });
@@ -4646,28 +4753,289 @@ function turnOn(mode, session) {
     windowsHide: true
   });
   child.unref();
-  writeFileSync6(pidPath(dir), String(child.pid ?? ""));
+  writeFileSync7(pidPath(dir), String(child.pid ?? ""));
 }
 function turnOff(session) {
-  const dir = join13(defaultRoot(), session);
+  const dir = join14(defaultRoot(), session);
   stopNarrator(pidPath(dir));
+  clearBudget(dir);
   clearSessionMode(dir);
   if (!anyActiveSession(defaultRoot())) writeSettings(withoutStatusLine(readSettings()));
 }
 
+// src/cli/budget.ts
+import { join as join15 } from "node:path";
+function parseBudgetArg(raw) {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (!s) return { kind: "report" };
+  if (s === "off" || s === "0") return { kind: "clear" };
+  const m = /^([\d,]+)(k)?$/.exec(s);
+  if (!m) return { kind: "invalid" };
+  const n = Number(m[1].replace(/,/g, "")) * (m[2] ? 1e3 : 1);
+  if (!Number.isFinite(n) || n <= 0) return { kind: "invalid" };
+  return { kind: "arm", cap: n };
+}
+function runBudget(raw) {
+  const session = latestSessionId();
+  if (!session) {
+    console.error("No Codey sessions found yet.");
+    process.exit(1);
+  }
+  const dir = join15(defaultRoot(), session);
+  const arg = parseBudgetArg(raw);
+  switch (arg.kind) {
+    case "report":
+      console.log(budgetStatusLine(readBudget(dir)));
+      return;
+    case "clear":
+      clearBudget(dir);
+      console.log("Budget cleared. Codey explains as usual.");
+      return;
+    case "arm":
+      armBudget(dir, arg.cap);
+      console.log(budgetStatusLine(readBudget(dir)));
+      return;
+    case "invalid":
+      console.log("Usage: /codey:budget <tokens>  (e.g. 5000 or 5k), or 'off' to clear.");
+      return;
+  }
+}
+
+// src/cli/explain.ts
+import { join as join17 } from "node:path";
+import { existsSync as existsSync18, readFileSync as readFileSync17 } from "node:fs";
+
+// src/narration/explain.ts
+var DEPTHS = ["simple", "deep", "teach"];
+function currentTurnStart(promptMarks) {
+  return promptMarks.length ? promptMarks[promptMarks.length - 1] : Number.NEGATIVE_INFINITY;
+}
+function eventsForCurrentTurn(events, turnStart) {
+  return events.filter((e) => e.timestamp >= turnStart);
+}
+function parseExplainArgs(tokens) {
+  let depth = "deep";
+  let task = null;
+  for (const t of tokens) {
+    const low = t.toLowerCase();
+    if (DEPTHS.includes(low)) depth = low;
+    else if (/^#?\d+$/.test(low)) task = Number(low.replace("#", ""));
+  }
+  return { depth, task };
+}
+function eventForTask(turnEvents, taskNumber) {
+  const pres = turnEvents.filter((e) => e.phase === "pre");
+  const target = pres[taskNumber - 1];
+  return target ? [target] : [];
+}
+function summarizeEvent2(e) {
+  const input = JSON.stringify(e.input ?? null).slice(0, 200);
+  const status = e.phase === "post" ? e.isError ? " [ERROR]" : " [done]" : "";
+  return `- ${e.tool}${status} ${input}`;
+}
+function depthInstruction(depth) {
+  switch (depth) {
+    case "simple":
+      return "In one plain English sentence for a non-technical person, say what Claude did and why.";
+    case "teach":
+      return "In a few plain English sentences for someone learning to code, explain what Claude did and why, then briefly teach the key concept involved (define any technical term you use).";
+    default:
+      return "In a few plain English sentences for a non-technical person, explain what Claude did and why it matters.";
+  }
+}
+function buildExplainPrompt(events, priorPasses, depth = "deep") {
+  const lines = events.map(summarizeEvent2).join("\n");
+  const instruction = depthInstruction(depth);
+  if (priorPasses.length === 0) {
+    return `These are the actions an AI coding agent took for the current task:
+${lines}
+
+${instruction} Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation.`;
+  }
+  const heard = priorPasses.map((p, i) => `${i + 1}. ${p}`).join("\n");
+  return `These are the actions an AI coding agent took for the current task:
+${lines}
+
+The user has already been told:
+${heard}
+
+Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction} Use plain hyphens, not em dashes. Reply with only the explanation.`;
+}
+
+// src/narration/explain-log.ts
+import { appendFileSync as appendFileSync4, readFileSync as readFileSync16, existsSync as existsSync17 } from "node:fs";
+import { join as join16 } from "node:path";
+function file5(dir) {
+  return join16(dir, "explain.jsonl");
+}
+function appendPass(dir, scope, text) {
+  appendFileSync4(file5(dir), JSON.stringify({ scope, text }) + "\n");
+}
+function passesForScope(dir, scope) {
+  const p = file5(dir);
+  if (!existsSync17(p)) return [];
+  const out = [];
+  for (const line of readFileSync16(p, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const o = JSON.parse(line);
+      if (o.scope === scope && typeof o.text === "string") out.push(o.text);
+    } catch {
+    }
+  }
+  return out;
+}
+
+// src/cli/explain.ts
+function readEvents2(dir) {
+  const p = join17(dir, "events.jsonl");
+  if (!existsSync18(p)) return [];
+  const out = [];
+  for (const line of readFileSync17(p, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+    }
+  }
+  return out;
+}
+async function runExplain(args = []) {
+  const session = latestSessionId();
+  if (!session) {
+    console.error("No Codey sessions found yet.");
+    process.exit(1);
+  }
+  const dir = join17(defaultRoot(), session);
+  const { depth, task } = parseExplainArgs(args);
+  const start = currentTurnStart(readPrompts(dir));
+  const turnEvents = eventsForCurrentTurn(readEvents2(dir), start);
+  const turnKey = start === Number.NEGATIVE_INFINITY ? 0 : start;
+  let events = turnEvents;
+  let scope = String(turnKey);
+  if (task != null) {
+    events = eventForTask(turnEvents, task);
+    scope = `${turnKey}:t${task}`;
+    if (events.length === 0) {
+      console.log(`Task #${task} hasn't happened yet this turn.`);
+      return;
+    }
+  } else if (events.length === 0) {
+    console.log("Nothing to explain yet; Claude has not started working on this prompt.");
+    return;
+  }
+  const prior = passesForScope(dir, scope);
+  const prompt = buildExplainPrompt(events, prior, depth);
+  const result = await runClaudeMetered(prompt, 3e4);
+  if (!result) {
+    console.log("Could not reach Claude for an explanation just now. Try again in a moment.");
+    return;
+  }
+  addSpend(dir, result.tokens);
+  appendPass(dir, scope, result.text);
+  console.log(result.text);
+}
+
+// src/timeline/costs.ts
+function summarizeCosts(turns) {
+  const b = attributeChunk(turns, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
+  const lines = b.workLines.map((l) => ({ label: l.label, tokens: l.tokens, failed: l.status === "fail" }));
+  let priciest = null;
+  let max = -1;
+  for (const l of b.workLines) {
+    if (l.tokens > max) {
+      max = l.tokens;
+      priciest = l.label;
+    }
+  }
+  return { lines, total: b.workTotal, priciest };
+}
+function renderCosts(s) {
+  if (s.lines.length === 0) return "No tasks recorded yet.";
+  const rows = s.lines.map((l) => `  ${String(l.tokens).padStart(6)}  ${l.label}${l.failed ? " (failed)" : ""}`);
+  const tail = [`  Total: ${s.total} tokens`];
+  if (s.priciest) tail.push(`  Priciest: ${s.priciest}`);
+  return ["Token cost by task (work output tokens):", ...rows, "", ...tail].join("\n");
+}
+
+// src/cli/costs.ts
+function runCosts() {
+  const session = latestSessionId();
+  if (!session) {
+    console.error("No Codey sessions found yet.");
+    process.exit(1);
+  }
+  const turns = readTranscriptTurns(readMeta(session)?.transcriptPath ?? null);
+  console.log(renderCosts(summarizeCosts(turns)));
+}
+
+// src/cli/timeline.ts
+import { spawn as spawn2 } from "node:child_process";
+import { readFileSync as readFileSync18, writeFileSync as writeFileSync8, existsSync as existsSync19 } from "node:fs";
+import { join as join18 } from "node:path";
+var DEFAULT_PORT = 4317;
+function timelineDecision(lock, isAlive) {
+  if (lock && isAlive(lock.pid)) return { reuse: true, port: lock.port };
+  return { reuse: false, port: DEFAULT_PORT };
+}
+function lockPath(dir) {
+  return join18(dir, "serve.lock");
+}
+function readLock(dir) {
+  const p = lockPath(dir);
+  if (!existsSync19(p)) return null;
+  try {
+    const o = JSON.parse(readFileSync18(p, "utf8"));
+    if (typeof o.port === "number" && typeof o.pid === "number") return { port: o.port, pid: o.pid };
+    return null;
+  } catch {
+    return null;
+  }
+}
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+function runTimeline() {
+  const session = latestSessionId();
+  if (!session) {
+    console.error("No Codey sessions found yet.");
+    process.exit(1);
+  }
+  const dir = join18(defaultRoot(), session);
+  const plan = timelineDecision(readLock(dir), alive);
+  if (plan.reuse) {
+    console.log(`Codey timeline already open at http://localhost:${plan.port}`);
+    return;
+  }
+  const self = process.argv[1];
+  const child = spawn2(process.execPath, [self, "serve", "--session", session, "--port", String(plan.port)], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  child.unref();
+  writeFileSync8(lockPath(dir), JSON.stringify({ port: plan.port, pid: child.pid ?? 0 }));
+  console.log(`Codey timeline at http://localhost:${plan.port}`);
+}
+
 // src/cli/index.ts
-import { join as join14 } from "node:path";
+import { join as join19 } from "node:path";
 function parseMode(m) {
-  return ["simple", "deep", "teach"].includes(m) ? m : "simple";
+  return ["simple", "deep", "teach", "ask"].includes(m) ? m : "simple";
 }
 function resolveWatchMode(opt, session) {
   if (opt) return parseMode(opt);
-  const snap = readStatus(join14(defaultRoot(), session));
+  const snap = readStatus(join19(defaultRoot(), session));
   return snap?.mode ?? "simple";
 }
 var program2 = new Command();
 program2.name("codey").description("Live legibility for Claude Code");
-program2.command("watch").description("Watch the current Claude Code session and narrate what it's doing").option("-m, --mode <mode>", "narration depth: simple | deep | teach (defaults to the session's mode)").option("-s, --session <id>", "session id to watch (defaults to most recent)").action((opts) => {
+program2.command("watch").description("Watch the current Claude Code session and narrate what it's doing").option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask (defaults to the session's mode)").option("-s, --session <id>", "session id to watch (defaults to most recent)").action((opts) => {
   const session = opts.session ?? latestSessionId();
   if (!session) {
     console.error("No Codey sessions found yet. Start a Claude Code session with the plugin enabled, then run `codey watch`.");
@@ -4686,7 +5054,7 @@ program2.command("feed").description("Scrollable terminal view of every task and
   }
   runFeed(session);
 });
-program2.command("narrate").description("Background narrator that feeds the status line").option("-m, --mode <mode>", "narration depth: simple | deep | teach", "simple").option("-s, --session <id>", "session id (defaults to most recent)").action((opts) => {
+program2.command("narrate").description("Background narrator that feeds the status line").option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask", "simple").option("-s, --session <id>", "session id (defaults to most recent)").action((opts) => {
   const mode = parseMode(opts.mode);
   const session = opts.session ?? latestSessionId();
   if (!session) {
@@ -4696,7 +5064,7 @@ program2.command("narrate").description("Background narrator that feeds the stat
   runNarrate(session, mode);
 });
 program2.command("statusline").description("Print the Codey status line (called by Claude Code)").action(() => runStatusLine());
-program2.command("on").description("Turn narration on in the status line").option("-m, --mode <mode>", "simple | deep | teach", "simple").action((opts) => {
+program2.command("on").description("Turn narration on in the status line").option("-m, --mode <mode>", "simple | deep | teach | ask", "simple").action((opts) => {
   const mode = parseMode(opts.mode);
   const session = latestSessionId();
   if (!session) {
@@ -4708,6 +5076,12 @@ program2.command("on").description("Turn narration on in the status line").optio
   console.log("For the full scrollable task history, run this in a new terminal:");
   console.log(`  node "${process.argv[1]}" feed`);
 });
+program2.command("explain").description("Explain the most recent task in depth; run again to go deeper").argument("[args...]", "optional depth (simple | deep | teach) and/or a task number").action((args) => {
+  void runExplain(args);
+});
+program2.command("budget").description("Set or report the token budget for automatic narration").argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report").action((amount) => runBudget(amount));
+program2.command("costs").description("Show the token cost of each task in this session").action(() => runCosts());
+program2.command("timeline").description("Open the browser timeline for this session, reusing a running one").action(() => runTimeline());
 program2.command("off").description("Turn narration off and restore the plain status line").action(() => {
   const session = latestSessionId();
   if (session) turnOff(session);

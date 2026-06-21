@@ -6,6 +6,7 @@ import type { Mode } from "../types.js";
 import { defaultRoot } from "../store/session-store.js";
 import { patchStatus } from "../statusline/state.js";
 import { writeSessionMode, clearSessionMode, anyActiveSession } from "../statusline/active-mode.js";
+import { clearBudget } from "../budget/budget.js";
 
 type Settings = Record<string, unknown> & { statusLine?: { type: string; command: string } };
 
@@ -79,6 +80,7 @@ export function turnOn(mode: Mode, session: string): void {
 export function turnOff(session: string): void {
   const dir = join(defaultRoot(), session);
   stopNarrator(pidPath(dir));
+  clearBudget(dir); // a fresh `on` should start uncapped
   clearSessionMode(dir);
   // Leave the status line command installed while any other session is still using it;
   // pull it from global settings only once Codey is fully off everywhere.
