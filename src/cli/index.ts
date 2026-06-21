@@ -116,7 +116,7 @@ program
 program
   .command("timeline")
   .description("Open the browser timeline for this session, reusing a running one")
-  .action(() => runTimeline());
+  .action(() => { void runTimeline(); });
 
 program
   .command("off")
