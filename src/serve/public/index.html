@@ -409,6 +409,7 @@
       let sessions = [];
       try { sessions = await (await fetch("/api/sessions")).json(); } catch { sessions = []; }
       if (!pinned && sessions[0]) currentId = sessions[0].id;
+      updateLiveBadge(sessions.filter((s) => s.live).length);
       renderRail(sessions);
       if (!currentId) { document.getElementById("main").innerHTML = '<div class="empty">No sessions found.</div>'; return; }
       try {
@@ -432,9 +433,67 @@
       tick();
     }
 
-    // Single-mode tick for now; Live Split tick is added in Task 13.
+    function updateLiveBadge(n) {
+      document.getElementById("livecount").textContent = n;
+      document.getElementById("livewrap").hidden = n === 0;
+    }
+
+    // ---- Live Split ----
+    const SPLIT_PER_PAGE = 3;
+    let lastLive = null; // keep the last payload so pager clicks re-render without a refetch
+
+    function paneHtml(s, isFirst) {
+      const cls = "pane" + (s.runningTool ? " run" : "");
+      const pill = isFirst ? `<span class="badge">&#10022; Just prompted</span>` : "";
+      const lastIdx = s.chunks.length - 1;
+      const cards = s.chunks.map((c, i) => {
+        const cur = i === lastIdx ? " cur" : "";
+        const run = i === lastIdx && s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
+        return `<div class="ptc${cur}"><div class="ptcr"><div class="pn"><b>${esc(c.name)}</b><span>${esc(c.narration || "")}</span></div>`
+          + `<div class="pchip"><b>${fmt(c.workTotal)}</b><small>tok</small></div></div>${run}</div>`;
+      }).join("") || '<div class="prun" style="padding:4px">just started</div>';
+      return `<div class="${cls}"><div class="phead">${pill}<span class="pname">${esc(s.name)}</span>`
+        + `<span class="pwork">work <b>${fmt(s.workTotal)}</b></span></div><div class="pbody">${cards}</div></div>`;
+    }
+
+    function renderSplit(live) {
+      const sessions = live.sessions;
+      updateLiveBadge(live.liveCount);
+      document.getElementById("sname").textContent = "Live sessions";
+      const main = document.getElementById("main");
+      if (sessions.length === 0) {
+        main.innerHTML = '<div class="empty">No sessions are active right now. Prompt Claude in any session to see it appear here.</div>';
+        return;
+      }
+      const pages = Math.max(1, Math.ceil(sessions.length / SPLIT_PER_PAGE));
+      if (!splitPinned) splitPage = 1;          // follow the front until the user pages
+      splitPage = Math.min(Math.max(1, splitPage), pages);
+      const start = (splitPage - 1) * SPLIT_PER_PAGE;
+      const pageItems = sessions.slice(start, start + SPLIT_PER_PAGE);
+
+      const grid = pageItems.map((s) => paneHtml(s, splitPage === 1 && s === sessions[0])).join("");
+      const dots = Array.from({ length: pages }, (_, i) => `<span class="dot${i + 1 === splitPage ? " on" : ""}"></span>`).join("");
+      const pager = pages > 1
+        ? `<div class="pager"><button class="nav" id="pg-prev" type="button"${splitPage === 1 ? " disabled" : ""}>&#8249;</button>`
+          + `<div class="dots">${dots}</div>`
+          + `<button class="nav" id="pg-next" type="button"${splitPage === pages ? " disabled" : ""}>&#8250;</button>`
+          + `<span class="prange">Page ${splitPage} of ${pages} &middot; most recent first</span></div>`
+        : "";
+      main.innerHTML = `<div class="grid">${grid}</div>${pager}`;
+
+      const prev = document.getElementById("pg-prev");
+      const next = document.getElementById("pg-next");
+      if (prev) prev.addEventListener("click", () => { splitPinned = true; splitPage--; renderSplit(lastLive); });
+      if (next) next.addEventListener("click", () => { splitPinned = true; splitPage++; renderSplit(lastLive); });
+    }
+
     function tick() { if (view === "single") return tickSingle(); return tickSplit(); }
-    async function tickSplit() { document.getElementById("main").innerHTML = '<div class="empty">Live Split coming up…</div>'; }
+    async function tickSplit() {
+      try {
+        lastLive = await (await fetch("/api/live")).json();
+        renderSplit(lastLive);
+      } catch { /* keep the last view on a transient error */ }
+    }
 
     tick();
     setInterval(tick, 2000);
