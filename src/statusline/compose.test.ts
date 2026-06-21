@@ -180,4 +180,10 @@ describe("composeView", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     expect(composeView(events, snap(), 1000, []).why).toBe("the live why");
   });
+
+  it("ask mode shows the explain hint instead of a why", () => {
+    const events = [pre("1", "Read", { file_path: "a.ts" }, 10)];
+    const view = composeView(events, snap({ mode: "ask" }), 1000, []);
+    expect(view.why).toBe("Run /codey:explain for the why");
+  });
 });

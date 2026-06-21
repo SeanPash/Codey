@@ -19,6 +19,10 @@ const GROUP_WINDOW_MS = 2500;
 // lingers longer than a single read instead of flashing past in one read-time.
 const GROUP_STEP_MS = 600;
 
+// In ask mode nothing is narrated automatically, so the why slot points the user at the
+// pull command instead of sitting empty.
+const ASK_HINT = "Run /codey:explain for the why";
+
 // Strip the friendly prefix so a group can list bare names: "the file a.ts" -> "a.ts".
 function shortName(target: string): string {
   return target.replace(/^the (file|folder) /, "");
@@ -115,7 +119,7 @@ export function composeView(
     const summary: SummaryView | null = done
       ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) }
       : null;
-    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary };
+    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft: null };
   }
 
   const { current, prev, isLatest } = schedule(cards, now, cardDwell);
@@ -124,9 +128,10 @@ export function composeView(
     mode: snap.mode,
     current: current ? toView(current) : null,
     prev: prev.map(toView),
-    why: isLatest ? heldWhy : null,
+    why: snap.mode === "ask" ? ASK_HINT : (isLatest ? heldWhy : null),
     warning: isLatest ? snap.warning : null,
     thinking: false,
     summary: null,
+    budgetLeft: null,
   };
 }
