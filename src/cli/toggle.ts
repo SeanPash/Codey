@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import type { Mode } from "../types.js";
 import { defaultRoot } from "../store/session-store.js";
 import { patchStatus } from "../statusline/state.js";
+import { writeActiveMode, clearActiveMode } from "../statusline/active-mode.js";
 
 type Settings = Record<string, unknown> & { statusLine?: { type: string; command: string } };
 
@@ -57,7 +58,8 @@ export function turnOn(mode: Mode, session: string): void {
   const self = process.argv[1];
   stopNarrator(pidPath());
   mkdirSync(join(defaultRoot(), session), { recursive: true });
-  patchStatus(join(defaultRoot(), session), { mode }); // show the new mode on the next render, instantly
+  writeActiveMode(mode); // single source of truth, so the status line never shows a stale mode
+  patchStatus(join(defaultRoot(), session), { mode }); // also seed the snapshot for an instant render
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   // detached lets the narrator outlive the slash command's process tree (Claude Code kills
   // that tree when the command returns). stdio "ignore" means no console handles, and
@@ -73,5 +75,6 @@ export function turnOn(mode: Mode, session: string): void {
 
 export function turnOff(): void {
   stopNarrator(pidPath());
+  clearActiveMode();
   writeSettings(withoutStatusLine(readSettings()));
 }

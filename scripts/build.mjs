@@ -13,6 +13,7 @@ const entryPoints = [
   "src/cli/index.ts",
   "src/capture/hook-emit.ts",
   "src/capture/intervene-check.ts",
+  "src/capture/prompt-mark.ts",
 ];
 
 await build({

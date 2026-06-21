@@ -2,6 +2,7 @@ import type { ActionLabel } from "./labels.js";
 
 export interface Card {
   seq: number;
+  endSeq?: number; // set when this card stands in for a grouped burst, e.g. #3-7
   action: ActionLabel;
   raw: string | null;
   ts: number;
