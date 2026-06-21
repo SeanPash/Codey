@@ -13,7 +13,9 @@ export function parseBudgetArg(raw: string | undefined): BudgetArg {
   const s = (raw ?? "").trim().toLowerCase();
   if (!s) return { kind: "report" };
   if (s === "off" || s === "0") return { kind: "clear" };
-  const m = /^([\d,]+)(k)?$/.exec(s);
+  // Accept a plain integer or properly grouped thousands ("12,500"), optionally with a "k"
+  // suffix. Reject stray commas like "5," or ",5".
+  const m = /^(\d{1,3}(?:,\d{3})*|\d+)(k)?$/.exec(s);
   if (!m) return { kind: "invalid" };
   const n = Number(m[1].replace(/,/g, "")) * (m[2] ? 1000 : 1);
   if (!Number.isFinite(n) || n <= 0) return { kind: "invalid" };

@@ -9,7 +9,7 @@ import { createWatchState, activeWarning, type WatchState } from "./watch.js";
 import { patchStatus } from "../statusline/state.js";
 import { appendWhy } from "../narration/history.js";
 import { runClaudeMetered, type MeteredResult } from "../narration/claude-metered.js";
-import { readBudget, addSpend, type Budget } from "../budget/budget.js";
+import { readBudget, addSpend, budgetAllows, type Budget } from "../budget/budget.js";
 import type { NarrateFn } from "../narration/engine.js";
 
 export async function narrateTick(dir: string, events: ToolEvent[], state: WatchState, now: number): Promise<void> {
@@ -31,7 +31,7 @@ export function makeBudgetedNarrate(
 ): NarrateFn {
   return async (prompt: string) => {
     const b = getBudget();
-    if (b && b.spent >= b.cap) return null; // budget exhausted: pause auto-narration
+    if (!budgetAllows(b)) return null; // budget exhausted: pause auto-narration
     const r = await metered(prompt);
     if (!r) return null;
     meter(r.tokens);
