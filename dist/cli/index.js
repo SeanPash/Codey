@@ -4296,8 +4296,24 @@ function writeSettings(s) {
 function statusLineCommand(self) {
   return `node "${self}" statusline`;
 }
+function pidPath() {
+  return join11(defaultRoot(), "narrator.pid");
+}
+function stopNarrator(path, kill = (pid) => process.kill(pid)) {
+  if (!existsSync13(path)) return;
+  const pid = Number(readFileSync12(path, "utf8").trim());
+  if (pid > 0) {
+    try {
+      kill(pid);
+    } catch {
+    }
+  }
+}
 function turnOn(mode, session) {
   const self = process.argv[1];
+  stopNarrator(pidPath());
+  mkdirSync5(join11(defaultRoot(), session), { recursive: true });
+  patchStatus(join11(defaultRoot(), session), { mode });
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
     detached: true,
@@ -4305,8 +4321,11 @@ function turnOn(mode, session) {
     windowsHide: true
   });
   child.unref();
+  mkdirSync5(defaultRoot(), { recursive: true });
+  writeFileSync5(pidPath(), String(child.pid ?? ""));
 }
 function turnOff() {
+  stopNarrator(pidPath());
   writeSettings(withoutStatusLine(readSettings()));
 }
 
