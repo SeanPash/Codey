@@ -3,6 +3,8 @@ import { spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import type { Mode } from "../types.js";
+import { defaultRoot } from "../store/session-store.js";
+import { patchStatus } from "../statusline/state.js";
 
 type Settings = Record<string, unknown> & { statusLine?: { type: string; command: string } };
 
@@ -38,8 +40,22 @@ function statusLineCommand(self: string): string {
   return `node "${self}" statusline`;
 }
 
+function pidPath(): string {
+  return join(defaultRoot(), "narrator.pid");
+}
+
+// Stop a previously-spawned narrator so modes never fight over the same file.
+export function stopNarrator(path: string, kill: (pid: number) => void = (pid) => process.kill(pid)): void {
+  if (!existsSync(path)) return;
+  const pid = Number(readFileSync(path, "utf8").trim());
+  if (pid > 0) { try { kill(pid); } catch { /* already gone */ } }
+}
+
 export function turnOn(mode: Mode, session: string): void {
   const self = process.argv[1];
+  stopNarrator(pidPath());
+  mkdirSync(join(defaultRoot(), session), { recursive: true });
+  patchStatus(join(defaultRoot(), session), { mode }); // show the new mode on the next render, instantly
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   // detached lets the narrator outlive the slash command's process tree (Claude Code kills
   // that tree when the command returns). stdio "ignore" means no console handles, and
@@ -50,10 +66,11 @@ export function turnOn(mode: Mode, session: string): void {
     windowsHide: true,
   });
   child.unref();
+  mkdirSync(defaultRoot(), { recursive: true });
+  writeFileSync(pidPath(), String(child.pid ?? ""));
 }
 
 export function turnOff(): void {
+  stopNarrator(pidPath());
   writeSettings(withoutStatusLine(readSettings()));
-  // The narrator is detached; it exits on its own when the session ends. A pidfile-based
-  // stop can be added if lingering processes turn out to be a problem.
 }
