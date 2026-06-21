@@ -3595,22 +3595,39 @@ var RESET = "\x1B[0m";
 var BOLD = "\x1B[1m";
 var DIM = "\x1B[2m";
 var BRAND = "\x1B[38;5;75m";
-var LABEL = "\x1B[38;5;250m";
+var GOLD = "\x1B[38;5;214m";
+var LAV = "\x1B[38;5;147m";
 var GRAY = "\x1B[38;5;250m";
 var TEXT = "\x1B[38;5;253m";
-var WHY = "\x1B[38;5;147m";
 var RED = "\x1B[38;5;203m";
+var MODE_COLOR = {
+  simple: "\x1B[38;5;75m",
+  deep: "\x1B[38;5;141m",
+  teach: "\x1B[38;5;150m"
+};
 var WRAP = 120;
 var MAX_WHY_LINES = 5;
 var COL = 5;
-function rail() {
-  return `${BRAND}\u258C${RESET} `;
-}
-function row(label, labelStyle, body) {
-  return `${rail()}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
-}
-function cont(body) {
-  return `${rail()}${" ".repeat(COL)}  ${body}`;
+function frame(railColor) {
+  const edge = (ch) => `${railColor}${ch}${RESET} `;
+  return {
+    // The branded title row, e.g. "codey · deep".
+    header(mode) {
+      return `${edge("\u256D")}${BOLD}${BRAND}codey${RESET} ${DIM}${GRAY}\xB7 ${mode}${RESET}`;
+    },
+    // A labeled body row: padded color label, then the body two spaces over.
+    row(label, labelStyle, body) {
+      return `${edge("\u2502")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
+    },
+    // A wrapped-why continuation line, aligned under the why body.
+    cont(body) {
+      return `${edge("\u2502")}${" ".repeat(COL)}  ${body}`;
+    },
+    // The closing corner under the last row.
+    bottom() {
+      return `${railColor}\u2570${RESET}`;
+    }
+  };
 }
 function wrapWhy(text, width, maxLines) {
   const words = text.split(/\s+/).filter(Boolean);
@@ -3637,23 +3654,27 @@ function wrapWhy(text, width, maxLines) {
   return lines;
 }
 function renderStatus(snap, width = WRAP) {
-  const out = [`${rail()}${BOLD}${BRAND}codey${RESET}`];
+  const f = frame(MODE_COLOR[snap.mode] ?? MODE_COLOR.simple);
+  const out = [f.header(snap.mode)];
   if (!snap.action) {
-    out.push(row("doing", `${BOLD}${LABEL}`, `${DIM}waiting for Claude${RESET}`));
+    out.push(f.row("task", `${BOLD}${GOLD}`, `${DIM}waiting for Claude${RESET}`));
+    out.push(f.bottom());
     return out.join("\n");
   }
   const { tag, target } = snap.action;
-  out.push(row("doing", `${BOLD}${LABEL}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
+  out.push(f.row("task", `${BOLD}${GOLD}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
   if (snap.warning) {
-    out.push(row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
+    out.push(f.row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
+    out.push(f.bottom());
     return out.join("\n");
   }
   if (snap.why) {
     wrapWhy(snap.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
       const body = `${BOLD}${TEXT}${ln}${RESET}`;
-      out.push(idx === 0 ? row("why", `${BOLD}${WHY}`, body) : cont(body));
+      out.push(idx === 0 ? f.row("why", `${BOLD}${LAV}`, body) : f.cont(body));
     });
   }
+  out.push(f.bottom());
   return out.join("\n");
 }
 
