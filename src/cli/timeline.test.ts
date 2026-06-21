@@ -6,11 +6,11 @@ describe("timelineDecision", () => {
     expect(timelineDecision(null, () => true)).toEqual({ reuse: false, port: 4317 });
   });
 
-  it("reuses a live server on its recorded port", () => {
-    expect(timelineDecision({ port: 4400, pid: 123 }, (pid) => pid === 123)).toEqual({ reuse: true, port: 4400 });
+  it("reuses a server that is answering on its recorded port", () => {
+    expect(timelineDecision({ port: 4400, pid: 123 }, (port) => port === 4400)).toEqual({ reuse: true, port: 4400 });
   });
 
-  it("spawns again when the recorded pid is dead", () => {
+  it("spawns again when nothing answers on the recorded port", () => {
     expect(timelineDecision({ port: 4400, pid: 123 }, () => false)).toEqual({ reuse: false, port: 4317 });
   });
 });

@@ -21,4 +21,10 @@ describe("parseBudgetArg", () => {
   it("reports invalid input rather than guessing", () => {
     expect(parseBudgetArg("banana")).toEqual({ kind: "invalid" });
   });
+
+  it("rejects stray or misgrouped commas instead of silently parsing them", () => {
+    expect(parseBudgetArg("5,")).toEqual({ kind: "invalid" });
+    expect(parseBudgetArg(",5")).toEqual({ kind: "invalid" });
+    expect(parseBudgetArg("5,00")).toEqual({ kind: "invalid" });
+  });
 });

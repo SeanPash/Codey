@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { connect } from "node:net";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { defaultRoot } from "../store/session-store.js";
@@ -16,10 +17,11 @@ export interface TimelinePlan {
   port: number;
 }
 
-// Pure decision: reuse a recorded server only if its process is still alive; otherwise
-// plan a fresh spawn on the default port.
-export function timelineDecision(lock: ServeLock | null, isAlive: (pid: number) => boolean): TimelinePlan {
-  if (lock && isAlive(lock.pid)) return { reuse: true, port: lock.port };
+// Pure decision: reuse a recorded server only if something is actually answering on its
+// port; otherwise plan a fresh spawn on the default port. Probing the port (rather than the
+// recorded pid) avoids reusing a dead server whose pid was recycled by the OS.
+export function timelineDecision(lock: ServeLock | null, isPortUp: (port: number) => boolean): TimelinePlan {
+  if (lock && isPortUp(lock.port)) return { reuse: true, port: lock.port };
   return { reuse: false, port: DEFAULT_PORT };
 }
 
@@ -39,15 +41,35 @@ function readLock(dir: string): ServeLock | null {
   }
 }
 
-function alive(pid: number): boolean {
-  try { process.kill(pid, 0); return true; } catch { return false; }
+// True if a TCP connection to the local port succeeds within the timeout: a real "is the
+// timeline actually serving" check, not just "is some process alive".
+function probePort(port: number, timeoutMs = 300): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = connect({ host: "127.0.0.1", port });
+    const done = (ok: boolean) => { sock.destroy(); resolve(ok); };
+    sock.setTimeout(timeoutMs);
+    sock.once("connect", () => done(true));
+    sock.once("timeout", () => done(false));
+    sock.once("error", () => done(false));
+  });
 }
 
-export function runTimeline(): void {
+async function waitForPort(port: number, attempts = 20, gapMs = 150): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    if (await probePort(port)) return true;
+    await new Promise((r) => setTimeout(r, gapMs));
+  }
+  return false;
+}
+
+export async function runTimeline(): Promise<void> {
   const session = latestSessionId();
   if (!session) { console.error("No Codey sessions found yet."); process.exit(1); }
   const dir = join(defaultRoot(), session);
-  const plan = timelineDecision(readLock(dir), alive);
+
+  const lock = readLock(dir);
+  const up = lock ? await probePort(lock.port) : false;
+  const plan = timelineDecision(lock, () => up);
 
   if (plan.reuse) {
     console.log(`Codey timeline already open at http://localhost:${plan.port}`);
@@ -62,5 +84,10 @@ export function runTimeline(): void {
   });
   child.unref();
   writeFileSync(lockPath(dir), JSON.stringify({ port: plan.port, pid: child.pid ?? 0 }));
-  console.log(`Codey timeline at http://localhost:${plan.port}`);
+
+  // Only claim it is ready once the port actually answers, so we never hand out a URL the
+  // browser would refuse.
+  const ready = await waitForPort(plan.port);
+  if (ready) console.log(`Codey timeline at http://localhost:${plan.port}`);
+  else console.log(`Codey timeline starting at http://localhost:${plan.port} (give it a moment to open).`);
 }

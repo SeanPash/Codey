@@ -1,4 +1,5 @@
 import type { ToolEvent } from "../types.js";
+import { cardsFromEvents } from "../statusline/compose.js";
 
 // How rich an on-demand explanation should be. Mirrors the live narration depths.
 export type ExplainDepth = "simple" | "deep" | "teach";
@@ -22,17 +23,27 @@ export function parseExplainArgs(tokens: string[]): { depth: ExplainDepth; task:
   for (const t of tokens) {
     const low = t.toLowerCase();
     if (DEPTHS.includes(low)) depth = low as ExplainDepth;
-    else if (/^#?\d+$/.test(low)) task = Number(low.replace("#", ""));
+    else if (/^#?\d+$/.test(low)) {
+      const n = Number(low.replace("#", ""));
+      if (n >= 1) task = n; // task numbers start at 1; ignore 0 or negatives
+    }
   }
   return { depth, task };
 }
 
-// Narrow a turn's events to a single task: the Nth tool call started this turn (1-based),
-// matching the #N numbering the status line shows. Empty if the number is out of range.
+// Narrow a turn's events to the task the user sees as #N. The status line groups rapid
+// same-kind actions into one card spanning #seq..#endSeq, so we map the number onto its
+// card and return that whole burst, not a single hidden mid-burst event. Empty if the
+// number falls past the last card.
 export function eventForTask(turnEvents: ToolEvent[], taskNumber: number): ToolEvent[] {
   const pres = turnEvents.filter((e) => e.phase === "pre");
-  const target = pres[taskNumber - 1];
-  return target ? [target] : [];
+  const card = cardsFromEvents(turnEvents).find((c) => {
+    const end = c.endSeq ?? c.seq;
+    return taskNumber >= c.seq && taskNumber <= end;
+  });
+  if (!card) return [];
+  const end = card.endSeq ?? card.seq;
+  return pres.slice(card.seq - 1, end); // seq..end are 1-based inclusive pre indices
 }
 
 function summarizeEvent(e: ToolEvent): string {

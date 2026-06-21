@@ -57,6 +57,11 @@ describe("parseExplainArgs", () => {
     expect(parseExplainArgs(["#5"])).toEqual({ depth: "deep", task: 5 });
   });
 
+  it("ignores task 0 and negatives since numbering starts at 1", () => {
+    expect(parseExplainArgs(["0"])).toEqual({ depth: "deep", task: null });
+    expect(parseExplainArgs(["#0"])).toEqual({ depth: "deep", task: null });
+  });
+
   it("reads a depth and a task in either order", () => {
     expect(parseExplainArgs(["simple", "2"])).toEqual({ depth: "simple", task: 2 });
     expect(parseExplainArgs(["2", "simple"])).toEqual({ depth: "simple", task: 2 });
@@ -68,12 +73,20 @@ describe("parseExplainArgs", () => {
 });
 
 describe("eventForTask", () => {
-  it("picks the Nth pre event in the turn (1-based)", () => {
-    const turn = [ev(10), ev(20), ev(30)];
+  it("picks the single event behind a standalone card", () => {
+    // Different tools do not group, so each is its own card #1, #2, #3.
+    const turn = [ev(10, "Read"), ev(20, "Write"), ev(30, "Bash")];
     expect(eventForTask(turn, 2).map((e) => e.timestamp)).toEqual([20]);
   });
 
-  it("is empty when the task number is out of range", () => {
+  it("returns the whole burst when the number lands inside a grouped card", () => {
+    // Three quick reads group into one card spanning #1-3; any number in range returns all.
+    const burst = [ev(10, "Read"), ev(20, "Read"), ev(30, "Read")];
+    expect(eventForTask(burst, 1).map((e) => e.timestamp)).toEqual([10, 20, 30]);
+    expect(eventForTask(burst, 3).map((e) => e.timestamp)).toEqual([10, 20, 30]);
+  });
+
+  it("is empty when the task number is past the last card", () => {
     expect(eventForTask([ev(10)], 4)).toEqual([]);
   });
 });

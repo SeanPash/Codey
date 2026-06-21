@@ -27,6 +27,14 @@ describe("summarizeCosts", () => {
     expect(s.priciest).toBeNull();
     expect(s.lines).toEqual([]);
   });
+
+  it("does not report a thinking turn as the priciest task", () => {
+    const turns = [
+      turn({ tool: "thinking", outputTokens: 5000 }),
+      turn({ tool: "Write", input: { file_path: "b.ts" }, outputTokens: 120 }),
+    ];
+    expect(summarizeCosts(turns).priciest).toBe("Writing b.ts");
+  });
 });
 
 describe("renderCosts", () => {
