@@ -160,6 +160,16 @@ describe("renderStatus", () => {
     expect(out).toContain("3.8k left");
   });
 
+  it("omits the empty summary rule when the finished turn has no sentence", () => {
+    const out = plain(renderStatus({
+      ...base,
+      summary: { sentence: null, items: [{ seq: 1, tag: "reading", target: "the file a.ts", raw: null }] },
+    }));
+    expect(out).not.toContain("summary"); // no bare header with nothing under it
+    expect(out).toContain("completed tasks"); // the done steps still show
+    expect(out).toContain("✓ #1 read a.ts");
+  });
+
   it("shows the timeline and costs affordances on the finished-turn summary", () => {
     const out = plain(renderStatus({
       ...base,

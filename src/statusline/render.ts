@@ -139,8 +139,10 @@ export function renderStatus(view: StatusView, width = WRAP): string {
   // rule, both centered so the finished turn reads as its own balanced panel.
   if (view.summary) {
     const s = view.summary;
-    out.push(f.divider("summary"));
+    // Only show the summary rule when there is a sentence under it; an empty header with no
+    // rows (common in ask mode, where nothing is narrated) reads as a broken box.
     if (s.sentence) {
+      out.push(f.divider("summary"));
       wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.centered(`${BOLD}${TEXT}${ln}${RESET}`, width)));
     }
     if (s.items.length) {
