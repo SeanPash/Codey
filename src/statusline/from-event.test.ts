@@ -6,7 +6,7 @@ const base: ToolEvent = { id: "1", phase: "pre", tool: "Edit", server: null, inp
 
 describe("actionFromEvent", () => {
   it("derives a label from a pre event", () => {
-    expect(actionFromEvent(base)).toEqual({ tag: "editing", target: "auth.ts" });
+    expect(actionFromEvent(base)).toEqual({ tag: "editing", target: "the file auth.ts" });
   });
   it("ignores post events (keeps the last pre action)", () => {
     expect(actionFromEvent({ ...base, phase: "post" })).toBeNull();
