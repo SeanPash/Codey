@@ -17,8 +17,10 @@ export function appendWhy(dir: string, entry: WhyEntry): void {
 export function readWhys(dir: string): WhyEntry[] {
   const p = file(dir);
   if (!existsSync(p)) return [];
-  return readFileSync(p, "utf8")
-    .split("\n")
-    .filter((l) => l.trim())
-    .map((l) => JSON.parse(l) as WhyEntry);
+  const out: WhyEntry[] = [];
+  for (const line of readFileSync(p, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try { out.push(JSON.parse(line) as WhyEntry); } catch { /* skip a partial line */ }
+  }
+  return out;
 }

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
@@ -49,6 +49,8 @@ export function stopNarrator(path: string, kill: (pid: number) => void = (pid) =
   if (!existsSync(path)) return;
   const pid = Number(readFileSync(path, "utf8").trim());
   if (pid > 0) { try { kill(pid); } catch { /* already gone */ } }
+  // Clear the pidfile so a later toggle never signals a reused, unrelated PID.
+  rmSync(path, { force: true });
 }
 
 export function turnOn(mode: Mode, session: string): void {
@@ -66,7 +68,6 @@ export function turnOn(mode: Mode, session: string): void {
     windowsHide: true,
   });
   child.unref();
-  mkdirSync(defaultRoot(), { recursive: true });
   writeFileSync(pidPath(), String(child.pid ?? ""));
 }
 

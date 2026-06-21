@@ -3065,7 +3065,15 @@ var SessionStore = class {
   }
   readAll() {
     if (!existsSync(this.file)) return [];
-    return readFileSync(this.file, "utf8").split("\n").filter((l) => l.trim().length > 0).map((l) => JSON.parse(l));
+    const out = [];
+    for (const line of readFileSync(this.file, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        out.push(JSON.parse(line));
+      } catch {
+      }
+    }
+    return out;
   }
   get path() {
     return this.file;
@@ -3585,7 +3593,15 @@ function appendWhy(dir, entry) {
 function readWhys(dir) {
   const p = file2(dir);
   if (!existsSync6(p)) return [];
-  return readFileSync6(p, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  const out = [];
+  for (const line of readFileSync6(p, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+    }
+  }
+  return out;
 }
 
 // src/cli/narrate.ts
@@ -4264,7 +4280,7 @@ function runFeed(sessionId) {
 }
 
 // src/cli/toggle.ts
-import { readFileSync as readFileSync12, writeFileSync as writeFileSync5, existsSync as existsSync13, mkdirSync as mkdirSync5 } from "node:fs";
+import { readFileSync as readFileSync12, writeFileSync as writeFileSync5, existsSync as existsSync13, mkdirSync as mkdirSync5, rmSync as rmSync2 } from "node:fs";
 import { spawn } from "node:child_process";
 import { join as join11, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
@@ -4308,6 +4324,7 @@ function stopNarrator(path, kill = (pid) => process.kill(pid)) {
     } catch {
     }
   }
+  rmSync2(path, { force: true });
 }
 function turnOn(mode, session) {
   const self = process.argv[1];
@@ -4321,7 +4338,6 @@ function turnOn(mode, session) {
     windowsHide: true
   });
   child.unref();
-  mkdirSync5(defaultRoot(), { recursive: true });
   writeFileSync5(pidPath(), String(child.pid ?? ""));
 }
 function turnOff() {

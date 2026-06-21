@@ -70,7 +70,15 @@ var SessionStore = class {
   }
   readAll() {
     if (!existsSync(this.file)) return [];
-    return readFileSync(this.file, "utf8").split("\n").filter((l) => l.trim().length > 0).map((l) => JSON.parse(l));
+    const out = [];
+    for (const line of readFileSync(this.file, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        out.push(JSON.parse(line));
+      } catch {
+      }
+    }
+    return out;
   }
   get path() {
     return this.file;

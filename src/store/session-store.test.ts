@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionStore } from "./session-store.js";
@@ -27,5 +27,13 @@ describe("SessionStore", () => {
 
   it("readAll on a fresh session returns an empty array", () => {
     expect(new SessionStore("missing", dir).readAll()).toEqual([]);
+  });
+
+  it("skips a malformed line instead of throwing", () => {
+    const store = new SessionStore("s1", dir);
+    store.append(ev({ id: "a" }));
+    appendFileSync(store.path, "{ partial line with no close\n");
+    store.append(ev({ id: "b" }));
+    expect(store.readAll().map((e) => e.id)).toEqual(["a", "b"]);
   });
 });
