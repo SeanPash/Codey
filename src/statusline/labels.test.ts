@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { actionLabel, rawTarget } from "./labels.js";
+import { pastTense } from "./labels.js";
 
 describe("actionLabel", () => {
   it("describes file tools in plain English", () => {
@@ -53,5 +54,27 @@ describe("rawTarget", () => {
   it("returns null when there is no literal target", () => {
     expect(rawTarget("Read", {})).toBeNull();
     expect(rawTarget("SomethingElse", { x: 1 })).toBeNull();
+  });
+});
+
+describe("pastTense", () => {
+  it("converts the common action verbs to past tense", () => {
+    expect(pastTense("reading")).toBe("read");
+    expect(pastTense("writing")).toBe("wrote");
+    expect(pastTense("editing")).toBe("edited");
+    expect(pastTense("removing")).toBe("removed");
+    expect(pastTense("creating")).toBe("created");
+    expect(pastTense("running")).toBe("ran");
+    expect(pastTense("searching")).toBe("searched");
+  });
+
+  it("handles two-word verb phrases", () => {
+    expect(pastTense("searching for")).toBe("searched for");
+    expect(pastTense("looking for")).toBe("looked for");
+    expect(pastTense("switching to")).toBe("switched to");
+  });
+
+  it("leaves an unknown verb unchanged", () => {
+    expect(pastTense("frobnicating")).toBe("frobnicating");
   });
 });

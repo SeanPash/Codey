@@ -3,17 +3,19 @@ import { join } from "node:path";
 import { SessionStore } from "../store/session-store.js";
 import { cardsFromEvents } from "../statusline/compose.js";
 import { readWhys } from "../narration/history.js";
+import { readPrompts } from "../capture/prompts.js";
 import { feedItems, advanceFeed, renderFeedHeader, type FeedCursor } from "../feed/render.js";
 
 export function runFeed(sessionId: string): void {
   const store = new SessionStore(sessionId);
   const narrationPath = join(store.dir, "narration.jsonl");
-  let cursor: FeedCursor = { lastSeq: 0, whysShownFor: new Set() };
+  const promptsPath = join(store.dir, "prompts.jsonl");
+  let cursor: FeedCursor = { lastSeq: 0, whysShownFor: new Set(), turnsHeadered: new Set(), turnsSummarized: new Set() };
 
   const build = () => feedItems(cardsFromEvents(store.readAll()), readWhys(store.dir));
   const flush = () => {
     if (!existsSync(store.path)) return;
-    const r = advanceFeed(build(), cursor);
+    const r = advanceFeed(build(), cursor, readPrompts(store.dir));
     cursor = r.cursor;
     if (r.text) process.stdout.write(r.text + "\n");
   };
@@ -22,4 +24,5 @@ export function runFeed(sessionId: string): void {
   flush();
   watchFile(store.path, { interval: 1000 }, flush);
   watchFile(narrationPath, { interval: 1000 }, flush);
+  watchFile(promptsPath, { interval: 1000 }, flush);
 }

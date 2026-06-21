@@ -162,3 +162,35 @@ export function actionLabel(tool: string, input: unknown): ActionLabel {
   if (m) return { tag: "using", target: `${m[2].replace(/_/g, " ")} (${m[1]})` };
   return { tag: "using", target: tool };
 }
+
+// Past-tense forms for the finished-task rows, where the verb reads better as
+// "read rules.md" than "reading rules.md". Unknown verbs fall through unchanged.
+const PAST: Record<string, string> = {
+  reading: "read",
+  writing: "wrote",
+  editing: "edited",
+  removing: "removed",
+  creating: "created",
+  copying: "copied",
+  moving: "moved",
+  listing: "listed",
+  running: "ran",
+  installing: "installed",
+  fetching: "fetched",
+  printing: "printed",
+  searching: "searched",
+  "searching for": "searched for",
+  "looking for": "looked for",
+  "switching to": "switched to",
+  using: "used",
+  asking: "asked",
+};
+
+export function pastTense(tag: string): string {
+  return PAST[tag] ?? tag;
+}
+
+// Drop the friendly prefix so done rows read tight: "the file rules.md" -> "rules.md".
+export function shortTarget(target: string): string {
+  return target.replace(/^the (file|folder) /, "");
+}

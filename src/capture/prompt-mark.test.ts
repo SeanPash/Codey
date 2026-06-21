@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handlePromptInput } from "./prompt-mark.js";
 import { readStatus } from "../statusline/state.js";
+import { readPrompts } from "./prompts.js";
 
 describe("handlePromptInput", () => {
   it("stamps promptAt on the session snapshot", () => {
@@ -20,5 +21,11 @@ describe("handlePromptInput", () => {
   it("ignores malformed json without throwing", () => {
     const root = mkdtempSync(join(tmpdir(), "codey-prompt-"));
     expect(() => handlePromptInput("{not json", 1, root)).not.toThrow();
+  });
+
+  it("appends the prompt timestamp to the prompts log", () => {
+    const root = mkdtempSync(join(tmpdir(), "codey-prompt-"));
+    handlePromptInput(JSON.stringify({ session_id: "s1", hook_event_name: "UserPromptSubmit" }), 4242, root);
+    expect(readPrompts(join(root, "s1"))).toEqual([4242]);
   });
 });

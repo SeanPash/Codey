@@ -17,6 +17,11 @@ describe("shouldNarrate", () => {
     expect(shouldNarrate("deep", { newEvents: 2, msSinceLast: 5000 })).toBe(true);
     expect(shouldNarrate("deep", { newEvents: 1, msSinceLast: 5000 })).toBe(false);
   });
+
+  it("deep mode waits the full read-time floor before narrating again", () => {
+    expect(shouldNarrate("deep", { newEvents: 2, msSinceLast: 4000 })).toBe(false);
+    expect(shouldNarrate("deep", { newEvents: 2, msSinceLast: 5000 })).toBe(true);
+  });
 });
 
 describe("teach pacing", () => {

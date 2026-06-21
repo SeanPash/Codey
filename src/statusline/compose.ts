@@ -1,8 +1,10 @@
 import type { ToolEvent } from "../types.js";
 import { actionLabel, rawTarget } from "./labels.js";
 import { schedule, type Card } from "./schedule.js";
+import { readMs, scheduleWhy } from "./read-time.js";
 import type { StatusSnapshot } from "./state.js";
 import type { CardView, StatusView, SummaryView } from "./view.js";
+import type { WhyEntry } from "../narration/history.js";
 
 // How many finished steps the summary checklist shows. Enough to recap the turn
 // without growing the box back into the wall of text we are trying to avoid.
@@ -12,6 +14,10 @@ const SUMMARY_ITEMS = 3;
 // burst. It keeps Codey from falling minutes behind when Claude reads ten files in
 // a second, while still giving deliberate, spaced-out steps their own card.
 const GROUP_WINDOW_MS = 2500;
+
+// Extra dwell per action folded into a burst, so a card that stands for ten reads
+// lingers longer than a single read instead of flashing past in one read-time.
+const GROUP_STEP_MS = 600;
 
 // Strip the friendly prefix so a group can list bare names: "the file a.ts" -> "a.ts".
 function shortName(target: string): string {
@@ -74,11 +80,19 @@ const toView = (c: Card): CardView => ({
   raw: c.raw,
 });
 
+// A card dwells for the time it takes to read its own line, plus a step for each extra
+// action it groups, so big bursts get proportionally more time on screen.
+function cardDwell(c: Card): number {
+  const base = readMs(`${c.action.tag} ${c.action.target}`);
+  const count = c.endSeq && c.endSeq > c.seq ? c.endSeq - c.seq + 1 : 1;
+  return base + (count - 1) * GROUP_STEP_MS;
+}
+
 export function composeView(
   events: ToolEvent[],
   snap: StatusSnapshot,
   now: number,
-  dwellMs: number,
+  whys: WhyEntry[] = [],
 ): StatusView {
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
   // Claude is between turns: a prompt arrived after the last tool finished, so nothing
@@ -104,12 +118,13 @@ export function composeView(
     return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary };
   }
 
-  const { current, prev, isLatest } = schedule(cards, now, dwellMs);
+  const { current, prev, isLatest } = schedule(cards, now, cardDwell);
+  const heldWhy = scheduleWhy(whys, now) ?? snap.why;
   return {
     mode: snap.mode,
     current: current ? toView(current) : null,
     prev: prev.map(toView),
-    why: isLatest ? snap.why : null,
+    why: isLatest ? heldWhy : null,
     warning: isLatest ? snap.warning : null,
     thinking: false,
     summary: null,

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { defaultRoot } from "../store/session-store.js";
 import { patchStatus } from "../statusline/state.js";
+import { appendPrompt } from "./prompts.js";
 
 // Records when the user last submitted a prompt so the status line can show a
 // "thinking" state in the gap before Claude's first tool call. Kept separate from
@@ -21,6 +22,7 @@ export function handlePromptInput(rawJson: string, now = Date.now(), root: strin
   const dir = join(root, raw.session_id);
   mkdirSync(dir, { recursive: true });
   patchStatus(dir, { promptAt: now });
+  appendPrompt(dir, now);
 }
 
 function main(): void {
