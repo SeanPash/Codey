@@ -9,7 +9,7 @@ interface ThrottleState {
 // floor so it stays cheap. deep refreshes more eagerly and says more.
 const PACING: Record<Mode, { everyN: number; minMs: number }> = {
   simple: { everyN: 1, minMs: 7000 },
-  deep: { everyN: 2, minMs: 3000 },
+  deep: { everyN: 2, minMs: 5000 },
   teach: { everyN: 3, minMs: 5000 },
 };
 
