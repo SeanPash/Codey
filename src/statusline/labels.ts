@@ -102,6 +102,24 @@ function describeBash(cmd: string): ActionLabel {
   return { tag: "running", target: `the command ${shorten(cmd)}` };
 }
 
+// The literal detail behind the friendly label: the full path or command, unshortened.
+export function rawTarget(tool: string, input: unknown): string | null {
+  const file = str(input, "file_path") ?? str(input, "path");
+  switch (tool) {
+    case "Read":
+    case "Edit":
+    case "MultiEdit":
+    case "Write":
+      return file;
+    case "Bash":
+      return str(input, "command");
+    case "Grep":
+    case "Glob":
+      return str(input, "pattern");
+  }
+  return null;
+}
+
 export function actionLabel(tool: string, input: unknown): ActionLabel {
   const file = str(input, "file_path") ?? str(input, "path");
   const named = (verb: string) => ({ tag: verb, target: file ? `the file ${basename(file)}` : "a file" });

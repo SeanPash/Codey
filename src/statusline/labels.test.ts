@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { actionLabel } from "./labels.js";
+import { actionLabel, rawTarget } from "./labels.js";
 
 describe("actionLabel", () => {
   it("describes file tools in plain English", () => {
@@ -20,5 +20,22 @@ describe("actionLabel", () => {
   it("falls back to a generic phrase for unknown tools", () => {
     expect(actionLabel("Write", {})).toEqual({ tag: "writing", target: "a file" });
     expect(actionLabel("WebFetch", {})).toEqual({ tag: "using", target: "WebFetch" });
+  });
+});
+
+describe("rawTarget", () => {
+  it("returns the full file path for file tools", () => {
+    expect(rawTarget("Write", { file_path: "C:\\proj\\a.ts" })).toBe("C:\\proj\\a.ts");
+    expect(rawTarget("Read", { path: "/tmp/b.ts" })).toBe("/tmp/b.ts");
+  });
+  it("returns the full command for Bash", () => {
+    expect(rawTarget("Bash", { command: "rm -rf build" })).toBe("rm -rf build");
+  });
+  it("returns the pattern for search tools", () => {
+    expect(rawTarget("Grep", { pattern: "TODO" })).toBe("TODO");
+  });
+  it("returns null when there is no literal target", () => {
+    expect(rawTarget("Read", {})).toBeNull();
+    expect(rawTarget("SomethingElse", { x: 1 })).toBeNull();
   });
 });
