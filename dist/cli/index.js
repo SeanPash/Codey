@@ -3721,6 +3721,9 @@ function addSpend(dir, tokens) {
   if (!b) return;
   writeFileSync3(file3(dir), JSON.stringify({ cap: b.cap, spent: b.spent + Math.max(0, tokens) }));
 }
+function budgetAllows(b) {
+  return !b || b.spent < b.cap;
+}
 function formatTokens(n) {
   if (n >= 1e3) return `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k`;
   return String(n);
@@ -3753,7 +3756,7 @@ async function narrateTick(dir, events, state, now) {
 function makeBudgetedNarrate(getBudget, metered, meter) {
   return async (prompt) => {
     const b = getBudget();
-    if (b && b.spent >= b.cap) return null;
+    if (!budgetAllows(b)) return null;
     const r = await metered(prompt);
     if (!r) return null;
     meter(r.tokens);
@@ -4033,8 +4036,8 @@ function renderStatus(view, width = WRAP) {
   }
   if (view.summary) {
     const s = view.summary;
-    out.push(f.divider("summary"));
     if (s.sentence) {
+      out.push(f.divider("summary"));
       wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.centered(`${BOLD}${TEXT}${ln}${RESET}`, width)));
     }
     if (s.items.length) {
@@ -4769,7 +4772,7 @@ function parseBudgetArg(raw) {
   const s = (raw ?? "").trim().toLowerCase();
   if (!s) return { kind: "report" };
   if (s === "off" || s === "0") return { kind: "clear" };
-  const m = /^([\d,]+)(k)?$/.exec(s);
+  const m = /^(\d{1,3}(?:,\d{3})*|\d+)(k)?$/.exec(s);
   if (!m) return { kind: "invalid" };
   const n = Number(m[1].replace(/,/g, "")) * (m[2] ? 1e3 : 1);
   if (!Number.isFinite(n) || n <= 0) return { kind: "invalid" };
@@ -4819,14 +4822,22 @@ function parseExplainArgs(tokens) {
   for (const t of tokens) {
     const low = t.toLowerCase();
     if (DEPTHS.includes(low)) depth = low;
-    else if (/^#?\d+$/.test(low)) task = Number(low.replace("#", ""));
+    else if (/^#?\d+$/.test(low)) {
+      const n = Number(low.replace("#", ""));
+      if (n >= 1) task = n;
+    }
   }
   return { depth, task };
 }
 function eventForTask(turnEvents, taskNumber) {
   const pres = turnEvents.filter((e) => e.phase === "pre");
-  const target = pres[taskNumber - 1];
-  return target ? [target] : [];
+  const card = cardsFromEvents(turnEvents).find((c) => {
+    const end2 = c.endSeq ?? c.seq;
+    return taskNumber >= c.seq && taskNumber <= end2;
+  });
+  if (!card) return [];
+  const end = card.endSeq ?? card.seq;
+  return pres.slice(card.seq - 1, end);
 }
 function summarizeEvent2(e) {
   const input = JSON.stringify(e.input ?? null).slice(0, 200);
@@ -4943,6 +4954,7 @@ function summarizeCosts(turns) {
   let priciest = null;
   let max = -1;
   for (const l of b.workLines) {
+    if (l.status === "none") continue;
     if (l.tokens > max) {
       max = l.tokens;
       priciest = l.label;
@@ -4971,11 +4983,12 @@ function runCosts() {
 
 // src/cli/timeline.ts
 import { spawn as spawn2 } from "node:child_process";
+import { connect } from "node:net";
 import { readFileSync as readFileSync18, writeFileSync as writeFileSync8, existsSync as existsSync19 } from "node:fs";
 import { join as join18 } from "node:path";
 var DEFAULT_PORT = 4317;
-function timelineDecision(lock, isAlive) {
-  if (lock && isAlive(lock.pid)) return { reuse: true, port: lock.port };
+function timelineDecision(lock, isPortUp) {
+  if (lock && isPortUp(lock.port)) return { reuse: true, port: lock.port };
   return { reuse: false, port: DEFAULT_PORT };
 }
 function lockPath(dir) {
@@ -4992,22 +5005,36 @@ function readLock(dir) {
     return null;
   }
 }
-function alive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+function probePort(port, timeoutMs = 300) {
+  return new Promise((resolve) => {
+    const sock = connect({ host: "127.0.0.1", port });
+    const done = (ok) => {
+      sock.destroy();
+      resolve(ok);
+    };
+    sock.setTimeout(timeoutMs);
+    sock.once("connect", () => done(true));
+    sock.once("timeout", () => done(false));
+    sock.once("error", () => done(false));
+  });
 }
-function runTimeline() {
+async function waitForPort(port, attempts = 20, gapMs = 150) {
+  for (let i = 0; i < attempts; i++) {
+    if (await probePort(port)) return true;
+    await new Promise((r) => setTimeout(r, gapMs));
+  }
+  return false;
+}
+async function runTimeline() {
   const session = latestSessionId();
   if (!session) {
     console.error("No Codey sessions found yet.");
     process.exit(1);
   }
   const dir = join18(defaultRoot(), session);
-  const plan = timelineDecision(readLock(dir), alive);
+  const lock = readLock(dir);
+  const up = lock ? await probePort(lock.port) : false;
+  const plan = timelineDecision(lock, () => up);
   if (plan.reuse) {
     console.log(`Codey timeline already open at http://localhost:${plan.port}`);
     return;
@@ -5020,7 +5047,9 @@ function runTimeline() {
   });
   child.unref();
   writeFileSync8(lockPath(dir), JSON.stringify({ port: plan.port, pid: child.pid ?? 0 }));
-  console.log(`Codey timeline at http://localhost:${plan.port}`);
+  const ready = await waitForPort(plan.port);
+  if (ready) console.log(`Codey timeline at http://localhost:${plan.port}`);
+  else console.log(`Codey timeline starting at http://localhost:${plan.port} (give it a moment to open).`);
 }
 
 // src/cli/index.ts
@@ -5081,7 +5110,9 @@ program2.command("explain").description("Explain the most recent task in depth; 
 });
 program2.command("budget").description("Set or report the token budget for automatic narration").argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report").action((amount) => runBudget(amount));
 program2.command("costs").description("Show the token cost of each task in this session").action(() => runCosts());
-program2.command("timeline").description("Open the browser timeline for this session, reusing a running one").action(() => runTimeline());
+program2.command("timeline").description("Open the browser timeline for this session, reusing a running one").action(() => {
+  void runTimeline();
+});
 program2.command("off").description("Turn narration off and restore the plain status line").action(() => {
   const session = latestSessionId();
   if (session) turnOff(session);
