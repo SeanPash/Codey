@@ -7,6 +7,7 @@ import { defaultRoot } from "../store/session-store.js";
 import { latestSessionId } from "./sessions.js";
 import { readSessionMode } from "../statusline/active-mode.js";
 import { readWhys } from "../narration/history.js";
+import { readBudget } from "../budget/budget.js";
 import type { ToolEvent, Mode } from "../types.js";
 
 function readEvents(dir: string): ToolEvent[] {
@@ -23,7 +24,7 @@ function readEvents(dir: string): ToolEvent[] {
 export function statusLineFor(dir: string, now = Date.now(), mode?: Mode): string {
   if (!existsSync(dir)) return "";
   const snap: StatusSnapshot = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
-  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir)));
+  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir), readBudget(dir)));
 }
 
 // Pull the session id out of the JSON payload Claude Code pipes to the status line.

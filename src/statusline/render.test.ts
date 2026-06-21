@@ -154,4 +154,9 @@ describe("renderStatus", () => {
     const out = plain(renderStatus({ ...base, mode: "ask" }));
     expect(out).toContain("Ask");
   });
+
+  it("shows the budget-left suffix in the header", () => {
+    const out = plain(renderStatus({ ...base, budgetLeft: "3.8k left" }));
+    expect(out).toContain("3.8k left");
+  });
 });
