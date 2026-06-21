@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { eventsForCurrentTurn, currentTurnStart, buildExplainPrompt } from "./explain.js";
+import { eventsForCurrentTurn, currentTurnStart, buildExplainPrompt, parseExplainArgs, eventForTask } from "./explain.js";
 import type { ToolEvent } from "../types.js";
 
 function ev(ts: number, tool = "Read"): ToolEvent {
@@ -35,5 +35,45 @@ describe("buildExplainPrompt", () => {
     expect(p).toContain("already been told");
     expect(p).toContain("Claude edited a file.");
     expect(p).toContain("deeper");
+  });
+
+  it("varies the instruction by depth", () => {
+    expect(buildExplainPrompt([ev(400)], [], "simple")).toContain("one plain English sentence");
+    expect(buildExplainPrompt([ev(400)], [], "teach")).toContain("teach the key concept");
+  });
+});
+
+describe("parseExplainArgs", () => {
+  it("defaults to deep depth and no task", () => {
+    expect(parseExplainArgs([])).toEqual({ depth: "deep", task: null });
+  });
+
+  it("reads a depth word", () => {
+    expect(parseExplainArgs(["teach"])).toEqual({ depth: "teach", task: null });
+  });
+
+  it("reads a task number with or without a hash", () => {
+    expect(parseExplainArgs(["3"])).toEqual({ depth: "deep", task: 3 });
+    expect(parseExplainArgs(["#5"])).toEqual({ depth: "deep", task: 5 });
+  });
+
+  it("reads a depth and a task in either order", () => {
+    expect(parseExplainArgs(["simple", "2"])).toEqual({ depth: "simple", task: 2 });
+    expect(parseExplainArgs(["2", "simple"])).toEqual({ depth: "simple", task: 2 });
+  });
+
+  it("ignores tokens it does not understand", () => {
+    expect(parseExplainArgs(["banana"])).toEqual({ depth: "deep", task: null });
+  });
+});
+
+describe("eventForTask", () => {
+  it("picks the Nth pre event in the turn (1-based)", () => {
+    const turn = [ev(10), ev(20), ev(30)];
+    expect(eventForTask(turn, 2).map((e) => e.timestamp)).toEqual([20]);
+  });
+
+  it("is empty when the task number is out of range", () => {
+    expect(eventForTask([ev(10)], 4)).toEqual([]);
   });
 });

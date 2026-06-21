@@ -99,7 +99,8 @@ program
 program
   .command("explain")
   .description("Explain the most recent task in depth; run again to go deeper")
-  .action(() => { void runExplain(); });
+  .argument("[args...]", "optional depth (simple | deep | teach) and/or a task number")
+  .action((args: string[]) => { void runExplain(args); });
 
 program
   .command("budget")

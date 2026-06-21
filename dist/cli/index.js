@@ -4806,24 +4806,51 @@ import { join as join17 } from "node:path";
 import { existsSync as existsSync18, readFileSync as readFileSync17 } from "node:fs";
 
 // src/narration/explain.ts
+var DEPTHS = ["simple", "deep", "teach"];
 function currentTurnStart(promptMarks) {
   return promptMarks.length ? promptMarks[promptMarks.length - 1] : Number.NEGATIVE_INFINITY;
 }
 function eventsForCurrentTurn(events, turnStart) {
   return events.filter((e) => e.timestamp >= turnStart);
 }
+function parseExplainArgs(tokens) {
+  let depth = "deep";
+  let task = null;
+  for (const t of tokens) {
+    const low = t.toLowerCase();
+    if (DEPTHS.includes(low)) depth = low;
+    else if (/^#?\d+$/.test(low)) task = Number(low.replace("#", ""));
+  }
+  return { depth, task };
+}
+function eventForTask(turnEvents, taskNumber) {
+  const pres = turnEvents.filter((e) => e.phase === "pre");
+  const target = pres[taskNumber - 1];
+  return target ? [target] : [];
+}
 function summarizeEvent2(e) {
   const input = JSON.stringify(e.input ?? null).slice(0, 200);
   const status = e.phase === "post" ? e.isError ? " [ERROR]" : " [done]" : "";
   return `- ${e.tool}${status} ${input}`;
 }
-function buildExplainPrompt(events, priorPasses) {
+function depthInstruction(depth) {
+  switch (depth) {
+    case "simple":
+      return "In one plain English sentence for a non-technical person, say what Claude did and why.";
+    case "teach":
+      return "In a few plain English sentences for someone learning to code, explain what Claude did and why, then briefly teach the key concept involved (define any technical term you use).";
+    default:
+      return "In a few plain English sentences for a non-technical person, explain what Claude did and why it matters.";
+  }
+}
+function buildExplainPrompt(events, priorPasses, depth = "deep") {
   const lines = events.map(summarizeEvent2).join("\n");
+  const instruction = depthInstruction(depth);
   if (priorPasses.length === 0) {
     return `These are the actions an AI coding agent took for the current task:
 ${lines}
 
-In a few plain English sentences for a non-technical person, explain what Claude did and why it matters. Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation.`;
+${instruction} Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation.`;
   }
   const heard = priorPasses.map((p, i) => `${i + 1}. ${p}`).join("\n");
   return `These are the actions an AI coding agent took for the current task:
@@ -4832,7 +4859,7 @@ ${lines}
 The user has already been told:
 ${heard}
 
-Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. A few plain English sentences for a non-technical person. Use plain hyphens, not em dashes. Reply with only the explanation.`;
+Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction} Use plain hyphens, not em dashes. Reply with only the explanation.`;
 }
 
 // src/narration/explain-log.ts
@@ -4841,10 +4868,10 @@ import { join as join16 } from "node:path";
 function file5(dir) {
   return join16(dir, "explain.jsonl");
 }
-function appendPass(dir, turn, text) {
-  appendFileSync4(file5(dir), JSON.stringify({ turn, text }) + "\n");
+function appendPass(dir, scope, text) {
+  appendFileSync4(file5(dir), JSON.stringify({ scope, text }) + "\n");
 }
-function passesForTurn(dir, turn) {
+function passesForScope(dir, scope) {
   const p = file5(dir);
   if (!existsSync17(p)) return [];
   const out = [];
@@ -4852,7 +4879,7 @@ function passesForTurn(dir, turn) {
     if (!line.trim()) continue;
     try {
       const o = JSON.parse(line);
-      if (o.turn === turn && typeof o.text === "string") out.push(o.text);
+      if (o.scope === scope && typeof o.text === "string") out.push(o.text);
     } catch {
     }
   }
@@ -4873,29 +4900,39 @@ function readEvents2(dir) {
   }
   return out;
 }
-async function runExplain() {
+async function runExplain(args = []) {
   const session = latestSessionId();
   if (!session) {
     console.error("No Codey sessions found yet.");
     process.exit(1);
   }
   const dir = join17(defaultRoot(), session);
+  const { depth, task } = parseExplainArgs(args);
   const start = currentTurnStart(readPrompts(dir));
-  const events = eventsForCurrentTurn(readEvents2(dir), start);
-  if (events.length === 0) {
+  const turnEvents = eventsForCurrentTurn(readEvents2(dir), start);
+  const turnKey = start === Number.NEGATIVE_INFINITY ? 0 : start;
+  let events = turnEvents;
+  let scope = String(turnKey);
+  if (task != null) {
+    events = eventForTask(turnEvents, task);
+    scope = `${turnKey}:t${task}`;
+    if (events.length === 0) {
+      console.log(`Task #${task} hasn't happened yet this turn.`);
+      return;
+    }
+  } else if (events.length === 0) {
     console.log("Nothing to explain yet; Claude has not started working on this prompt.");
     return;
   }
-  const turn = start === Number.NEGATIVE_INFINITY ? 0 : start;
-  const prior = passesForTurn(dir, turn);
-  const prompt = buildExplainPrompt(events, prior);
+  const prior = passesForScope(dir, scope);
+  const prompt = buildExplainPrompt(events, prior, depth);
   const result = await runClaudeMetered(prompt, 3e4);
   if (!result) {
     console.log("Could not reach Claude for an explanation just now. Try again in a moment.");
     return;
   }
   addSpend(dir, result.tokens);
-  appendPass(dir, turn, result.text);
+  appendPass(dir, scope, result.text);
   console.log(result.text);
 }
 
@@ -5039,8 +5076,8 @@ program2.command("on").description("Turn narration on in the status line").optio
   console.log("For the full scrollable task history, run this in a new terminal:");
   console.log(`  node "${process.argv[1]}" feed`);
 });
-program2.command("explain").description("Explain the most recent task in depth; run again to go deeper").action(() => {
-  void runExplain();
+program2.command("explain").description("Explain the most recent task in depth; run again to go deeper").argument("[args...]", "optional depth (simple | deep | teach) and/or a task number").action((args) => {
+  void runExplain(args);
 });
 program2.command("budget").description("Set or report the token budget for automatic narration").argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report").action((amount) => runBudget(amount));
 program2.command("costs").description("Show the token cost of each task in this session").action(() => runCosts());
