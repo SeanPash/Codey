@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { shouldNarrate } from "./throttle.js";
 
 describe("shouldNarrate", () => {
-  // simple: narrate at most every 5 new events AND not more than once / 8s
-  it("simple mode waits for 5 new events", () => {
-    expect(shouldNarrate("simple", { newEvents: 4, msSinceLast: 99999 })).toBe(false);
-    expect(shouldNarrate("simple", { newEvents: 5, msSinceLast: 99999 })).toBe(true);
+  // simple: still narrates so it carries a short why, but at most once / 7s
+  it("simple mode narrates after a new event", () => {
+    expect(shouldNarrate("simple", { newEvents: 0, msSinceLast: 99999 })).toBe(false);
+    expect(shouldNarrate("simple", { newEvents: 1, msSinceLast: 99999 })).toBe(true);
   });
 
   it("simple mode respects the time floor", () => {

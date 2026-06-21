@@ -3300,7 +3300,7 @@ function summarizeEvent(e) {
 }
 function buildNarrationPrompt(events, mode) {
   const lines = events.map(summarizeEvent).join("\n");
-  const instruction = mode === "teach" ? "In a few plain-English sentences for someone learning to code, explain what Claude is doing and why, then briefly teach the key concept involved (define any technical term you use). Do not list the tools; describe the goal." : mode === "deep" ? "In 2-3 plain-English sentences for a non-technical person, explain what Claude is doing AND why it matters. Do not list the tools; describe the goal." : "Write one sentence for a non-technical person saying what Claude is currently doing. Do not list the tools; describe the goal.";
+  const instruction = mode === "teach" ? "In a few plain-English sentences for someone learning to code, explain what Claude is doing and why, then briefly teach the key concept involved (define any technical term you use). Do not list the tools; describe the goal." : mode === "deep" ? "In 2-3 plain-English sentences for a non-technical person, explain what Claude is doing, why it matters, and how this change actually addresses the problem. Do not list the tools; describe the goal." : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Do not list the tools; describe the goal.";
   return `These are the most recent actions an AI coding agent took:
 ${lines}
 
@@ -3310,7 +3310,7 @@ Use plain hyphens, not em dashes. Reply with only the explanation, no preamble.`
 
 // src/narration/throttle.ts
 var PACING = {
-  simple: { everyN: 5, minMs: 8e3 },
+  simple: { everyN: 1, minMs: 7e3 },
   deep: { everyN: 2, minMs: 3e3 },
   teach: { everyN: 3, minMs: 5e3 }
 };
@@ -3394,7 +3394,14 @@ function pathArg(cmd) {
   const last = tokens[tokens.length - 1];
   return last ? basename(last) : null;
 }
+function isCompound(cmd) {
+  return /[;|\n]|&&|\|\||\$\(|`/.test(cmd) || /^\s*(for|while|until|if|case)\b/.test(cmd);
+}
 function describeBash(cmd) {
+  if (isCompound(cmd)) {
+    if (/^\s*(for|while|until)\b/.test(cmd)) return { tag: "running", target: "a shell loop" };
+    return { tag: "running", target: "a few shell commands" };
+  }
   const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
   const name = pathArg(cmd);
   const file3 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
@@ -3459,7 +3466,7 @@ function describeBash(cmd) {
     case "echo":
       return { tag: "printing", target: "to the terminal" };
   }
-  return { tag: "running", target: `the command ${shorten(cmd)}` };
+  return word ? { tag: "running", target: `the ${word} command` } : { tag: "running", target: "a shell command" };
 }
 function rawTarget(tool, input) {
   const file3 = str(input, "file_path") ?? str(input, "path");
@@ -3495,7 +3502,8 @@ function actionLabel(tool, input) {
     case "Grep":
     case "Glob": {
       const p = str(input, "pattern");
-      return { tag: "searching for", target: p ?? "something in the code" };
+      if (p && /^[\w.\-/ ]+$/.test(p) && p.length <= 40) return { tag: "searching for", target: p };
+      return tool === "Glob" ? { tag: "looking for", target: "files" } : { tag: "searching", target: "the code" };
     }
   }
   const m = /^mcp__([^_]+)__(.+)$/.exec(tool);
@@ -3873,25 +3881,30 @@ function listSessions(root = defaultRoot()) {
 }
 
 // src/statusline/active-mode.ts
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync3, existsSync as existsSync9, rmSync, mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname as dirname2, join as join6 } from "node:path";
-import { homedir as homedir2 } from "node:os";
-function modeFile(home) {
-  return join6(home, ".codey", "mode");
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync3, existsSync as existsSync9, rmSync, mkdirSync as mkdirSync3, readdirSync as readdirSync2 } from "node:fs";
+import { join as join6 } from "node:path";
+function modeFile(sessionDir) {
+  return join6(sessionDir, "mode");
 }
-function writeActiveMode(mode, home = homedir2()) {
-  const p = modeFile(home);
-  mkdirSync3(dirname2(p), { recursive: true });
-  writeFileSync3(p, mode);
+function writeSessionMode(mode, sessionDir) {
+  mkdirSync3(sessionDir, { recursive: true });
+  writeFileSync3(modeFile(sessionDir), mode);
 }
-function clearActiveMode(home = homedir2()) {
-  rmSync(modeFile(home), { force: true });
+function clearSessionMode(sessionDir) {
+  rmSync(modeFile(sessionDir), { force: true });
 }
-function readActiveMode(home = homedir2()) {
-  const p = modeFile(home);
+function readSessionMode(sessionDir) {
+  const p = modeFile(sessionDir);
   if (!existsSync9(p)) return null;
   const raw = readFileSync8(p, "utf8").trim();
   return raw === "simple" || raw === "deep" || raw === "teach" ? raw : null;
+}
+function anyActiveSession(root) {
+  if (!existsSync9(root)) return false;
+  for (const name of readdirSync2(root)) {
+    if (existsSync9(modeFile(join6(root, name)))) return true;
+  }
+  return false;
 }
 
 // src/cli/statusline.ts
@@ -3914,18 +3927,38 @@ function statusLineFor(dir, now = Date.now(), dwellMs = DWELL_MS, mode) {
   const snap = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
   return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, dwellMs));
 }
+function sessionFromPayload(payload) {
+  try {
+    const o = JSON.parse(payload);
+    return typeof o.session_id === "string" && o.session_id ? o.session_id : null;
+  } catch {
+    return null;
+  }
+}
+function lineForSession(session, root, now, dwellMs) {
+  if (!session) return "";
+  const dir = join7(root, session);
+  const mode = readSessionMode(dir);
+  if (!mode) return "";
+  return statusLineFor(dir, now, dwellMs, mode);
+}
 function runStatusLine() {
-  const session = latestSessionId();
-  if (!session) {
-    process.stdout.write("");
+  if (process.stdin.isTTY) {
+    process.stdout.write(lineForSession(latestSessionId(), defaultRoot(), Date.now(), DWELL_MS));
     return;
   }
-  process.stdout.write(statusLineFor(join7(defaultRoot(), session), Date.now(), DWELL_MS, readActiveMode() ?? void 0));
+  let raw = "";
+  process.stdin.setEncoding("utf8");
+  process.stdin.on("data", (c) => raw += c);
+  process.stdin.on("end", () => {
+    const session = sessionFromPayload(raw);
+    process.stdout.write(lineForSession(session, defaultRoot(), Date.now(), DWELL_MS));
+  });
 }
 
 // src/cli/serve.ts
 import { fileURLToPath } from "node:url";
-import { dirname as dirname3, join as join10 } from "node:path";
+import { dirname as dirname2, join as join10 } from "node:path";
 
 // src/serve/server.ts
 import { createServer as createHttpServer } from "node:http";
@@ -4282,7 +4315,7 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 }
 
 // src/cli/serve.ts
-var here = dirname3(fileURLToPath(import.meta.url));
+var here = dirname2(fileURLToPath(import.meta.url));
 function pagePath() {
   return join10(here, "..", "serve", "public", "index.html");
 }
@@ -4376,8 +4409,8 @@ function runFeed(sessionId) {
 // src/cli/toggle.ts
 import { readFileSync as readFileSync13, writeFileSync as writeFileSync6, existsSync as existsSync14, mkdirSync as mkdirSync6, rmSync as rmSync3 } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join12, dirname as dirname4 } from "node:path";
-import { homedir as homedir3 } from "node:os";
+import { join as join12, dirname as dirname3 } from "node:path";
+import { homedir as homedir2 } from "node:os";
 function withStatusLine(s, command) {
   return { ...s, statusLine: { type: "command", command } };
 }
@@ -4387,7 +4420,7 @@ function withoutStatusLine(s) {
   return next;
 }
 function settingsPath() {
-  return join12(homedir3(), ".claude", "settings.json");
+  return join12(homedir2(), ".claude", "settings.json");
 }
 function readSettings() {
   const p = settingsPath();
@@ -4400,14 +4433,14 @@ function readSettings() {
 }
 function writeSettings(s) {
   const p = settingsPath();
-  mkdirSync6(dirname4(p), { recursive: true });
+  mkdirSync6(dirname3(p), { recursive: true });
   writeFileSync6(p, JSON.stringify(s, null, 2));
 }
 function statusLineCommand(self) {
   return `node "${self}" statusline`;
 }
-function pidPath() {
-  return join12(defaultRoot(), "narrator.pid");
+function pidPath(sessionDir) {
+  return join12(sessionDir, "narrator.pid");
 }
 function stopNarrator(path, kill = (pid) => process.kill(pid)) {
   if (!existsSync14(path)) return;
@@ -4422,10 +4455,11 @@ function stopNarrator(path, kill = (pid) => process.kill(pid)) {
 }
 function turnOn(mode, session) {
   const self = process.argv[1];
-  stopNarrator(pidPath());
-  mkdirSync6(join12(defaultRoot(), session), { recursive: true });
-  writeActiveMode(mode);
-  patchStatus(join12(defaultRoot(), session), { mode });
+  const dir = join12(defaultRoot(), session);
+  mkdirSync6(dir, { recursive: true });
+  stopNarrator(pidPath(dir));
+  writeSessionMode(mode, dir);
+  patchStatus(dir, { mode });
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
     detached: true,
@@ -4433,12 +4467,13 @@ function turnOn(mode, session) {
     windowsHide: true
   });
   child.unref();
-  writeFileSync6(pidPath(), String(child.pid ?? ""));
+  writeFileSync6(pidPath(dir), String(child.pid ?? ""));
 }
-function turnOff() {
-  stopNarrator(pidPath());
-  clearActiveMode();
-  writeSettings(withoutStatusLine(readSettings()));
+function turnOff(session) {
+  const dir = join12(defaultRoot(), session);
+  stopNarrator(pidPath(dir));
+  clearSessionMode(dir);
+  if (!anyActiveSession(defaultRoot())) writeSettings(withoutStatusLine(readSettings()));
 }
 
 // src/cli/index.ts
@@ -4495,7 +4530,8 @@ program2.command("on").description("Turn narration on in the status line").optio
   console.log(`  node "${process.argv[1]}" feed`);
 });
 program2.command("off").description("Turn narration off and restore the plain status line").action(() => {
-  turnOff();
+  const session = latestSessionId();
+  if (session) turnOff(session);
   console.log("Codey narration off.");
 });
 program2.parseAsync(process.argv);

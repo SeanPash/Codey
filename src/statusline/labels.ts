@@ -31,9 +31,20 @@ function pathArg(cmd: string): string | null {
   return last ? basename(last) : null;
 }
 
-// Turn a shell command into a plain-English action. Covers the common cases and
-// falls back to a readable "running the command ..." for anything unrecognised.
+// A command that chains, pipes, redirects, or loops is not one tidy action. Spotting
+// these keeps us from picking a file out of an `echo` string or echoing raw shell into
+// the task line; the full command still shows on the "raw" line for anyone who wants it.
+function isCompound(cmd: string): boolean {
+  return /[;|\n]|&&|\|\||\$\(|`/.test(cmd) || /^\s*(for|while|until|if|case)\b/.test(cmd);
+}
+
+// Turn a shell command into a plain-English action. Covers the common cases and falls
+// back to an honest, readable phrase (never raw shell) for anything unrecognised.
 function describeBash(cmd: string): ActionLabel {
+  if (isCompound(cmd)) {
+    if (/^\s*(for|while|until)\b/.test(cmd)) return { tag: "running", target: "a shell loop" };
+    return { tag: "running", target: "a few shell commands" };
+  }
   const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
   const name = pathArg(cmd);
   const file = (verb: string, fallback: string) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
@@ -99,7 +110,8 @@ function describeBash(cmd: string): ActionLabel {
     case "echo":
       return { tag: "printing", target: "to the terminal" };
   }
-  return { tag: "running", target: `the command ${shorten(cmd)}` };
+  // A single unrecognised program: name it plainly instead of echoing its arguments.
+  return word ? { tag: "running", target: `the ${word} command` } : { tag: "running", target: "a shell command" };
 }
 
 // The literal detail behind the friendly label: the full path or command, unshortened.
@@ -138,7 +150,12 @@ export function actionLabel(tool: string, input: unknown): ActionLabel {
     case "Grep":
     case "Glob": {
       const p = str(input, "pattern");
-      return { tag: "searching for", target: p ?? "something in the code" };
+      // A plain word or path reads fine ("searching for validateUser"); a regex or glob
+      // full of metacharacters does not, so fall back to a generic phrase for those.
+      if (p && /^[\w.\-/ ]+$/.test(p) && p.length <= 40) return { tag: "searching for", target: p };
+      return tool === "Glob"
+        ? { tag: "looking for", target: "files" }
+        : { tag: "searching", target: "the code" };
     }
   }
   const m = /^mcp__([^_]+)__(.+)$/.exec(tool);

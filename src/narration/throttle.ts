@@ -5,8 +5,10 @@ interface ThrottleState {
   msSinceLast: number; // ms since last narration
 }
 
+// simple still carries a short "why", just refreshed less often and capped by the time
+// floor so it stays cheap. deep refreshes more eagerly and says more.
 const PACING: Record<Mode, { everyN: number; minMs: number }> = {
-  simple: { everyN: 5, minMs: 8000 },
+  simple: { everyN: 1, minMs: 7000 },
   deep: { everyN: 2, minMs: 3000 },
   teach: { everyN: 3, minMs: 5000 },
 };

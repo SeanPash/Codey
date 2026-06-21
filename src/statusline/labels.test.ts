@@ -17,6 +17,22 @@ describe("actionLabel", () => {
     expect(actionLabel("Bash", { command: "node scripts/build.mjs" })).toEqual({ tag: "running", target: "build.mjs" });
   });
 
+  it("keeps task labels in plain English, never raw shell or regex", () => {
+    // A loop or chained command must not echo raw shell into the task line.
+    expect(actionLabel("Bash", { command: "for i in 1 2 3; do echo $i; done" }))
+      .toEqual({ tag: "running", target: "a shell loop" });
+    expect(actionLabel("Bash", { command: 'cat x.json; echo "---HOOKS---"; ls hooks/' }))
+      .toEqual({ tag: "running", target: "a few shell commands" });
+    // An unrecognised single program is named, not spelled out with its arguments.
+    expect(actionLabel("Bash", { command: "tsc --noEmit" }))
+      .toEqual({ tag: "running", target: "the tsc command" });
+    // A regex search reads as English; a clean identifier still shows through.
+    expect(actionLabel("Grep", { pattern: "ActiveMode|latestSessionId|readStatus\\(" }))
+      .toEqual({ tag: "searching", target: "the code" });
+    expect(actionLabel("Glob", { pattern: "**/*.ts" }))
+      .toEqual({ tag: "looking for", target: "files" });
+  });
+
   it("falls back to a generic phrase for unknown tools", () => {
     expect(actionLabel("Write", {})).toEqual({ tag: "writing", target: "a file" });
     expect(actionLabel("WebFetch", {})).toEqual({ tag: "using", target: "WebFetch" });
