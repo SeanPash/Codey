@@ -1,20 +1,21 @@
 import { describe, it, expect } from "vitest";
-import { feedItems, renderFeed, renderFeedHeader, advanceFeed } from "./render.js";
+import { feedItems, advanceFeed, renderFeedHeader } from "./render.js";
 import type { Card } from "../statusline/schedule.js";
 
 const plain = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
+const fresh = () => ({ lastSeq: 0, whysShownFor: new Set<number>(), turnsHeadered: new Set<number>(), turnsSummarized: new Set<number>() });
 
 const card = (seq: number, ts: number): Card => ({
   seq, action: { tag: "writing", target: `the file f${seq}.ts` }, raw: `f${seq}.ts`, ts,
 });
 
 describe("feedItems", () => {
-  it("attaches each why to the card whose window it falls in", () => {
+  it("attaches each why to the card whose window it falls in and keeps the ts", () => {
     const cards = [card(1, 0), card(2, 100)];
     const items = feedItems(cards, [{ ts: 50, why: "first why" }, { ts: 150, why: "second why" }]);
     expect(items).toEqual([
-      { seq: 1, tag: "writing", target: "the file f1.ts", why: "first why" },
-      { seq: 2, tag: "writing", target: "the file f2.ts", why: "second why" },
+      { seq: 1, ts: 0, tag: "writing", target: "the file f1.ts", why: "first why" },
+      { seq: 2, ts: 100, tag: "writing", target: "the file f2.ts", why: "second why" },
     ]);
   });
 
@@ -24,28 +25,42 @@ describe("feedItems", () => {
   });
 });
 
-describe("renderFeed", () => {
-  it("lists each task with its number and why", () => {
-    const out = plain(renderFeed(feedItems([card(1, 0)], [{ ts: 1, why: "scratch file" }])));
-    expect(out).toContain("#1 writing the file f1.ts");
-    expect(out).toContain("scratch file");
-  });
-});
-
-describe("advanceFeed", () => {
-  it("emits only new cards and remembers the cursor", () => {
-    const items = feedItems([card(1, 0), card(2, 10)], []);
-    const first = advanceFeed(items.slice(0, 1), { lastSeq: 0, whysShownFor: new Set() });
-    expect(plain(first.text)).toContain("#1");
-    const second = advanceFeed(items, first.cursor);
-    expect(plain(second.text)).toContain("#2");
-    expect(plain(second.text)).not.toContain("#1");
+describe("advanceFeed turns", () => {
+  it("prints a turn header before the first card of a turn", () => {
+    const items = feedItems([card(1, 10)], []);
+    const out = plain(advanceFeed(items, fresh(), [10]).text);
+    expect(out).toContain("Turn 1");
+    expect(out).toContain("#1");
   });
 
-  it("emits a late why for a card already printed", () => {
-    const before = advanceFeed(feedItems([card(1, 0)], []), { lastSeq: 0, whysShownFor: new Set() });
-    const after = advanceFeed(feedItems([card(1, 0)], [{ ts: 1, why: "late why" }]), before.cursor);
-    expect(plain(after.text)).toContain("late why");
+  it("starts a new turn header when a later prompt boundary is crossed", () => {
+    const items = feedItems([card(1, 10), card(2, 200)], []);
+    const out = plain(advanceFeed(items, fresh(), [10, 150]).text);
+    expect(out).toContain("Turn 1");
+    expect(out).toContain("Turn 2");
+  });
+
+  it("indents each why under its own card", () => {
+    const items = feedItems([card(1, 10)], [{ ts: 12, why: "scratch file" }]);
+    const out = plain(advanceFeed(items, fresh(), [10]).text);
+    const lines = out.split("\n");
+    const cardIdx = lines.findIndex((l) => l.includes("#1"));
+    const whyIdx = lines.findIndex((l) => l.includes("scratch file"));
+    expect(whyIdx).toBe(cardIdx + 1); // why sits directly under its card
+  });
+
+  it("appends a summary once a turn is closed by a later turn", () => {
+    const items = feedItems([card(1, 10), card(2, 200)], [{ ts: 12, why: "did the thing" }]);
+    const out = plain(advanceFeed(items, fresh(), [10, 150]).text);
+    expect(out).toContain("summary");
+    expect(out).toContain("✓ #1");
+  });
+
+  it("does not repeat a header or summary across calls", () => {
+    const items = feedItems([card(1, 10), card(2, 200)], []);
+    const first = advanceFeed(items, fresh(), [10, 150]);
+    const second = advanceFeed(items, first.cursor, [10, 150]);
+    expect(second.text).toBe(""); // nothing new to print
   });
 });
 
