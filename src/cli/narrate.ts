@@ -7,13 +7,17 @@ import { reconcileErrors } from "../warnings/reconcile.js";
 import { formatWarning } from "../warnings/format.js";
 import { createWatchState, activeWarning, type WatchState } from "./watch.js";
 import { patchStatus } from "../statusline/state.js";
+import { appendWhy } from "../narration/history.js";
 import { runClaude } from "../narration/claude-headless.js";
 
 export async function narrateTick(dir: string, events: ToolEvent[], state: WatchState, now: number): Promise<void> {
   const w = activeWarning(events, now);
   patchStatus(dir, { warning: w ? formatWarning(w) : null });
   const why = await state.engine.onEvents(events, now);
-  if (why) patchStatus(dir, { why });
+  if (why) {
+    patchStatus(dir, { why });
+    appendWhy(dir, { ts: now, why });
+  }
 }
 
 export function runNarrate(sessionId: string, mode: Mode): void {

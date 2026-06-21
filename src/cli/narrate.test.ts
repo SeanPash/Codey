@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { narrateTick } from "./narrate.js";
 import { readStatus } from "../statusline/state.js";
 import { createWatchState } from "./watch.js";
+import { readWhys } from "../narration/history.js";
 import type { ToolEvent } from "../types.js";
 
 function evt(i: number): ToolEvent {
@@ -20,6 +21,15 @@ describe("narrateTick", () => {
     await narrateTick(dir, events, state, now);
     expect(readStatus(dir)?.why).toBe("adding validation");
     expect(readStatus(dir)?.warning).toBeNull();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("appends the produced why to the narration history", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "codey-narr-"));
+    const state = createWatchState("deep", async () => "because reasons");
+    const events = [0, 1, 2, 3, 4].map(evt); // enough new events for deep mode to narrate
+    await narrateTick(dir, events, state, 1234);
+    expect(readWhys(dir)).toEqual([{ ts: 1234, why: "because reasons" }]);
     rmSync(dir, { recursive: true, force: true });
   });
 });
