@@ -3527,10 +3527,14 @@ var PAST = {
   "searching for": "searched for",
   "looking for": "looked for",
   "switching to": "switched to",
-  using: "used"
+  using: "used",
+  asking: "asked"
 };
 function pastTense(tag) {
   return PAST[tag] ?? tag;
+}
+function shortTarget(target) {
+  return target.replace(/^the (file|folder) /, "");
 }
 
 // src/statusline/from-event.ts
@@ -3837,9 +3841,6 @@ function clampRaw(raw) {
   const line = raw.split("\n")[0].trim();
   return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "\u2026" : line;
 }
-function shortTarget(target) {
-  return target.replace(/^the (file|folder) /, "");
-}
 function visLen(s) {
   return s.replace(/\x1b\[[0-9;]*m/g, "").length;
 }
@@ -3934,7 +3935,7 @@ function renderStatus(view, width = WRAP) {
     if (s.items.length) {
       out.push(f.divider("completed tasks"));
       for (const it of s.items) {
-        out.push(f.centered(`${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`, width));
+        out.push(f.centered(`${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET}`, width));
       }
     }
     out.push(f.bottom());
@@ -4523,7 +4524,7 @@ function summaryBlock(items) {
   const lines = [`${DIM}\u2500\u2500 summary \u2500\u2500${RESET2}`];
   const last = [...items].reverse().find((it) => it.why);
   if (last?.why) lines.push(`  ${TEXT2}${last.why}${RESET2}`);
-  for (const it of items) lines.push(`  ${GREEN2}\u2713${RESET2} ${GOLD2}#${it.seq}${RESET2} ${TEXT2}${it.tag} ${it.target}${RESET2}`);
+  for (const it of items) lines.push(`  ${GREEN2}\u2713${RESET2} ${GOLD2}#${it.seq}${RESET2} ${TEXT2}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET2}`);
   return lines.join("\n");
 }
 function renderFeedHeader() {
