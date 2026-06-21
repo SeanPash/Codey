@@ -147,7 +147,14 @@ function pathArg(cmd) {
   const last = tokens[tokens.length - 1];
   return last ? basename(last) : null;
 }
+function isCompound(cmd) {
+  return /[;|\n]|&&|\|\||\$\(|`/.test(cmd) || /^\s*(for|while|until|if|case)\b/.test(cmd);
+}
 function describeBash(cmd) {
+  if (isCompound(cmd)) {
+    if (/^\s*(for|while|until)\b/.test(cmd)) return { tag: "running", target: "a shell loop" };
+    return { tag: "running", target: "a few shell commands" };
+  }
   const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
   const name = pathArg(cmd);
   const file2 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
@@ -212,7 +219,7 @@ function describeBash(cmd) {
     case "echo":
       return { tag: "printing", target: "to the terminal" };
   }
-  return { tag: "running", target: `the command ${shorten(cmd)}` };
+  return word ? { tag: "running", target: `the ${word} command` } : { tag: "running", target: "a shell command" };
 }
 function actionLabel(tool, input) {
   const file2 = str(input, "file_path") ?? str(input, "path");
@@ -232,7 +239,8 @@ function actionLabel(tool, input) {
     case "Grep":
     case "Glob": {
       const p = str(input, "pattern");
-      return { tag: "searching for", target: p ?? "something in the code" };
+      if (p && /^[\w.\-/ ]+$/.test(p) && p.length <= 40) return { tag: "searching for", target: p };
+      return tool === "Glob" ? { tag: "looking for", target: "files" } : { tag: "searching", target: "the code" };
     }
   }
   const m = /^mcp__([^_]+)__(.+)$/.exec(tool);

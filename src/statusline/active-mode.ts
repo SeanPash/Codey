@@ -1,29 +1,37 @@
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { homedir } from "node:os";
+import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import type { Mode } from "../types.js";
 
-// The active narration mode is one global choice, not per session. Keeping it in a
-// single file stops the toggle, the narrator, and the status line from disagreeing
-// about which mode is on when several session folders sit side by side.
-function modeFile(home: string): string {
-  return join(home, ".codey", "mode");
+// Codey is on per session, not globally. Each terminal/tab is its own Claude Code
+// session, so the on/off choice lives in that session's folder. A brand new tab has
+// no mode file and therefore shows nothing until the user turns Codey on in it.
+function modeFile(sessionDir: string): string {
+  return join(sessionDir, "mode");
 }
 
-export function writeActiveMode(mode: Mode, home: string = homedir()): void {
-  const p = modeFile(home);
-  mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, mode);
+export function writeSessionMode(mode: Mode, sessionDir: string): void {
+  mkdirSync(sessionDir, { recursive: true });
+  writeFileSync(modeFile(sessionDir), mode);
 }
 
-export function clearActiveMode(home: string = homedir()): void {
-  rmSync(modeFile(home), { force: true });
+export function clearSessionMode(sessionDir: string): void {
+  rmSync(modeFile(sessionDir), { force: true });
 }
 
-// Returns null when narration is off so the status line can stay blank by default.
-export function readActiveMode(home: string = homedir()): Mode | null {
-  const p = modeFile(home);
+// Returns null when Codey is off for this session so the status line stays blank.
+export function readSessionMode(sessionDir: string): Mode | null {
+  const p = modeFile(sessionDir);
   if (!existsSync(p)) return null;
   const raw = readFileSync(p, "utf8").trim();
   return raw === "simple" || raw === "deep" || raw === "teach" ? raw : null;
+}
+
+// True when any session still has Codey on. Used so turning off the last session can
+// take the status line command back out of global settings.
+export function anyActiveSession(root: string): boolean {
+  if (!existsSync(root)) return false;
+  for (const name of readdirSync(root)) {
+    if (existsSync(modeFile(join(root, name)))) return true;
+  }
+  return false;
 }

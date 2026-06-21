@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import type { Mode } from "../types.js";
 import { defaultRoot } from "../store/session-store.js";
 import { patchStatus } from "../statusline/state.js";
-import { writeActiveMode, clearActiveMode } from "../statusline/active-mode.js";
+import { writeSessionMode, clearSessionMode, anyActiveSession } from "../statusline/active-mode.js";
 
 type Settings = Record<string, unknown> & { statusLine?: { type: string; command: string } };
 
@@ -41,8 +41,10 @@ function statusLineCommand(self: string): string {
   return `node "${self}" statusline`;
 }
 
-function pidPath(): string {
-  return join(defaultRoot(), "narrator.pid");
+// One narrator per session, so two terminals can run Codey without fighting over a
+// single shared pidfile.
+function pidPath(sessionDir: string): string {
+  return join(sessionDir, "narrator.pid");
 }
 
 // Stop a previously-spawned narrator so modes never fight over the same file.
@@ -56,10 +58,11 @@ export function stopNarrator(path: string, kill: (pid: number) => void = (pid) =
 
 export function turnOn(mode: Mode, session: string): void {
   const self = process.argv[1];
-  stopNarrator(pidPath());
-  mkdirSync(join(defaultRoot(), session), { recursive: true });
-  writeActiveMode(mode); // single source of truth, so the status line never shows a stale mode
-  patchStatus(join(defaultRoot(), session), { mode }); // also seed the snapshot for an instant render
+  const dir = join(defaultRoot(), session);
+  mkdirSync(dir, { recursive: true });
+  stopNarrator(pidPath(dir));
+  writeSessionMode(mode, dir); // marks this session on, and stores its mode for the status line
+  patchStatus(dir, { mode }); // also seed the snapshot for an instant render
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   // detached lets the narrator outlive the slash command's process tree (Claude Code kills
   // that tree when the command returns). stdio "ignore" means no console handles, and
@@ -70,11 +73,14 @@ export function turnOn(mode: Mode, session: string): void {
     windowsHide: true,
   });
   child.unref();
-  writeFileSync(pidPath(), String(child.pid ?? ""));
+  writeFileSync(pidPath(dir), String(child.pid ?? ""));
 }
 
-export function turnOff(): void {
-  stopNarrator(pidPath());
-  clearActiveMode();
-  writeSettings(withoutStatusLine(readSettings()));
+export function turnOff(session: string): void {
+  const dir = join(defaultRoot(), session);
+  stopNarrator(pidPath(dir));
+  clearSessionMode(dir);
+  // Leave the status line command installed while any other session is still using it;
+  // pull it from global settings only once Codey is fully off everywhere.
+  if (!anyActiveSession(defaultRoot())) writeSettings(withoutStatusLine(readSettings()));
 }

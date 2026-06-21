@@ -11,13 +11,16 @@ const base: StatusView = {
   why: null,
   warning: null,
   thinking: false,
+  summary: null,
 };
 
 describe("renderStatus", () => {
-  it("shows a loud uppercase mode in the header", () => {
+  it("shows a title-cased name and mode in the header", () => {
     const out = plain(renderStatus(base));
-    expect(out).toContain("CODEY");
-    expect(out).toContain("DEEP");
+    expect(out).toContain("Codey");
+    expect(out).toContain("Deep");
+    expect(out).not.toContain("CODEY"); // not shouting
+    expect(out).not.toContain("DEEP");
   });
 
   it("numbers and phrases the current task, with the raw target above it", () => {
@@ -68,8 +71,8 @@ describe("renderStatus", () => {
   });
 
   it("renders a waiting placeholder when there is no current card", () => {
-    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false }));
-    expect(out).toContain("CODEY");
+    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false, summary: null }));
+    expect(out).toContain("Codey");
     expect(out).toContain("waiting for Claude");
   });
 
@@ -85,6 +88,42 @@ describe("renderStatus", () => {
       current: { seq: 3, endSeq: 7, tag: "reading", target: "5 files (a.ts, b.ts, +3)", raw: null },
     }));
     expect(out).toContain("#3–7 Claude is reading 5 files (a.ts, b.ts, +3)");
+  });
+
+  it("clamps a very long raw command to a single line with an ellipsis", () => {
+    const longCmd = "gh pr create --base main --title " + "x".repeat(300);
+    const out = plain(renderStatus({ ...base, current: { ...base.current!, raw: longCmd } }));
+    const rawLine = out.split("\n").find((l) => l.includes("raw"))!;
+    expect(rawLine).toBeDefined();
+    expect(rawLine.length).toBeLessThan(100);
+    expect(rawLine).toContain("…");
+  });
+
+  it("separates the raw detail from the task line with a divider", () => {
+    const lines = plain(renderStatus(base)).split("\n");
+    const rawIdx = lines.findIndex((l) => l.includes("raw"));
+    const taskIdx = lines.findIndex((l) => l.includes("Claude is removing"));
+    const between = lines.slice(rawIdx + 1, taskIdx);
+    expect(between.some((l) => l.includes("├"))).toBe(true);
+  });
+
+  it("renders a finished-turn recap with a sentence and a done checklist", () => {
+    const out = plain(renderStatus({
+      ...base,
+      summary: {
+        sentence: "Opened PR #18 with the per-session fixes.",
+        items: [
+          { seq: 1, tag: "asking", target: "you a question", raw: null },
+          { seq: 2, tag: "pushing", target: "the branch", raw: null },
+        ],
+      },
+    }));
+    expect(out).toContain("done"); // the recap section rule
+    expect(out).toContain("steps"); // the checklist section rule
+    expect(out).toContain("Opened PR #18 with the per-session fixes.");
+    expect(out).toContain("✓ #1 asking you a question");
+    expect(out).toContain("✓ #2 pushing the branch");
+    expect(out).not.toContain("Claude is removing"); // the live task is replaced by the summary
   });
 
   it("frames the card and closes the corner", () => {

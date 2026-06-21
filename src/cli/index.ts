@@ -95,6 +95,10 @@ program
 program
   .command("off")
   .description("Turn narration off and restore the plain status line")
-  .action(() => { turnOff(); console.log("Codey narration off."); });
+  .action(() => {
+    const session = latestSessionId();
+    if (session) turnOff(session);
+    console.log("Codey narration off.");
+  });
 
 program.parseAsync(process.argv);

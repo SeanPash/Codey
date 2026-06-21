@@ -8,16 +8,16 @@ function ev(i: number): ToolEvent {
 }
 
 describe("NarrationEngine", () => {
-  it("narrates once the simple-mode threshold of new events is reached", async () => {
+  it("narrates a why in simple mode, then waits for a new event before narrating again", async () => {
     const calls: string[] = [];
     const engine = new NarrationEngine("simple", async (prompt) => { calls.push(prompt); return "Claude is reading files."; });
 
-    let out = await engine.onEvents([ev(0), ev(1), ev(2), ev(3)], 100000); // 4 events < 5
-    expect(out).toBeNull();
-    expect(calls).toHaveLength(0);
-
-    out = await engine.onEvents([ev(0), ev(1), ev(2), ev(3), ev(4)], 100000); // now 5
+    let out = await engine.onEvents([ev(0)], 100000); // first event -> simple narrates a short why
     expect(out).toBe("Claude is reading files.");
+    expect(calls).toHaveLength(1);
+
+    out = await engine.onEvents([ev(0)], 200000); // no new events -> nothing to add
+    expect(out).toBeNull();
     expect(calls).toHaveLength(1);
   });
 
