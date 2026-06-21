@@ -16,9 +16,12 @@ export interface CostSummary {
 export function summarizeCosts(turns: AssistantTurn[]): CostSummary {
   const b = attributeChunk(turns, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
   const lines: CostLine[] = b.workLines.map((l) => ({ label: l.label, tokens: l.tokens, failed: l.status === "fail" }));
+  // Pick the priciest real task. Skip non-tool turns (thinking) so we never report
+  // "Thinking it through" as the headline cost.
   let priciest: string | null = null;
   let max = -1;
   for (const l of b.workLines) {
+    if (l.status === "none") continue;
     if (l.tokens > max) { max = l.tokens; priciest = l.label; }
   }
   return { lines, total: b.workTotal, priciest };
