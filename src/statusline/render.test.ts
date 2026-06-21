@@ -107,7 +107,7 @@ describe("renderStatus", () => {
     expect(between.some((l) => l.includes("├"))).toBe(true);
   });
 
-  it("renders a finished-turn recap with a sentence and a done checklist", () => {
+  it("renders a finished-turn recap with a sentence and a completed-tasks checklist", () => {
     const out = plain(renderStatus({
       ...base,
       summary: {
@@ -118,12 +118,27 @@ describe("renderStatus", () => {
         ],
       },
     }));
-    expect(out).toContain("done"); // the recap section rule
-    expect(out).toContain("steps"); // the checklist section rule
+    expect(out).toContain("summary"); // the recap section rule
+    expect(out).toContain("completed tasks"); // the checklist section rule
     expect(out).toContain("Opened PR #18 with the per-session fixes.");
     expect(out).toContain("✓ #1 asking you a question");
     expect(out).toContain("✓ #2 pushing the branch");
     expect(out).not.toContain("Claude is removing"); // the live task is replaced by the summary
+  });
+
+  it("centers the recap sentence and the completed-task rows in the box", () => {
+    const lines = plain(renderStatus({
+      ...base,
+      summary: {
+        sentence: "Opened PR #18 with the per-session fixes.",
+        items: [{ seq: 1, tag: "asking", target: "you a question", raw: null }],
+      },
+    })).split("\n");
+    const sentenceLine = lines.find((l) => l.includes("Opened PR #18"))!;
+    const taskLine = lines.find((l) => l.includes("asking you a question"))!;
+    // centered lines carry leading padding past the bar, not flush like the live rows
+    expect(sentenceLine).toMatch(/│\s{3,}Opened/);
+    expect(taskLine).toMatch(/│\s{3,}✓/);
   });
 
   it("frames the card and closes the corner", () => {

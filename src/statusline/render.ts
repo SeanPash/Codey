@@ -35,6 +35,11 @@ function clampRaw(raw: string): string {
   return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "…" : line;
 }
 
+// Visible width of a line, ignoring ANSI color codes, so we can center it.
+function visLen(s: string): number {
+  return s.replace(/\x1b\[[0-9;]*m/g, "").length;
+}
+
 // Title case for the mode banner: "Deep", not "DEEP". Quieter to read at a glance.
 function modeLabel(mode: Mode): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
@@ -57,6 +62,13 @@ function frame(rail: string) {
     // sentence and the done-steps read as a clean column, not floating mid-box.
     item(body: string): string {
       return `${edge("│")}${body}`;
+    },
+    // A centered recap line: the summary sentence and completed-task rows sit in the
+    // middle of the box rather than hugging the left bar, so the finished turn reads
+    // as its own balanced panel.
+    centered(body: string, width: number): string {
+      const pad = Math.max(0, Math.floor((width - visLen(body)) / 2) - 2);
+      return `${edge("│")}${" ".repeat(pad)}${body}`;
     },
     // A plain rule, or one carrying a small section label so the parts read as
     // distinct sections rather than one long block.
@@ -114,18 +126,18 @@ export function renderStatus(view: StatusView, width = WRAP): string {
   }
 
   // Claude finished its turn: recap what got done instead of pointing at a live task.
-  // The recap sentence sits under a "done" rule, the steps under a "steps" rule, so the
-  // box reads as two tidy sections rather than one centered blob.
+  // The recap sentence sits under a "summary" rule, the steps under a "completed tasks"
+  // rule, both centered so the finished turn reads as its own balanced panel.
   if (view.summary) {
     const s = view.summary;
-    out.push(f.divider("done"));
+    out.push(f.divider("summary"));
     if (s.sentence) {
-      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.item(`${BOLD}${TEXT}${ln}${RESET}`)));
+      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.centered(`${BOLD}${TEXT}${ln}${RESET}`, width)));
     }
     if (s.items.length) {
-      out.push(f.divider("steps"));
+      out.push(f.divider("completed tasks"));
       for (const it of s.items) {
-        out.push(f.item(`${GREEN}✓${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`));
+        out.push(f.centered(`${GREEN}✓${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`, width));
       }
     }
     out.push(f.bottom());
