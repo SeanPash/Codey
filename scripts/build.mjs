@@ -8,12 +8,13 @@ import { cpSync, rmSync } from "node:fs";
 rmSync("dist", { recursive: true, force: true });
 
 // The only files external callers invoke directly: the CLI (status line,
-// on/off, watch, narrate, serve) and the two capture hooks.
+// on/off, watch, narrate, serve) and the capture hooks.
 const entryPoints = [
   "src/cli/index.ts",
   "src/capture/hook-emit.ts",
   "src/capture/intervene-check.ts",
   "src/capture/prompt-mark.ts",
+  "src/capture/stop-mark.ts",
 ];
 
 await build({

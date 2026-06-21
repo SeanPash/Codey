@@ -83,6 +83,43 @@ describe("composeView thinking", () => {
   });
 });
 
+describe("composeView summary", () => {
+  it("builds a summary with the narrator sentence and a done checklist when finished", () => {
+    const events = [
+      pre("a", "Read", { file_path: "a.ts" }, 0),
+      pre("b", "Write", { file_path: "b.ts" }, 100),
+    ];
+    // doneAt lands after the last tool event and we are caught up
+    const view = composeView(events, snap({ doneAt: 200, why: "Wired the summary section." }), 10000, 4500);
+    expect(view.summary?.sentence).toBe("Wired the summary section.");
+    expect(view.summary?.items.map((i) => i.seq)).toEqual([1, 2]);
+  });
+
+  it("keeps only the last three completed cards in the checklist", () => {
+    const events = [
+      pre("a", "Read", { file_path: "a.ts" }, 0),
+      pre("b", "Write", { file_path: "b.ts" }, 9000),
+      pre("c", "Edit", { file_path: "c.ts" }, 18000),
+      pre("d", "Read", { file_path: "d.ts" }, 27000),
+    ];
+    const view = composeView(events, snap({ doneAt: 40000 }), 60000, 4500);
+    expect(view.summary?.items.map((i) => i.seq)).toEqual([2, 3, 4]);
+  });
+
+  it("has no summary while Claude is still working", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+    const view = composeView(events, snap({ doneAt: null }), 1000, 4500);
+    expect(view.summary).toBeNull();
+  });
+
+  it("drops the summary when a new prompt arrives after finishing", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+    const view = composeView(events, snap({ doneAt: 50, promptAt: 100 }), 5000, 4500);
+    expect(view.summary).toBeNull();
+    expect(view.thinking).toBe(true);
+  });
+});
+
 describe("composeView", () => {
   it("hides the why while catching up to an older card", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0), pre("b", "Write", { file_path: "b.ts" }, 0)];

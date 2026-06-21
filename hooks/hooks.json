@@ -9,6 +9,9 @@
     ],
     "UserPromptSubmit": [
       { "matcher": "*", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/capture/prompt-mark.js\"" } ] }
+    ],
+    "Stop": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/capture/stop-mark.js\"" } ] }
     ]
   }
 }

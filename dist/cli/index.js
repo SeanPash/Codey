@@ -3688,6 +3688,7 @@ function schedule(cards, now, dwellMs) {
 }
 
 // src/statusline/compose.ts
+var SUMMARY_ITEMS = 3;
 var GROUP_WINDOW_MS = 2500;
 function shortName(target) {
   return target.replace(/^the (file|folder) /, "");
@@ -3738,16 +3739,20 @@ var toView = (c) => ({
   raw: c.raw
 });
 function composeView(events, snap, now, dwellMs) {
-  const { current, prev, isLatest } = schedule(cardsFromEvents(events), now, dwellMs);
+  const cards = cardsFromEvents(events);
+  const { current, prev, isLatest } = schedule(cards, now, dwellMs);
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
   const thinking = snap.promptAt != null && snap.promptAt > newestTs && isLatest;
+  const done = !thinking && isLatest && snap.doneAt != null && snap.doneAt >= newestTs;
+  const summary = done ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) } : null;
   return {
     mode: snap.mode,
     current: current ? toView(current) : null,
     prev: prev.map(toView),
     why: isLatest && !thinking ? snap.why : null,
     warning: isLatest ? snap.warning : null,
-    thinking
+    thinking,
+    summary
   };
 }
 
@@ -3759,7 +3764,8 @@ var GOLD = "\x1B[38;5;214m";
 var LAV = "\x1B[38;5;147m";
 var GRAY = "\x1B[38;5;250m";
 var TEXT = "\x1B[38;5;253m";
-var LABEL = "\x1B[38;5;245m";
+var LABEL = "\x1B[38;5;110m";
+var DOT = "\x1B[38;5;248m";
 var GREEN = "\x1B[38;5;114m";
 var NUM = "\x1B[1m\x1B[38;5;220m";
 var RED = "\x1B[38;5;203m";
@@ -3772,12 +3778,17 @@ var WRAP = 120;
 var MAX_WHY_LINES = 5;
 var COL = 5;
 var RULE = 26;
+var RAW_MAX = 64;
+function clampRaw(raw) {
+  const line = raw.split("\n")[0].trim();
+  return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "\u2026" : line;
+}
 function frame(rail) {
   const edge = (ch) => `${rail}${ch}${RESET} `;
   return {
     header(mode) {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
-      return `${edge("\u256D")}${BOLD}${BRAND}CODEY${RESET} ${LABEL}\xB7${RESET} ${BOLD}${m}${mode.toUpperCase()}${RESET}`;
+      return `${edge("\u256D")}${BOLD}${BRAND}CODEY${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${mode.toUpperCase()}${RESET}`;
     },
     row(label, labelStyle, body) {
       return `${edge("\u2502")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
@@ -3785,8 +3796,12 @@ function frame(rail) {
     cont(body) {
       return `${edge("\u2502")}${" ".repeat(COL)}  ${body}`;
     },
-    divider() {
-      return `${rail}\u251C${"\u2500".repeat(RULE)}${RESET}`;
+    // A plain rule, or one carrying a small section label so the parts read as
+    // distinct sections rather than one long block.
+    divider(label) {
+      if (!label) return `${rail}\u251C${"\u2500".repeat(RULE)}${RESET}`;
+      const right = Math.max(2, RULE - label.length - 3);
+      return `${rail}\u251C\u2500 ${LABEL}${label}${RESET}${rail} ${"\u2500".repeat(right)}${RESET}`;
     },
     bottom() {
       return `${rail}\u2570${RESET}`;
@@ -3829,6 +3844,21 @@ function renderStatus(view, width = WRAP) {
     out.push(f.bottom());
     return out.join("\n");
   }
+  if (view.summary) {
+    const s = view.summary;
+    out.push(f.divider("summary"));
+    if (s.sentence) {
+      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.cont(`${BOLD}${TEXT}${ln}${RESET}`)));
+    }
+    if (s.items.length) {
+      out.push(f.divider());
+      for (const it of s.items) {
+        out.push(f.row("", LABEL, `${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`));
+      }
+    }
+    out.push(f.bottom());
+    return out.join("\n");
+  }
   if (!view.current) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${GRAY}waiting for Claude${RESET}`));
     out.push(f.bottom());
@@ -3841,7 +3871,8 @@ function renderStatus(view, width = WRAP) {
     out.push(f.divider());
   }
   if (view.current.raw) {
-    out.push(f.row("raw", LABEL, `${TEXT}${view.current.raw}${RESET}`));
+    out.push(f.row("raw", LABEL, `${TEXT}${clampRaw(view.current.raw)}${RESET}`));
+    out.push(f.divider());
   }
   out.push(
     f.row(

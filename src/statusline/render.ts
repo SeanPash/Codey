@@ -9,7 +9,8 @@ const GOLD = "\x1b[38;5;214m"; // the "task" label
 const LAV = "\x1b[38;5;147m"; // the "why" label
 const GRAY = "\x1b[38;5;250m"; // action sentence and prev rows
 const TEXT = "\x1b[38;5;253m"; // the specific target / why body
-const LABEL = "\x1b[38;5;245m"; // subdued row labels (prev / raw) that still read clearly
+const LABEL = "\x1b[38;5;110m"; // row labels (prev / raw / why), soft blue so the column stands out
+const DOT = "\x1b[38;5;248m"; // the · in the header, bright enough to read
 const GREEN = "\x1b[38;5;114m"; // the done check on history rows
 const NUM = "\x1b[1m\x1b[38;5;220m"; // the task number, bright so it's easy to track
 const RED = "\x1b[38;5;203m"; // warning
@@ -26,13 +27,20 @@ const WRAP = 120;
 const MAX_WHY_LINES = 5;
 const COL = 5; // label column width so "task" / "why" / "prev" line up
 const RULE = 26; // divider rule length
+const RAW_MAX = 64; // raw detail is clamped to one line so a heredoc can't blow up the box
+
+// Keep the raw detail to a single readable line: first line only, ellipsis if long.
+function clampRaw(raw: string): string {
+  const line = raw.split("\n")[0].trim();
+  return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "…" : line;
+}
 
 function frame(rail: string) {
   const edge = (ch: string) => `${rail}${ch}${RESET} `;
   return {
     header(mode: Mode): string {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
-      return `${edge("╭")}${BOLD}${BRAND}CODEY${RESET} ${LABEL}·${RESET} ${BOLD}${m}${mode.toUpperCase()}${RESET}`;
+      return `${edge("╭")}${BOLD}${BRAND}CODEY${RESET} ${DOT}·${RESET} ${BOLD}${m}${mode.toUpperCase()}${RESET}`;
     },
     row(label: string, labelStyle: string, body: string): string {
       return `${edge("│")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
@@ -40,8 +48,12 @@ function frame(rail: string) {
     cont(body: string): string {
       return `${edge("│")}${" ".repeat(COL)}  ${body}`;
     },
-    divider(): string {
-      return `${rail}├${"─".repeat(RULE)}${RESET}`;
+    // A plain rule, or one carrying a small section label so the parts read as
+    // distinct sections rather than one long block.
+    divider(label?: string): string {
+      if (!label) return `${rail}├${"─".repeat(RULE)}${RESET}`;
+      const right = Math.max(2, RULE - label.length - 3);
+      return `${rail}├─ ${LABEL}${label}${RESET}${rail} ${"─".repeat(right)}${RESET}`;
     },
     bottom(): string {
       return `${rail}╰${RESET}`;
@@ -91,6 +103,23 @@ export function renderStatus(view: StatusView, width = WRAP): string {
     return out.join("\n");
   }
 
+  // Claude finished its turn: recap what got done instead of pointing at a live task.
+  if (view.summary) {
+    const s = view.summary;
+    out.push(f.divider("summary"));
+    if (s.sentence) {
+      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.cont(`${BOLD}${TEXT}${ln}${RESET}`)));
+    }
+    if (s.items.length) {
+      out.push(f.divider());
+      for (const it of s.items) {
+        out.push(f.row("", LABEL, `${GREEN}✓${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`));
+      }
+    }
+    out.push(f.bottom());
+    return out.join("\n");
+  }
+
   if (!view.current) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${GRAY}waiting for Claude${RESET}`));
     out.push(f.bottom());
@@ -107,7 +136,8 @@ export function renderStatus(view: StatusView, width = WRAP): string {
   }
 
   if (view.current.raw) {
-    out.push(f.row("raw", LABEL, `${TEXT}${view.current.raw}${RESET}`));
+    out.push(f.row("raw", LABEL, `${TEXT}${clampRaw(view.current.raw)}${RESET}`));
+    out.push(f.divider());
   }
   // The pointer sits where the done checks sit on the prev rows, so the numbers
   // read top to bottom as an ordered checklist: ✓ for finished, ▸ for the live one.

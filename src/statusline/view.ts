@@ -8,6 +8,11 @@ export interface CardView {
   raw: string | null;
 }
 
+export interface SummaryView {
+  sentence: string | null; // the narrator's plain-English recap of the finished turn
+  items: CardView[]; // the last few completed steps, as a done checklist
+}
+
 export interface StatusView {
   mode: Mode;
   current: CardView | null;
@@ -15,4 +20,5 @@ export interface StatusView {
   why: string | null;
   warning: string | null;
   thinking: boolean; // true between a prompt and Claude's first tool call
+  summary: SummaryView | null; // present once Claude has finished a turn
 }

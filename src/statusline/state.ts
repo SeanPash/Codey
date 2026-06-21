@@ -9,6 +9,7 @@ export interface StatusSnapshot {
   why: string | null;          // the AI "why", written by the narrator
   warning: string | null;      // a formatted warning line, or null
   promptAt?: number | null;    // when the user last submitted a prompt, for the thinking state
+  doneAt?: number | null;      // when Claude last finished a turn, for the summary state
   updatedAt: number;
 }
 
