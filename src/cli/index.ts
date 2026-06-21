@@ -7,6 +7,7 @@ import { runServe } from "./serve.js";
 import { runFeed } from "./feed.js";
 import { latestSessionId } from "./sessions.js";
 import { turnOn, turnOff } from "./toggle.js";
+import { runBudget } from "./budget.js";
 import { readStatus } from "../statusline/state.js";
 import { defaultRoot } from "../store/session-store.js";
 import { join } from "node:path";
@@ -91,6 +92,12 @@ program
     console.log("For the full scrollable task history, run this in a new terminal:");
     console.log(`  node "${process.argv[1]}" feed`);
   });
+
+program
+  .command("budget")
+  .description("Set or report the token budget for automatic narration")
+  .argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report")
+  .action((amount: string | undefined) => runBudget(amount));
 
 program
   .command("off")
