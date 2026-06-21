@@ -3739,20 +3739,24 @@ var toView = (c) => ({
   raw: c.raw
 });
 function composeView(events, snap, now, dwellMs) {
-  const cards = cardsFromEvents(events);
-  const { current, prev, isLatest } = schedule(cards, now, dwellMs);
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
-  const thinking = snap.promptAt != null && snap.promptAt > newestTs && isLatest;
-  const done = !thinking && isLatest && snap.doneAt != null && snap.doneAt >= newestTs;
-  const summary = done ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) } : null;
+  const thinking = snap.promptAt != null && snap.promptAt > newestTs;
+  const done = !thinking && snap.doneAt != null && snap.doneAt >= newestTs;
+  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+  const cards = cardsFromEvents(events.filter((e) => e.timestamp >= turnStart));
+  if (thinking || done) {
+    const summary = done ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) } : null;
+    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary };
+  }
+  const { current, prev, isLatest } = schedule(cards, now, dwellMs);
   return {
     mode: snap.mode,
     current: current ? toView(current) : null,
     prev: prev.map(toView),
-    why: isLatest && !thinking ? snap.why : null,
+    why: isLatest ? snap.why : null,
     warning: isLatest ? snap.warning : null,
-    thinking,
-    summary
+    thinking: false,
+    summary: null
   };
 }
 
@@ -3783,18 +3787,26 @@ function clampRaw(raw) {
   const line = raw.split("\n")[0].trim();
   return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "\u2026" : line;
 }
+function modeLabel(mode) {
+  return mode.charAt(0).toUpperCase() + mode.slice(1);
+}
 function frame(rail) {
   const edge = (ch) => `${rail}${ch}${RESET} `;
   return {
     header(mode) {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
-      return `${edge("\u256D")}${BOLD}${BRAND}CODEY${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${mode.toUpperCase()}${RESET}`;
+      return `${edge("\u256D")}${BOLD}${BRAND}Codey${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}`;
     },
     row(label, labelStyle, body) {
       return `${edge("\u2502")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
     },
     cont(body) {
       return `${edge("\u2502")}${" ".repeat(COL)}  ${body}`;
+    },
+    // A flush list line for the finished-turn recap: sits tight to the bar so the
+    // sentence and the done-steps read as a clean column, not floating mid-box.
+    item(body) {
+      return `${edge("\u2502")}${body}`;
     },
     // A plain rule, or one carrying a small section label so the parts read as
     // distinct sections rather than one long block.
@@ -3846,14 +3858,14 @@ function renderStatus(view, width = WRAP) {
   }
   if (view.summary) {
     const s = view.summary;
-    out.push(f.divider("summary"));
+    out.push(f.divider("done"));
     if (s.sentence) {
-      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.cont(`${BOLD}${TEXT}${ln}${RESET}`)));
+      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.item(`${BOLD}${TEXT}${ln}${RESET}`)));
     }
     if (s.items.length) {
-      out.push(f.divider());
+      out.push(f.divider("steps"));
       for (const it of s.items) {
-        out.push(f.row("", LABEL, `${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`));
+        out.push(f.item(`${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`));
       }
     }
     out.push(f.bottom());

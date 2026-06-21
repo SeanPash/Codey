@@ -15,10 +15,12 @@ const base: StatusView = {
 };
 
 describe("renderStatus", () => {
-  it("shows a loud uppercase mode in the header", () => {
+  it("shows a title-cased name and mode in the header", () => {
     const out = plain(renderStatus(base));
-    expect(out).toContain("CODEY");
-    expect(out).toContain("DEEP");
+    expect(out).toContain("Codey");
+    expect(out).toContain("Deep");
+    expect(out).not.toContain("CODEY"); // not shouting
+    expect(out).not.toContain("DEEP");
   });
 
   it("numbers and phrases the current task, with the raw target above it", () => {
@@ -70,7 +72,7 @@ describe("renderStatus", () => {
 
   it("renders a waiting placeholder when there is no current card", () => {
     const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false, summary: null }));
-    expect(out).toContain("CODEY");
+    expect(out).toContain("Codey");
     expect(out).toContain("waiting for Claude");
   });
 
@@ -105,7 +107,7 @@ describe("renderStatus", () => {
     expect(between.some((l) => l.includes("├"))).toBe(true);
   });
 
-  it("renders a summary section with a sentence and a done checklist when finished", () => {
+  it("renders a finished-turn recap with a sentence and a done checklist", () => {
     const out = plain(renderStatus({
       ...base,
       summary: {
@@ -116,7 +118,8 @@ describe("renderStatus", () => {
         ],
       },
     }));
-    expect(out).toContain("summary");
+    expect(out).toContain("done"); // the recap section rule
+    expect(out).toContain("steps"); // the checklist section rule
     expect(out).toContain("Opened PR #18 with the per-session fixes.");
     expect(out).toContain("✓ #1 asking you a question");
     expect(out).toContain("✓ #2 pushing the branch");

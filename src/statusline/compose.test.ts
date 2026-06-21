@@ -106,6 +106,19 @@ describe("composeView summary", () => {
     expect(view.summary?.items.map((i) => i.seq)).toEqual([2, 3, 4]);
   });
 
+  it("shows the summary immediately, before the reveal animation catches up", () => {
+    const events = [
+      pre("a", "Read", { file_path: "a.ts" }, 0),
+      pre("b", "Write", { file_path: "b.ts" }, 9000),
+    ];
+    // doneAt lands just after the last tool, but now is barely past the first card so the
+    // pointer has not reached the last step. The summary should still snap in.
+    const view = composeView(events, snap({ doneAt: 9001 }), 1000, 4500);
+    expect(view.summary).not.toBeNull();
+    expect(view.summary?.items.map((i) => i.seq)).toEqual([1, 2]);
+    expect(view.current).toBeNull();
+  });
+
   it("has no summary while Claude is still working", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const view = composeView(events, snap({ doneAt: null }), 1000, 4500);
@@ -117,6 +130,21 @@ describe("composeView summary", () => {
     const view = composeView(events, snap({ doneAt: 50, promptAt: 100 }), 5000, 4500);
     expect(view.summary).toBeNull();
     expect(view.thinking).toBe(true);
+  });
+});
+
+describe("composeView per-turn numbering", () => {
+  it("restarts the count at the current turn after a new prompt", () => {
+    const events = [
+      pre("a", "Read", { file_path: "a.ts" }, 0), // previous turn
+      pre("b", "Write", { file_path: "b.ts" }, 200), // this turn
+      pre("c", "Edit", { file_path: "c.ts" }, 9000), // this turn, spaced apart
+    ];
+    // the prompt landed at 150, between the first tool and the rest
+    const view = composeView(events, snap({ promptAt: 150 }), 60000, 4500);
+    expect(view.thinking).toBe(false);
+    expect(view.current?.seq).toBe(2); // b is #1, c is #2 within the turn
+    expect(view.prev.map((p) => p.seq)).toEqual([1]);
   });
 });
 

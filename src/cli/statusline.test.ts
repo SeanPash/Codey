@@ -27,7 +27,7 @@ function seed(): string {
 describe("statusLineFor", () => {
   it("renders the current task and why from events plus the snapshot", () => {
     const out = plain(statusLineFor(seed(), 1000));
-    expect(out).toContain("CODEY");
+    expect(out).toContain("Codey");
     expect(out).toContain("#1 Claude is editing the file auth.ts");
     expect(out).toContain("adding validation");
   });
@@ -49,7 +49,7 @@ describe("lineForSession", () => {
     const root = dirname(dir);
     writeSessionMode("simple", dir);
     const out = plain(lineForSession("s1", root, 1000, 4500));
-    expect(out).toContain("CODEY");
+    expect(out).toContain("Codey");
     expect(out).toContain("#1 Claude is editing the file auth.ts");
   });
 

@@ -80,26 +80,38 @@ export function composeView(
   now: number,
   dwellMs: number,
 ): StatusView {
-  const cards = cardsFromEvents(events);
-  const { current, prev, isLatest } = schedule(cards, now, dwellMs);
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
-  // Claude is between turns: a prompt arrived after the last tool finished and we are
-  // caught up, so nothing new is running yet.
-  const thinking = snap.promptAt != null && snap.promptAt > newestTs && isLatest;
-  // Claude has finished: the stop hook stamped a doneAt at or after the last tool, no
-  // newer prompt is pending, and we have caught up. Then we recap instead of pointing
-  // at a live task.
-  const done = !thinking && isLatest && snap.doneAt != null && snap.doneAt >= newestTs;
-  const summary: SummaryView | null = done
-    ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) }
-    : null;
+  // Claude is between turns: a prompt arrived after the last tool finished, so nothing
+  // new is running yet.
+  const thinking = snap.promptAt != null && snap.promptAt > newestTs;
+  // Claude has finished: the stop hook stamped a doneAt at or after the last tool and no
+  // newer prompt is pending. Then we recap instead of pointing at a live task.
+  const done = !thinking && snap.doneAt != null && snap.doneAt >= newestTs;
+
+  // The live line is scoped to the current turn so the numbers restart at #1 each prompt;
+  // a status line that climbs to #87 is noise. The full cross-session history lives in the
+  // feed. Before any prompt is stamped, the whole session counts as one turn.
+  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+  const cards = cardsFromEvents(events.filter((e) => e.timestamp >= turnStart));
+
+  // Thinking and done are turn-boundary states, so they preempt the reveal animation: the
+  // line snaps straight to them instead of waiting for the pointer to crawl through the
+  // steps it already missed. That is what kept the summary and the thinking line lagging.
+  if (thinking || done) {
+    const summary: SummaryView | null = done
+      ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) }
+      : null;
+    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary };
+  }
+
+  const { current, prev, isLatest } = schedule(cards, now, dwellMs);
   return {
     mode: snap.mode,
     current: current ? toView(current) : null,
     prev: prev.map(toView),
-    why: isLatest && !thinking ? snap.why : null,
+    why: isLatest ? snap.why : null,
     warning: isLatest ? snap.warning : null,
-    thinking,
-    summary,
+    thinking: false,
+    summary: null,
   };
 }
