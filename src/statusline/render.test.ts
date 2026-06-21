@@ -10,6 +10,7 @@ const base: StatusView = {
   prev: [],
   why: null,
   warning: null,
+  thinking: false,
 };
 
 describe("renderStatus", () => {
@@ -43,6 +44,16 @@ describe("renderStatus", () => {
     expect(out).toContain("├"); // a divider rule between sections
   });
 
+  it("points at the live task so the numbers read as an ordered checklist", () => {
+    const out = plain(renderStatus({
+      ...base,
+      prev: [{ seq: 14, tag: "reading", target: "the file rules.md", raw: "rules.md" }],
+    }));
+    // done step keeps the check, the live step gets the pointer, aligned under it
+    expect(out).toContain("✓ #14 reading the file rules.md");
+    expect(out).toContain("▸ #15 Claude is removing the file temp-demo.txt");
+  });
+
   it("shows the why in its own section when present", () => {
     const out = plain(renderStatus({ ...base, why: "cleaning up the demo file" }));
     expect(out).toContain("why");
@@ -57,9 +68,23 @@ describe("renderStatus", () => {
   });
 
   it("renders a waiting placeholder when there is no current card", () => {
-    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null }));
+    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false }));
     expect(out).toContain("CODEY");
     expect(out).toContain("waiting for Claude");
+  });
+
+  it("shows a thinking line between a prompt and the first tool", () => {
+    const out = plain(renderStatus({ ...base, thinking: true }));
+    expect(out).toContain("thinking through your request");
+    expect(out).not.toContain("removing"); // the live task is replaced by the thinking line
+  });
+
+  it("shows a range on the number when a card stands for a grouped burst", () => {
+    const out = plain(renderStatus({
+      ...base,
+      current: { seq: 3, endSeq: 7, tag: "reading", target: "5 files (a.ts, b.ts, +3)", raw: null },
+    }));
+    expect(out).toContain("#3–7 Claude is reading 5 files (a.ts, b.ts, +3)");
   });
 
   it("frames the card and closes the corner", () => {

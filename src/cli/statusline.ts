@@ -5,7 +5,8 @@ import { composeView } from "../statusline/compose.js";
 import { renderStatus } from "../statusline/render.js";
 import { defaultRoot } from "../store/session-store.js";
 import { latestSessionId } from "./sessions.js";
-import type { ToolEvent } from "../types.js";
+import { readActiveMode } from "../statusline/active-mode.js";
+import type { ToolEvent, Mode } from "../types.js";
 
 const DWELL_MS = 4500;
 
@@ -20,15 +21,16 @@ function readEvents(dir: string): ToolEvent[] {
   return out;
 }
 
-export function statusLineFor(dir: string, now = Date.now(), dwellMs = DWELL_MS): string {
+export function statusLineFor(dir: string, now = Date.now(), dwellMs = DWELL_MS, mode?: Mode): string {
   if (!existsSync(dir)) return "";
   const snap: StatusSnapshot = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
-  return renderStatus(composeView(readEvents(dir), snap, now, dwellMs));
+  // The global mode wins when set; it's the one place the toggle records the user's choice.
+  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, dwellMs));
 }
 
 // Claude Code calls this on its own refresh cadence; we fall back to the most recent session.
 export function runStatusLine(): void {
   const session = latestSessionId();
   if (!session) { process.stdout.write(""); return; }
-  process.stdout.write(statusLineFor(join(defaultRoot(), session)));
+  process.stdout.write(statusLineFor(join(defaultRoot(), session), Date.now(), DWELL_MS, readActiveMode() ?? undefined));
 }

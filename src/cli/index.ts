@@ -86,7 +86,10 @@ program
     if (!session) { console.error("No Codey sessions found yet."); process.exit(1); }
     turnOn(mode, session);
     console.log(`Codey narration on (${mode}).`);
-    console.log("Run `codey feed` in another terminal for the full history.");
+    // Print the resolved path so it can be pasted into a fresh terminal where
+    // CLAUDE_PLUGIN_ROOT is not set.
+    console.log("For the full scrollable task history, run this in a new terminal:");
+    console.log(`  node "${process.argv[1]}" feed`);
   });
 
 program
