@@ -42,9 +42,14 @@ Restart the session so the hooks load. No build step: Codey ships prebuilt.
 Turn narration on and pick a depth. Type `/codey` and the picker lists these:
 
 ```
-/codey:simple    one-line, near-zero tokens
+/codey:simple    one calm line, near-zero tokens
 /codey:deep      explains the why
 /codey:teach     explains and teaches the concepts
+/codey:ask       free labels; pull a why with /codey:explain
+/codey:explain   explain the last task in depth (run again to go deeper)
+/codey:budget    cap tokens spent explaining; pauses when reached
+/codey:costs     token cost of each task
+/codey:timeline  open the browser storyboard
 /codey:off       stop narrating
 ```
 
@@ -71,6 +76,19 @@ node dist/cli/index.js watch --mode deep
 
 Narration draws on your existing Claude plan (the same bucket as normal Claude Code work),
 so deeper modes cost more of your quota.
+
+## Controlling cost
+
+You decide when and how much Codey spends:
+
+- **ask** turns off automatic narration and keeps the free labels. When you want the
+  reasoning for what just happened, run `/codey:explain`. Each call spends a little; run it
+  again on the same task for a deeper pass.
+- **`/codey:budget 5000`** (or `5k`) caps how many tokens go to automatic explaining. Once
+  that much is spent, narration pauses and the status line says so. `/codey:budget` with no
+  number reports what is left; `/codey:budget off` clears the cap.
+- **`/codey:costs`** lists what each task cost, and **`/codey:timeline`** opens the browser
+  storyboard. The finished-turn recap in the status line points at both.
 
 ## Browser timeline (`codey serve`)
 
