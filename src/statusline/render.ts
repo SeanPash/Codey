@@ -83,6 +83,8 @@ export function renderStatus(view: StatusView, width = WRAP): string {
   }
 
   if (view.prev.length) {
+    // History rows stay compact: a check, the number, and the bare verb phrase.
+    // The "Claude is" prefix is only on the live task row below.
     for (const p of view.prev) {
       out.push(f.row("prev", `${DIM}${GRAY}`, `${DIM}✓ #${p.seq} ${p.tag} ${p.target}${RESET}`));
     }

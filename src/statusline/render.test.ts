@@ -50,9 +50,10 @@ describe("renderStatus", () => {
   });
 
   it("shows a warning in place of the why", () => {
-    const out = plain(renderStatus({ ...base, why: "x", warning: "stuck: same edit x3" }));
+    const out = plain(renderStatus({ ...base, why: "suppressed-why-body", warning: "stuck: same edit x3" }));
     expect(out).toContain("stuck: same edit x3");
     expect(out).not.toContain("why");
+    expect(out).not.toContain("suppressed-why-body"); // the why body is hidden too, not just the label
   });
 
   it("renders a waiting placeholder when there is no current card", () => {
