@@ -1,5 +1,6 @@
 import type { StatusView } from "./view.js";
 import type { Mode } from "../types.js";
+import { pastTense } from "./labels.js";
 
 // ANSI palette. Terminals that ignore color still read the plain text fine.
 const RESET = "\x1b[0m";
@@ -35,6 +36,11 @@ function clampRaw(raw: string): string {
   return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "…" : line;
 }
 
+// Drop the friendly prefix so rows read tight: "the file rules.md" -> "rules.md".
+function shortTarget(target: string): string {
+  return target.replace(/^the (file|folder) /, "");
+}
+
 // Visible width of a line, ignoring ANSI color codes, so we can center it.
 function visLen(s: string): number {
   return s.replace(/\x1b\[[0-9;]*m/g, "").length;
@@ -50,7 +56,8 @@ function frame(rail: string) {
   return {
     header(mode: Mode): string {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
-      return `${edge("╭")}${BOLD}${BRAND}Codey${RESET} ${DOT}·${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}`;
+      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}·${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}`;
+      return `${edge("╭")}${title} ${rail}${"─".repeat(8)}${RESET}`;
     },
     row(label: string, labelStyle: string, body: string): string {
       return `${edge("│")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
@@ -62,6 +69,11 @@ function frame(rail: string) {
     // sentence and the done-steps read as a clean column, not floating mid-box.
     item(body: string): string {
       return `${edge("│")}${body}`;
+    },
+    // An indented list line for the named-section layout, so rows sit a step in from
+    // the bar instead of hugging it.
+    listItem(body: string): string {
+      return `${edge("│")}  ${body}`;
     },
     // A centered recap line: the summary sentence and completed-task rows sit in the
     // middle of the box rather than hugging the left bar, so the finished turn reads
@@ -145,47 +157,41 @@ export function renderStatus(view: StatusView, width = WRAP): string {
   }
 
   if (!view.current) {
-    out.push(f.row("task", `${BOLD}${GOLD}`, `${GRAY}waiting for Claude${RESET}`));
+    out.push(f.divider("Current task"));
+    out.push(f.listItem(`${GRAY}waiting for Claude${RESET}`));
     out.push(f.bottom());
     return out.join("\n");
   }
 
   if (view.prev.length) {
-    // History rows stay compact: a check, the number, and the bare verb phrase.
-    // The "Claude is" prefix is only on the live task row below.
+    out.push(f.divider("Previous tasks"));
     for (const p of view.prev) {
-      out.push(f.row("prev", LABEL, `${GREEN}✓${RESET} ${NUM}${tasknum(p)}${RESET} ${GRAY}${p.tag} ${p.target}${RESET}`));
+      out.push(
+        f.listItem(`${GREEN}✓${RESET} ${NUM}${tasknum(p)}${RESET} ${GRAY}${pastTense(p.tag)} ${shortTarget(p.target)}${RESET}`),
+      );
     }
-    out.push(f.divider());
   }
 
-  if (view.current.raw) {
-    out.push(f.row("raw", LABEL, `${TEXT}${clampRaw(view.current.raw)}${RESET}`));
-    out.push(f.divider());
-  }
-  // The pointer sits where the done checks sit on the prev rows, so the numbers
-  // read top to bottom as an ordered checklist: ✓ for finished, ▸ for the live one.
+  out.push(f.divider("Current task"));
   out.push(
-    f.row(
-      "task",
-      `${BOLD}${GOLD}`,
-      `${BOLD}${accent}▸${RESET} ${NUM}${tasknum(view.current)}${RESET} ${GRAY}Claude is ${view.current.tag}${RESET} ${TEXT}${view.current.target}${RESET}`,
+    f.listItem(
+      `${BOLD}${accent}▸${RESET} ${NUM}${tasknum(view.current)}${RESET} ${GRAY}${view.current.tag}${RESET} ${TEXT}${shortTarget(view.current.target)}${RESET}`,
     ),
   );
+  if (view.current.raw) {
+    out.push(f.cont(`     ↳ ${LABEL}running${RESET}  ${TEXT}${clampRaw(view.current.raw)}${RESET}`));
+  }
 
   if (view.warning) {
-    out.push(f.divider());
-    out.push(f.row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${view.warning}${RESET}`));
+    out.push(f.divider("Stuck"));
+    out.push(f.listItem(`${BOLD}${RED}${view.warning}${RESET}`));
     out.push(f.bottom());
     return out.join("\n");
   }
 
   if (view.why) {
-    out.push(f.divider());
-    wrapWhy(view.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
-      const body = `${BOLD}${TEXT}${ln}${RESET}`;
-      out.push(idx === 0 ? f.row("why", `${BOLD}${LAV}`, body) : f.cont(body));
-    });
+    out.push(f.divider("Explanation"));
+    wrapWhy(view.why, width, MAX_WHY_LINES).forEach((ln) => out.push(f.listItem(`${BOLD}${TEXT}${ln}${RESET}`)));
   }
 
   out.push(f.bottom());

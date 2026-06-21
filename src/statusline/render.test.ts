@@ -23,16 +23,16 @@ describe("renderStatus", () => {
     expect(out).not.toContain("DEEP");
   });
 
-  it("numbers and phrases the current task, with the raw target above it", () => {
+  it("shows the current task with its raw command as an indented sub-line", () => {
     const out = plain(renderStatus(base));
-    const rawIdx = out.indexOf("C:\\proj\\temp-demo.txt");
-    const taskIdx = out.indexOf("#15 Claude is removing the file temp-demo.txt");
-    expect(rawIdx).toBeGreaterThan(-1);
-    expect(taskIdx).toBeGreaterThan(-1);
-    expect(rawIdx).toBeLessThan(taskIdx); // raw sits above task
+    expect(out).toContain("Current task");
+    expect(out).toContain("#15 removing temp-demo.txt");
+    const taskIdx = out.indexOf("#15 removing temp-demo.txt");
+    const rawIdx = out.indexOf("running  C:\\proj\\temp-demo.txt");
+    expect(rawIdx).toBeGreaterThan(taskIdx); // raw sits UNDER the task now
   });
 
-  it("marks prev rows as done with their number, separated by a divider", () => {
+  it("lists previous tasks in past tense under their own section", () => {
     const out = plain(renderStatus({
       ...base,
       prev: [
@@ -40,34 +40,32 @@ describe("renderStatus", () => {
         { seq: 14, tag: "writing", target: "the file temp-demo.txt", raw: "temp-demo.txt" },
       ],
     }));
-    expect(out).toContain("prev");
-    expect(out).toContain("#13 reading the file rules.md");
-    expect(out).toContain("#14 writing the file temp-demo.txt");
-    expect(out).toContain("✓");
-    expect(out).toContain("├"); // a divider rule between sections
+    expect(out).toContain("Previous tasks");
+    expect(out).toContain("✓ #13 read rules.md");
+    expect(out).toContain("✓ #14 wrote temp-demo.txt");
   });
 
-  it("points at the live task so the numbers read as an ordered checklist", () => {
+  it("points at the live task and shows finished ones in past tense", () => {
     const out = plain(renderStatus({
       ...base,
       prev: [{ seq: 14, tag: "reading", target: "the file rules.md", raw: "rules.md" }],
     }));
-    // done step keeps the check, the live step gets the pointer, aligned under it
-    expect(out).toContain("✓ #14 reading the file rules.md");
-    expect(out).toContain("▸ #15 Claude is removing the file temp-demo.txt");
+    expect(out).toContain("✓ #14 read rules.md");
+    expect(out).toContain("▸ #15 removing temp-demo.txt");
   });
 
-  it("shows the why in its own section when present", () => {
+  it("shows the why under an Explanation section when present", () => {
     const out = plain(renderStatus({ ...base, why: "cleaning up the demo file" }));
-    expect(out).toContain("why");
+    expect(out).toContain("Explanation");
     expect(out).toContain("cleaning up the demo file");
   });
 
-  it("shows a warning in place of the why", () => {
+  it("shows a Stuck section in place of the Explanation when warned", () => {
     const out = plain(renderStatus({ ...base, why: "suppressed-why-body", warning: "stuck: same edit x3" }));
+    expect(out).toContain("Stuck");
     expect(out).toContain("stuck: same edit x3");
-    expect(out).not.toContain("why");
-    expect(out).not.toContain("suppressed-why-body"); // the why body is hidden too, not just the label
+    expect(out).not.toContain("Explanation");
+    expect(out).not.toContain("suppressed-why-body");
   });
 
   it("renders a waiting placeholder when there is no current card", () => {
@@ -87,24 +85,22 @@ describe("renderStatus", () => {
       ...base,
       current: { seq: 3, endSeq: 7, tag: "reading", target: "5 files (a.ts, b.ts, +3)", raw: null },
     }));
-    expect(out).toContain("#3–7 Claude is reading 5 files (a.ts, b.ts, +3)");
+    expect(out).toContain("#3–7 reading 5 files (a.ts, b.ts, +3)");
   });
 
   it("clamps a very long raw command to a single line with an ellipsis", () => {
     const longCmd = "gh pr create --base main --title " + "x".repeat(300);
     const out = plain(renderStatus({ ...base, current: { ...base.current!, raw: longCmd } }));
-    const rawLine = out.split("\n").find((l) => l.includes("raw"))!;
+    const rawLine = out.split("\n").find((l) => l.includes("running") && l.includes("gh pr create"))!;
     expect(rawLine).toBeDefined();
     expect(rawLine.length).toBeLessThan(100);
     expect(rawLine).toContain("…");
   });
 
-  it("separates the raw detail from the task line with a divider", () => {
-    const lines = plain(renderStatus(base)).split("\n");
-    const rawIdx = lines.findIndex((l) => l.includes("raw"));
-    const taskIdx = lines.findIndex((l) => l.includes("Claude is removing"));
-    const between = lines.slice(rawIdx + 1, taskIdx);
-    expect(between.some((l) => l.includes("├"))).toBe(true);
+  it("omits the raw sub-line when the current card has no raw", () => {
+    const out = plain(renderStatus({ ...base, current: { ...base.current!, raw: null } }));
+    expect(out).toContain("#15 removing temp-demo.txt");
+    expect(out).not.toContain("↳ running");
   });
 
   it("renders a finished-turn recap with a sentence and a completed-tasks checklist", () => {
