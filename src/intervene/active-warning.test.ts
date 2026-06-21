@@ -26,9 +26,9 @@ describe("resolveActiveWarning", () => {
     expect(resolveActiveWarning(events, 1000)?.kind).toBe("repeat_error");
   });
 
-  it("detects a hang from a stale open call", () => {
-    const w = resolveActiveWarning([ev({ phase: "pre", tool: "Bash", timestamp: 0 })], 60_000);
-    expect(w?.kind).toBe("hang");
+  it("detects a hang from a stale open call past its per-tool threshold", () => {
+    const w = resolveActiveWarning([ev({ phase: "pre", tool: "Bash", timestamp: 0 })], 200_000);
+    expect(w?.kind).toBe("hang"); // 200s is past the 180s shell leash
     expect(w?.tool).toBe("Bash");
   });
 });

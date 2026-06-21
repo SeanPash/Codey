@@ -3215,10 +3215,10 @@ function detectRepeatError(events, threshold) {
     timestamp: last.timestamp
   };
 }
-function detectHang(openCalls, now, thresholdMs) {
+function detectHang(openCalls, now, thresholdFor) {
   for (const call of openCalls) {
     const elapsed = now - call.timestamp;
-    if (elapsed >= thresholdMs) {
+    if (elapsed >= thresholdFor(call.tool)) {
       return {
         kind: "hang",
         tool: call.tool,
@@ -3229,6 +3229,27 @@ function detectHang(openCalls, now, thresholdMs) {
     }
   }
   return null;
+}
+
+// src/warnings/hang-config.ts
+var DEFAULT_MS = 9e4;
+var BY_TOOL = {
+  // Subagents do their own multi-step work and routinely run for minutes.
+  Task: 3e5,
+  Agent: 3e5,
+  // Shells run builds, installs, and test suites.
+  Bash: 18e4,
+  PowerShell: 18e4,
+  // Fast tools: a stall here is worth surfacing quickly.
+  Read: 45e3,
+  Edit: 45e3,
+  MultiEdit: 45e3,
+  Write: 45e3,
+  Grep: 45e3,
+  Glob: 45e3
+};
+function hangThreshold(tool) {
+  return BY_TOOL[tool] ?? DEFAULT_MS;
 }
 
 // src/warnings/reconcile.ts
@@ -3491,12 +3512,11 @@ function actionFromEvent(e) {
 // src/cli/watch.ts
 var LOOP_THRESHOLD = 5;
 var REPEAT_ERROR_THRESHOLD = 3;
-var HANG_MS = 45e3;
 function createWatchState(mode, narrate) {
   return { engine: new NarrationEngine(mode, narrate), lastWarningKey: null, lastActionKey: null };
 }
 function activeWarning(events, now) {
-  return detectLoop(events, LOOP_THRESHOLD) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ?? detectHang(computeOpenCalls(events), now, HANG_MS);
+  return detectLoop(events, LOOP_THRESHOLD) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ?? detectHang(computeOpenCalls(events), now, hangThreshold);
 }
 function warningKey(w) {
   return `${w.kind}|${w.tool}|${w.count}`;
@@ -4122,9 +4142,8 @@ function buildSnapshot(input) {
 // src/intervene/active-warning.ts
 var LOOP_THRESHOLD3 = 5;
 var REPEAT_ERROR_THRESHOLD3 = 3;
-var HANG_MS2 = 45e3;
 function resolveActiveWarning(events, now) {
-  return detectLoop(events, LOOP_THRESHOLD3) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD3) ?? detectHang(computeOpenCalls(events), now, HANG_MS2);
+  return detectLoop(events, LOOP_THRESHOLD3) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD3) ?? detectHang(computeOpenCalls(events), now, hangThreshold);
 }
 
 // src/serve/load-snapshot.ts

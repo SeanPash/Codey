@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { detectLoop, detectRepeatError, detectHang } from "./detectors.js";
+import { hangThreshold } from "./hang-config.js";
 import type { ToolEvent } from "../types.js";
 
 function ev(over: Partial<ToolEvent>): ToolEvent {
@@ -50,7 +51,7 @@ describe("detectRepeatError", () => {
 describe("detectHang", () => {
   it("warns when an open call is older than the threshold", () => {
     const open = [ev({ id: "a", phase: "pre", tool: "Bash", timestamp: 1000 })];
-    const w = detectHang(open, 46_000, 45_000);
+    const w = detectHang(open, 46_000, () => 45_000);
     expect(w?.kind).toBe("hang");
     expect(w?.tool).toBe("Bash");
     expect(w?.count).toBe(45); // seconds elapsed
@@ -58,6 +59,14 @@ describe("detectHang", () => {
 
   it("does not warn when nothing has exceeded the threshold", () => {
     const open = [ev({ phase: "pre", timestamp: 1000 })];
-    expect(detectHang(open, 2000, 45_000)).toBeNull();
+    expect(detectHang(open, 2000, () => 45_000)).toBeNull();
+  });
+
+  it("uses the per-tool threshold so a slow shell is tolerated but a slow read is not", () => {
+    const now = 200_000; // both calls below are 100s old
+    const slowRead = [ev({ id: "r", phase: "pre", tool: "Read", timestamp: 100_000 })];
+    const slowBash = [ev({ id: "b", phase: "pre", tool: "Bash", timestamp: 100_000 })];
+    expect(detectHang(slowRead, now, hangThreshold)?.tool).toBe("Read"); // 100s past the 45s read leash
+    expect(detectHang(slowBash, now, hangThreshold)).toBeNull();         // 100s still under the 180s shell leash
   });
 });

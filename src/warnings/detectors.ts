@@ -34,11 +34,11 @@ export function detectRepeatError(events: ToolEvent[], threshold: number): Warni
     timestamp: last.timestamp };
 }
 
-// Any open call older than thresholdMs (oldest first) becomes a hang warning.
-export function detectHang(openCalls: ToolEvent[], now: number, thresholdMs: number): Warning | null {
+// Any open call older than its per-tool threshold (oldest first) becomes a hang warning.
+export function detectHang(openCalls: ToolEvent[], now: number, thresholdFor: (tool: string) => number): Warning | null {
   for (const call of openCalls) {
     const elapsed = now - call.timestamp;
-    if (elapsed >= thresholdMs) {
+    if (elapsed >= thresholdFor(call.tool)) {
       return { kind: "hang", tool: call.tool, count: Math.floor(elapsed / 1000),
         message: `This step (${call.tool}) is taking unusually long.`,
         timestamp: call.timestamp };

@@ -5,6 +5,7 @@ import { readMeta } from "../store/session-meta.js";
 import { readTranscriptTurns } from "../timeline/transcript.js";
 import { computeOpenCalls } from "../warnings/open-calls.js";
 import { detectLoop, detectRepeatError, detectHang } from "../warnings/detectors.js";
+import { hangThreshold } from "../warnings/hang-config.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
 import { formatWarning } from "../warnings/format.js";
 import { NarrationEngine, type NarrateFn } from "../narration/engine.js";
@@ -15,7 +16,6 @@ import type { ActionLabel } from "../statusline/labels.js";
 
 const LOOP_THRESHOLD = 5;
 const REPEAT_ERROR_THRESHOLD = 3;
-const HANG_MS = 45_000;
 
 export interface WatchState {
   engine: NarrationEngine;
@@ -31,7 +31,7 @@ export function activeWarning(events: ToolEvent[], now: number): Warning | null 
   return (
     detectLoop(events, LOOP_THRESHOLD) ??
     detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ??
-    detectHang(computeOpenCalls(events), now, HANG_MS)
+    detectHang(computeOpenCalls(events), now, hangThreshold)
   );
 }
 
