@@ -3787,6 +3787,9 @@ function clampRaw(raw) {
   const line = raw.split("\n")[0].trim();
   return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "\u2026" : line;
 }
+function visLen(s) {
+  return s.replace(/\x1b\[[0-9;]*m/g, "").length;
+}
 function modeLabel(mode) {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
@@ -3807,6 +3810,13 @@ function frame(rail) {
     // sentence and the done-steps read as a clean column, not floating mid-box.
     item(body) {
       return `${edge("\u2502")}${body}`;
+    },
+    // A centered recap line: the summary sentence and completed-task rows sit in the
+    // middle of the box rather than hugging the left bar, so the finished turn reads
+    // as its own balanced panel.
+    centered(body, width) {
+      const pad = Math.max(0, Math.floor((width - visLen(body)) / 2) - 2);
+      return `${edge("\u2502")}${" ".repeat(pad)}${body}`;
     },
     // A plain rule, or one carrying a small section label so the parts read as
     // distinct sections rather than one long block.
@@ -3858,14 +3868,14 @@ function renderStatus(view, width = WRAP) {
   }
   if (view.summary) {
     const s = view.summary;
-    out.push(f.divider("done"));
+    out.push(f.divider("summary"));
     if (s.sentence) {
-      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.item(`${BOLD}${TEXT}${ln}${RESET}`)));
+      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.centered(`${BOLD}${TEXT}${ln}${RESET}`, width)));
     }
     if (s.items.length) {
-      out.push(f.divider("steps"));
+      out.push(f.divider("completed tasks"));
       for (const it of s.items) {
-        out.push(f.item(`${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`));
+        out.push(f.centered(`${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${it.tag} ${it.target}${RESET}`, width));
       }
     }
     out.push(f.bottom());
@@ -3913,10 +3923,17 @@ function renderStatus(view, width = WRAP) {
 // src/cli/sessions.ts
 import { readdirSync, statSync, existsSync as existsSync8 } from "node:fs";
 import { join as join5 } from "node:path";
+function eventsMtime(sessionDir) {
+  const p = join5(sessionDir, "events.jsonl");
+  return existsSync8(p) ? statSync(p).mtimeMs : null;
+}
 function latestSessionId(root = defaultRoot()) {
   if (!existsSync8(root)) return null;
-  const dirs = readdirSync(root).map((name) => ({ name, mtime: statSync(join5(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
-  return dirs.length > 0 ? dirs[0].name : null;
+  const names = readdirSync(root);
+  if (names.length === 0) return null;
+  const active = names.map((name) => ({ name, mtime: eventsMtime(join5(root, name)) })).filter((s) => s.mtime !== null).sort((a, b) => b.mtime - a.mtime);
+  if (active.length > 0) return active[0].name;
+  return names.map((name) => ({ name, mtime: statSync(join5(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
 }
 function listSessions(root = defaultRoot()) {
   if (!existsSync8(root)) return [];
