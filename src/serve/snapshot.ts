@@ -2,6 +2,8 @@ import type { ToolEvent, Warning, TimelineChunk, SessionSnapshot } from "../type
 import type { AssistantTurn } from "../timeline/transcript.js";
 import type { RawChunk } from "../timeline/segment.js";
 import { attributeChunk } from "../timeline/attribution.js";
+import { sessionTotals } from "../timeline/totals.js";
+import { groupThinking } from "../timeline/grouping.js";
 import { detectLoop, detectRepeatError } from "../warnings/detectors.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
 
@@ -38,7 +40,8 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     const endIndex = next ? next.startIndex : events.length;
     const endTs = next ? (events[next.startIndex]?.timestamp ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
     const slice = events.slice(rc.startIndex, endIndex);
-    const receipt = attributeChunk(turns, startTs, endTs);
+    const raw = attributeChunk(turns, startTs, endTs);
+    const receipt = { ...raw, workLines: groupThinking(raw.workLines) };
     return {
       id: `c${idx}`,
       name: rc.name,
@@ -46,21 +49,29 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
       startTs,
       endTs,
       tokenTotal: receipt.workTotal + receipt.contextTotal,
+      workTotal: receipt.workTotal,
+      contextTotal: receipt.contextTotal,
       warnings: chunkWarnings(slice, turns),
       receipt,
     };
   });
 
-  const totalTokens = chunks.reduce((s, c) => s + c.tokenTotal, 0);
-  const priciest = chunks.reduce<TimelineChunk | null>((m, c) => (!m || c.tokenTotal > m.tokenTotal ? c : m), null);
+  // Session totals come from the transcript counted once, never the sum of per-chunk totals
+  // (which would re-count the shared cached context in every chunk).
+  const totals = sessionTotals(turns);
+  // Priciest by WORK, skipping zero-work chunks so a no-op task never headlines.
+  const priciest = chunks.reduce<TimelineChunk | null>(
+    (m, c) => (c.workTotal > 0 && (!m || c.workTotal > m.workTotal) ? c : m), null);
 
   return {
     sessionId: input.sessionId,
     sessionName: input.sessionName,
     live: input.live,
-    totalTokens,
+    totalTokens: totals.total,
+    workTotal: totals.work,
+    contextTotal: totals.context,
     taskCount: chunks.length,
-    priciestTaskName: priciest && priciest.tokenTotal > 0 ? priciest.name : null,
+    priciestTaskName: priciest ? priciest.name : null,
     chunks,
     activeWarning: null,
   };
