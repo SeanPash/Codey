@@ -28,7 +28,7 @@ describe("statusLineFor", () => {
   it("renders the current task and why from events plus the snapshot", () => {
     const out = plain(statusLineFor(seed(), 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("#1 Claude is editing the file auth.ts");
+    expect(out).toContain("#1 editing auth.ts");
     expect(out).toContain("adding validation");
   });
 
@@ -41,19 +41,19 @@ describe("lineForSession", () => {
   it("stays blank for a session that has not turned Codey on", () => {
     const dir = seed(); // events + snapshot exist, but no mode marker
     const root = dirname(dir);
-    expect(lineForSession("s1", root, 1000, 4500)).toBe("");
+    expect(lineForSession("s1", root, 1000)).toBe("");
   });
 
   it("renders once the session has a mode marker", () => {
     const dir = seed();
     const root = dirname(dir);
     writeSessionMode("simple", dir);
-    const out = plain(lineForSession("s1", root, 1000, 4500));
+    const out = plain(lineForSession("s1", root, 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("#1 Claude is editing the file auth.ts");
+    expect(out).toContain("#1 editing auth.ts");
   });
 
   it("renders blank when no session is given (no payload session id)", () => {
-    expect(lineForSession(null, tmpdir(), 1000, 4500)).toBe("");
+    expect(lineForSession(null, tmpdir(), 1000)).toBe("");
   });
 });
