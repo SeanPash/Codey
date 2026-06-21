@@ -23,7 +23,7 @@ export function readSessionMode(sessionDir: string): Mode | null {
   const p = modeFile(sessionDir);
   if (!existsSync(p)) return null;
   const raw = readFileSync(p, "utf8").trim();
-  return raw === "simple" || raw === "deep" || raw === "teach" ? raw : null;
+  return raw === "simple" || raw === "deep" || raw === "teach" || raw === "ask" ? raw : null;
 }
 
 // True when any session still has Codey on. Used so turning off the last session can

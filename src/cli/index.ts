@@ -13,7 +13,7 @@ import { join } from "node:path";
 import type { Mode } from "../types.js";
 
 function parseMode(m: string): Mode {
-  return (["simple", "deep", "teach"].includes(m) ? m : "simple") as Mode;
+  return (["simple", "deep", "teach", "ask"].includes(m) ? m : "simple") as Mode;
 }
 
 // Use the depth the session was turned on with, unless the user passed --mode.
@@ -29,7 +29,7 @@ program.name("codey").description("Live legibility for Claude Code");
 program
   .command("watch")
   .description("Watch the current Claude Code session and narrate what it's doing")
-  .option("-m, --mode <mode>", "narration depth: simple | deep | teach (defaults to the session's mode)")
+  .option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask (defaults to the session's mode)")
   .option("-s, --session <id>", "session id to watch (defaults to most recent)")
   .action((opts: { mode?: string; session?: string }) => {
     const session = opts.session ?? latestSessionId();
@@ -62,7 +62,7 @@ program
 program
   .command("narrate")
   .description("Background narrator that feeds the status line")
-  .option("-m, --mode <mode>", "narration depth: simple | deep | teach", "simple")
+  .option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask", "simple")
   .option("-s, --session <id>", "session id (defaults to most recent)")
   .action((opts: { mode: string; session?: string }) => {
     const mode = parseMode(opts.mode);
@@ -79,7 +79,7 @@ program
 program
   .command("on")
   .description("Turn narration on in the status line")
-  .option("-m, --mode <mode>", "simple | deep | teach", "simple")
+  .option("-m, --mode <mode>", "simple | deep | teach | ask", "simple")
   .action((opts: { mode: string }) => {
     const mode = parseMode(opts.mode);
     const session = latestSessionId();
