@@ -9,6 +9,7 @@ import { latestSessionId } from "./sessions.js";
 import { turnOn, turnOff } from "./toggle.js";
 import { runBudget } from "./budget.js";
 import { runExplain } from "./explain.js";
+import { runCosts } from "./costs.js";
 import { readStatus } from "../statusline/state.js";
 import { defaultRoot } from "../store/session-store.js";
 import { join } from "node:path";
@@ -104,6 +105,11 @@ program
   .description("Set or report the token budget for automatic narration")
   .argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report")
   .action((amount: string | undefined) => runBudget(amount));
+
+program
+  .command("costs")
+  .description("Show the token cost of each task in this session")
+  .action(() => runCosts());
 
 program
   .command("off")
