@@ -3082,10 +3082,10 @@ function metaPath(sessionId, root) {
   return join2(root, sessionId, "meta.json");
 }
 function readMeta(sessionId, root = defaultRoot()) {
-  const file2 = metaPath(sessionId, root);
-  if (!existsSync2(file2)) return null;
+  const file3 = metaPath(sessionId, root);
+  if (!existsSync2(file3)) return null;
   try {
-    return JSON.parse(readFileSync2(file2, "utf8"));
+    return JSON.parse(readFileSync2(file3, "utf8"));
   } catch {
     return null;
   }
@@ -3368,29 +3368,29 @@ function pathArg(cmd) {
 function describeBash(cmd) {
   const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
   const name = pathArg(cmd);
-  const file2 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
+  const file3 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
   const folder = (verb, fallback) => ({ tag: verb, target: name ? `the folder ${name}` : fallback });
   switch (word) {
     case "rm":
     case "del":
     case "unlink":
-      return file2("removing", "a file");
+      return file3("removing", "a file");
     case "rmdir":
       return folder("removing", "a folder");
     case "mkdir":
       return folder("creating", "a folder");
     case "touch":
-      return file2("creating", "a file");
+      return file3("creating", "a file");
     case "cp":
-      return file2("copying", "a file");
+      return file3("copying", "a file");
     case "mv":
-      return file2("moving", "a file");
+      return file3("moving", "a file");
     case "cat":
     case "less":
     case "more":
     case "head":
     case "tail":
-      return file2("reading", "a file");
+      return file3("reading", "a file");
     case "cd":
       return folder("switching to", "a folder");
     case "ls":
@@ -3432,9 +3432,25 @@ function describeBash(cmd) {
   }
   return { tag: "running", target: `the command ${shorten(cmd)}` };
 }
+function rawTarget(tool, input) {
+  const file3 = str(input, "file_path") ?? str(input, "path");
+  switch (tool) {
+    case "Read":
+    case "Edit":
+    case "MultiEdit":
+    case "Write":
+      return file3;
+    case "Bash":
+      return str(input, "command");
+    case "Grep":
+    case "Glob":
+      return str(input, "pattern");
+  }
+  return null;
+}
 function actionLabel(tool, input) {
-  const file2 = str(input, "file_path") ?? str(input, "path");
-  const named = (verb) => ({ tag: verb, target: file2 ? `the file ${basename(file2)}` : "a file" });
+  const file3 = str(input, "file_path") ?? str(input, "path");
+  const named = (verb) => ({ tag: verb, target: file3 ? `the file ${basename(file3)}` : "a file" });
   switch (tool) {
     case "Read":
       return named("reading");
@@ -3532,7 +3548,7 @@ function runWatch(sessionId, mode) {
 }
 
 // src/cli/narrate.ts
-import { existsSync as existsSync6, readFileSync as readFileSync6, watchFile as watchFile2 } from "node:fs";
+import { existsSync as existsSync7, readFileSync as readFileSync7, watchFile as watchFile2 } from "node:fs";
 
 // src/statusline/state.ts
 import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, existsSync as existsSync5 } from "node:fs";
@@ -3557,21 +3573,39 @@ function readStatus(dir) {
   }
 }
 
+// src/narration/history.ts
+import { appendFileSync as appendFileSync2, readFileSync as readFileSync6, existsSync as existsSync6 } from "node:fs";
+import { join as join4 } from "node:path";
+function file2(dir) {
+  return join4(dir, "narration.jsonl");
+}
+function appendWhy(dir, entry) {
+  appendFileSync2(file2(dir), JSON.stringify(entry) + "\n");
+}
+function readWhys(dir) {
+  const p = file2(dir);
+  if (!existsSync6(p)) return [];
+  return readFileSync6(p, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+}
+
 // src/cli/narrate.ts
 async function narrateTick(dir, events, state, now) {
   const w = activeWarning(events, now);
   patchStatus(dir, { warning: w ? formatWarning(w) : null });
   const why = await state.engine.onEvents(events, now);
-  if (why) patchStatus(dir, { why });
+  if (why) {
+    patchStatus(dir, { why });
+    appendWhy(dir, { ts: now, why });
+  }
 }
 function runNarrate(sessionId, mode) {
   const store = new SessionStore(sessionId);
   const state = createWatchState(mode, (p) => runClaude(p));
   patchStatus(store.dir, { mode });
   const tick = async () => {
-    if (!existsSync6(store.path)) return;
+    if (!existsSync7(store.path)) return;
     const events = [];
-    for (const line of readFileSync6(store.path, "utf8").split("\n")) {
+    for (const line of readFileSync7(store.path, "utf8").split("\n")) {
       if (!line.trim()) continue;
       try {
         events.push(JSON.parse(line));
@@ -3588,7 +3622,49 @@ function runNarrate(sessionId, mode) {
 }
 
 // src/cli/statusline.ts
-import { join as join5 } from "node:path";
+import { join as join6 } from "node:path";
+import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
+
+// src/statusline/schedule.ts
+function schedule(cards, now, dwellMs) {
+  if (cards.length === 0) return { current: null, prev: [], isLatest: true };
+  let shownAt = cards[0].ts;
+  let displayed = 0;
+  for (let i = 1; i < cards.length; i++) {
+    const earliest = Math.max(cards[i].ts, shownAt + dwellMs);
+    if (earliest > now) break;
+    shownAt = earliest;
+    displayed = i;
+  }
+  return {
+    current: cards[displayed],
+    prev: cards.slice(Math.max(0, displayed - 2), displayed),
+    isLatest: displayed === cards.length - 1
+  };
+}
+
+// src/statusline/compose.ts
+function cardsFromEvents(events) {
+  const cards = [];
+  let seq = 0;
+  for (const e of events) {
+    if (e.phase !== "pre") continue;
+    seq++;
+    cards.push({ seq, action: actionLabel(e.tool, e.input), raw: rawTarget(e.tool, e.input), ts: e.timestamp });
+  }
+  return cards;
+}
+var toView = (c) => ({ seq: c.seq, tag: c.action.tag, target: c.action.target, raw: c.raw });
+function composeView(events, snap, now, dwellMs) {
+  const { current, prev, isLatest } = schedule(cardsFromEvents(events), now, dwellMs);
+  return {
+    mode: snap.mode,
+    current: current ? toView(current) : null,
+    prev: prev.map(toView),
+    why: isLatest ? snap.why : null,
+    warning: isLatest ? snap.warning : null
+  };
+}
 
 // src/statusline/render.ts
 var RESET = "\x1B[0m";
@@ -3608,24 +3684,24 @@ var MODE_COLOR = {
 var WRAP = 120;
 var MAX_WHY_LINES = 5;
 var COL = 5;
-function frame(railColor) {
-  const edge = (ch) => `${railColor}${ch}${RESET} `;
+var RULE = 26;
+function frame(rail) {
+  const edge = (ch) => `${rail}${ch}${RESET} `;
   return {
-    // The branded title row, e.g. "codey · deep".
     header(mode) {
-      return `${edge("\u256D")}${BOLD}${BRAND}codey${RESET} ${DIM}${GRAY}\xB7 ${mode}${RESET}`;
+      return `${edge("\u256D")}${BOLD}${BRAND}CODEY${RESET} ${DIM}${GRAY}\xB7 ${mode.toUpperCase()}${RESET}`;
     },
-    // A labeled body row: padded color label, then the body two spaces over.
     row(label, labelStyle, body) {
       return `${edge("\u2502")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
     },
-    // A wrapped-why continuation line, aligned under the why body.
     cont(body) {
       return `${edge("\u2502")}${" ".repeat(COL)}  ${body}`;
     },
-    // The closing corner under the last row.
+    divider() {
+      return `${rail}\u251C${"\u2500".repeat(RULE)}${RESET}`;
+    },
     bottom() {
-      return `${railColor}\u2570${RESET}`;
+      return `${rail}\u2570${RESET}`;
     }
   };
 }
@@ -3653,23 +3729,39 @@ function wrapWhy(text, width, maxLines) {
   lines[lines.length - 1] = last.replace(/[ .,;:]+$/, "") + "\u2026";
   return lines;
 }
-function renderStatus(snap, width = WRAP) {
-  const f = frame(MODE_COLOR[snap.mode] ?? MODE_COLOR.simple);
-  const out = [f.header(snap.mode)];
-  if (!snap.action) {
+function renderStatus(view, width = WRAP) {
+  const f = frame(MODE_COLOR[view.mode] ?? MODE_COLOR.simple);
+  const out = [f.header(view.mode)];
+  if (!view.current) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${DIM}waiting for Claude${RESET}`));
     out.push(f.bottom());
     return out.join("\n");
   }
-  const { tag, target } = snap.action;
-  out.push(f.row("task", `${BOLD}${GOLD}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
-  if (snap.warning) {
-    out.push(f.row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
+  if (view.prev.length) {
+    for (const p of view.prev) {
+      out.push(f.row("prev", `${DIM}${GRAY}`, `${DIM}\u2713 #${p.seq} ${p.tag} ${p.target}${RESET}`));
+    }
+    out.push(f.divider());
+  }
+  if (view.current.raw) {
+    out.push(f.row("raw", `${DIM}${GRAY}`, `${DIM}${TEXT}${view.current.raw}${RESET}`));
+  }
+  out.push(
+    f.row(
+      "task",
+      `${BOLD}${GOLD}`,
+      `${GRAY}#${view.current.seq} Claude is ${view.current.tag}${RESET} ${TEXT}${view.current.target}${RESET}`
+    )
+  );
+  if (view.warning) {
+    out.push(f.divider());
+    out.push(f.row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${view.warning}${RESET}`));
     out.push(f.bottom());
     return out.join("\n");
   }
-  if (snap.why) {
-    wrapWhy(snap.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
+  if (view.why) {
+    out.push(f.divider());
+    wrapWhy(view.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
       const body = `${BOLD}${TEXT}${ln}${RESET}`;
       out.push(idx === 0 ? f.row("why", `${BOLD}${LAV}`, body) : f.cont(body));
     });
@@ -3679,22 +3771,37 @@ function renderStatus(snap, width = WRAP) {
 }
 
 // src/cli/sessions.ts
-import { readdirSync, statSync, existsSync as existsSync7 } from "node:fs";
-import { join as join4 } from "node:path";
+import { readdirSync, statSync, existsSync as existsSync8 } from "node:fs";
+import { join as join5 } from "node:path";
 function latestSessionId(root = defaultRoot()) {
-  if (!existsSync7(root)) return null;
-  const dirs = readdirSync(root).map((name) => ({ name, mtime: statSync(join4(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
+  if (!existsSync8(root)) return null;
+  const dirs = readdirSync(root).map((name) => ({ name, mtime: statSync(join5(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
   return dirs.length > 0 ? dirs[0].name : null;
 }
 function listSessions(root = defaultRoot()) {
-  if (!existsSync7(root)) return [];
-  return readdirSync(root).filter((name) => statSync(join4(root, name)).isDirectory()).map((name) => ({ id: name, mtime: statSync(join4(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
+  if (!existsSync8(root)) return [];
+  return readdirSync(root).filter((name) => statSync(join5(root, name)).isDirectory()).map((name) => ({ id: name, mtime: statSync(join5(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime);
 }
 
 // src/cli/statusline.ts
-function statusLineFor(dir) {
-  const snap = readStatus(dir);
-  return snap ? renderStatus(snap) : "";
+var DWELL_MS = 4500;
+function readEvents(dir) {
+  const p = join6(dir, "events.jsonl");
+  if (!existsSync9(p)) return [];
+  const out = [];
+  for (const line of readFileSync8(p, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+    }
+  }
+  return out;
+}
+function statusLineFor(dir, now = Date.now(), dwellMs = DWELL_MS) {
+  if (!existsSync9(dir)) return "";
+  const snap = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
+  return renderStatus(composeView(readEvents(dir), snap, now, dwellMs));
 }
 function runStatusLine() {
   const session = latestSessionId();
@@ -3702,16 +3809,16 @@ function runStatusLine() {
     process.stdout.write("");
     return;
   }
-  process.stdout.write(statusLineFor(join5(defaultRoot(), session)));
+  process.stdout.write(statusLineFor(join6(defaultRoot(), session)));
 }
 
 // src/cli/serve.ts
 import { fileURLToPath } from "node:url";
-import { dirname as dirname2, join as join8 } from "node:path";
+import { dirname as dirname2, join as join9 } from "node:path";
 
 // src/serve/server.ts
 import { createServer as createHttpServer } from "node:http";
-import { readFileSync as readFileSync7 } from "node:fs";
+import { readFileSync as readFileSync9 } from "node:fs";
 function resolveRoute(method, url) {
   if (!url) return { type: "notfound" };
   const path = url.split("?")[0];
@@ -3745,7 +3852,7 @@ function createServer(deps) {
     try {
       if (route.type === "page") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(readFileSync7(deps.pagePath, "utf8"));
+        res.end(readFileSync9(deps.pagePath, "utf8"));
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
@@ -3775,8 +3882,8 @@ import { statSync as statSync2 } from "node:fs";
 import { basename as basename3 } from "node:path";
 
 // src/timeline/segment-cache.ts
-import { writeFileSync as writeFileSync3, readFileSync as readFileSync8, existsSync as existsSync8, mkdirSync as mkdirSync3 } from "node:fs";
-import { join as join6 } from "node:path";
+import { writeFileSync as writeFileSync3, readFileSync as readFileSync10, existsSync as existsSync10, mkdirSync as mkdirSync3 } from "node:fs";
+import { join as join7 } from "node:path";
 
 // src/timeline/segment.ts
 var GAP_MS = 6e4;
@@ -3833,19 +3940,19 @@ function parseSegmentation(text, eventCount) {
 // src/timeline/segment-cache.ts
 var STALE_SLACK = 5;
 function cachePath(sessionId, root) {
-  return join6(root, sessionId, "timeline.json");
+  return join7(root, sessionId, "timeline.json");
 }
 function readCache(sessionId, root = defaultRoot()) {
-  const file2 = cachePath(sessionId, root);
-  if (!existsSync8(file2)) return null;
+  const file3 = cachePath(sessionId, root);
+  if (!existsSync10(file3)) return null;
   try {
-    return JSON.parse(readFileSync8(file2, "utf8"));
+    return JSON.parse(readFileSync10(file3, "utf8"));
   } catch {
     return null;
   }
 }
 function writeCache(sessionId, cache, root = defaultRoot()) {
-  mkdirSync3(join6(root, sessionId), { recursive: true });
+  mkdirSync3(join7(root, sessionId), { recursive: true });
   writeFileSync3(cachePath(sessionId, root), JSON.stringify(cache));
 }
 function isStale(cache, eventCount) {
@@ -3896,15 +4003,15 @@ function prettify(s) {
 }
 function describeAction(tool, input) {
   if (!tool || tool === "thinking") return "Thinking it through";
-  const file2 = fileFrom(input);
+  const file3 = fileFrom(input);
   switch (tool) {
     case "Write":
-      return file2 ? `Writing ${file2}` : "Writing a file";
+      return file3 ? `Writing ${file3}` : "Writing a file";
     case "Edit":
     case "MultiEdit":
-      return file2 ? `Editing ${file2}` : "Editing a file";
+      return file3 ? `Editing ${file3}` : "Editing a file";
     case "Read":
-      return file2 ? `Reading ${file2}` : "Reading a file";
+      return file3 ? `Reading ${file3}` : "Reading a file";
     case "Bash": {
       const c = commandFrom(input);
       return c ? `Running: ${c}` : "Running a command";
@@ -4036,14 +4143,14 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
 }
 
 // src/intervene/file-io.ts
-import { writeFileSync as writeFileSync4, readFileSync as readFileSync9, existsSync as existsSync9, rmSync, mkdirSync as mkdirSync4 } from "node:fs";
-import { join as join7 } from "node:path";
+import { writeFileSync as writeFileSync4, readFileSync as readFileSync11, existsSync as existsSync11, rmSync, mkdirSync as mkdirSync4 } from "node:fs";
+import { join as join8 } from "node:path";
 function interventionPath(sessionId, root = defaultRoot()) {
-  return join7(root, sessionId, "intervene.json");
+  return join8(root, sessionId, "intervene.json");
 }
-function writeInterventionFile(sessionId, file2, root = defaultRoot()) {
-  mkdirSync4(join7(root, sessionId), { recursive: true });
-  writeFileSync4(interventionPath(sessionId, root), JSON.stringify(file2));
+function writeInterventionFile(sessionId, file3, root = defaultRoot()) {
+  mkdirSync4(join8(root, sessionId), { recursive: true });
+  writeFileSync4(interventionPath(sessionId, root), JSON.stringify(file3));
 }
 
 // src/intervene/record.ts
@@ -4067,7 +4174,7 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 // src/cli/serve.ts
 var here = dirname2(fileURLToPath(import.meta.url));
 function pagePath() {
-  return join8(here, "..", "serve", "public", "index.html");
+  return join9(here, "..", "serve", "public", "index.html");
 }
 function runServe(opts) {
   const server = createServer({
@@ -4082,10 +4189,84 @@ function runServe(opts) {
   });
 }
 
+// src/cli/feed.ts
+import { existsSync as existsSync12, watchFile as watchFile3 } from "node:fs";
+import { join as join10 } from "node:path";
+
+// src/feed/render.ts
+var RESET2 = "\x1B[0m";
+var BOLD2 = "\x1B[1m";
+var DIM2 = "\x1B[2m";
+var BRAND2 = "\x1B[38;5;75m";
+var GOLD2 = "\x1B[38;5;214m";
+var LAV2 = "\x1B[38;5;147m";
+var TEXT2 = "\x1B[38;5;253m";
+function feedItems(cards, whys) {
+  return cards.map((c, i) => {
+    const next = cards[i + 1]?.ts ?? Infinity;
+    const inWindow = whys.filter((w) => w.ts >= c.ts && w.ts < next);
+    return {
+      seq: c.seq,
+      tag: c.action.tag,
+      target: c.action.target,
+      why: inWindow.length ? inWindow[inWindow.length - 1].why : null
+    };
+  });
+}
+function cardBlock(it) {
+  const lines = [`${BRAND2}\u256D${RESET2} ${BOLD2}${GOLD2}#${it.seq}${RESET2} ${TEXT2}${it.tag} ${it.target}${RESET2}`];
+  if (it.why) lines.push(whyLine(it.why));
+  lines.push(`${BRAND2}\u2570${RESET2}`);
+  return lines.join("\n");
+}
+function whyLine(why) {
+  return `${BRAND2}\u2502${RESET2} ${LAV2}why${RESET2}  ${TEXT2}${why}${RESET2}`;
+}
+function renderFeedHeader() {
+  return `${BOLD2}${BRAND2}codey${RESET2} ${DIM2}\xB7 session feed${RESET2}`;
+}
+function advanceFeed(items, cursor) {
+  const parts = [];
+  const whysShownFor = new Set(cursor.whysShownFor);
+  for (const it of items) {
+    if (it.seq <= cursor.lastSeq && it.why && !whysShownFor.has(it.seq)) {
+      parts.push(whyLine(it.why));
+      whysShownFor.add(it.seq);
+    }
+  }
+  let lastSeq = cursor.lastSeq;
+  for (const it of items) {
+    if (it.seq > cursor.lastSeq) {
+      parts.push(cardBlock(it));
+      if (it.why) whysShownFor.add(it.seq);
+      lastSeq = Math.max(lastSeq, it.seq);
+    }
+  }
+  return { text: parts.join("\n"), cursor: { lastSeq, whysShownFor } };
+}
+
+// src/cli/feed.ts
+function runFeed(sessionId) {
+  const store = new SessionStore(sessionId);
+  const narrationPath = join10(store.dir, "narration.jsonl");
+  let cursor = { lastSeq: 0, whysShownFor: /* @__PURE__ */ new Set() };
+  const build = () => feedItems(cardsFromEvents(store.readAll()), readWhys(store.dir));
+  const flush = () => {
+    if (!existsSync12(store.path)) return;
+    const r = advanceFeed(build(), cursor);
+    cursor = r.cursor;
+    if (r.text) process.stdout.write(r.text + "\n");
+  };
+  process.stdout.write(renderFeedHeader() + "\n");
+  flush();
+  watchFile3(store.path, { interval: 1e3 }, flush);
+  watchFile3(narrationPath, { interval: 1e3 }, flush);
+}
+
 // src/cli/toggle.ts
-import { readFileSync as readFileSync10, writeFileSync as writeFileSync5, existsSync as existsSync10, mkdirSync as mkdirSync5 } from "node:fs";
+import { readFileSync as readFileSync12, writeFileSync as writeFileSync5, existsSync as existsSync13, mkdirSync as mkdirSync5 } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join9, dirname as dirname3 } from "node:path";
+import { join as join11, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
 function withStatusLine(s, command) {
   return { ...s, statusLine: { type: "command", command } };
@@ -4096,13 +4277,13 @@ function withoutStatusLine(s) {
   return next;
 }
 function settingsPath() {
-  return join9(homedir2(), ".claude", "settings.json");
+  return join11(homedir2(), ".claude", "settings.json");
 }
 function readSettings() {
   const p = settingsPath();
-  if (!existsSync10(p)) return {};
+  if (!existsSync13(p)) return {};
   try {
-    return JSON.parse(readFileSync10(p, "utf8"));
+    return JSON.parse(readFileSync12(p, "utf8"));
   } catch {
     return {};
   }
@@ -4130,13 +4311,13 @@ function turnOff() {
 }
 
 // src/cli/index.ts
-import { join as join10 } from "node:path";
+import { join as join12 } from "node:path";
 function parseMode(m) {
   return ["simple", "deep", "teach"].includes(m) ? m : "simple";
 }
 function resolveWatchMode(opt, session) {
   if (opt) return parseMode(opt);
-  const snap = readStatus(join10(defaultRoot(), session));
+  const snap = readStatus(join12(defaultRoot(), session));
   return snap?.mode ?? "simple";
 }
 var program2 = new Command();
@@ -4151,6 +4332,14 @@ program2.command("watch").description("Watch the current Claude Code session and
 });
 program2.command("serve").description("Open the browser timeline for a Claude Code session").option("-s, --session <id>", "session id to open (defaults to most recent)").option("-p, --port <port>", "port to serve on", "4317").action((opts) => {
   runServe({ session: opts.session, port: Number(opts.port) || 4317 });
+});
+program2.command("feed").description("Scrollable terminal view of every task and why in this session").option("-s, --session <id>", "session id to show (defaults to most recent)").action((opts) => {
+  const session = opts.session ?? latestSessionId();
+  if (!session) {
+    console.error("No Codey sessions found yet.");
+    process.exit(1);
+  }
+  runFeed(session);
 });
 program2.command("narrate").description("Background narrator that feeds the status line").option("-m, --mode <mode>", "narration depth: simple | deep | teach", "simple").option("-s, --session <id>", "session id (defaults to most recent)").action((opts) => {
   const mode = parseMode(opts.mode);
@@ -4171,6 +4360,7 @@ program2.command("on").description("Turn narration on in the status line").optio
   }
   turnOn(mode, session);
   console.log(`Codey narration on (${mode}).`);
+  console.log("Run `codey feed` in another terminal for the full history.");
 });
 program2.command("off").description("Turn narration off and restore the plain status line").action(() => {
   turnOff();

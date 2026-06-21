@@ -4,6 +4,7 @@ import { runWatch } from "./watch.js";
 import { runNarrate } from "./narrate.js";
 import { runStatusLine } from "./statusline.js";
 import { runServe } from "./serve.js";
+import { runFeed } from "./feed.js";
 import { latestSessionId } from "./sessions.js";
 import { turnOn, turnOff } from "./toggle.js";
 import { readStatus } from "../statusline/state.js";
@@ -49,6 +50,16 @@ program
   });
 
 program
+  .command("feed")
+  .description("Scrollable terminal view of every task and why in this session")
+  .option("-s, --session <id>", "session id to show (defaults to most recent)")
+  .action((opts: { session?: string }) => {
+    const session = opts.session ?? latestSessionId();
+    if (!session) { console.error("No Codey sessions found yet."); process.exit(1); }
+    runFeed(session);
+  });
+
+program
   .command("narrate")
   .description("Background narrator that feeds the status line")
   .option("-m, --mode <mode>", "narration depth: simple | deep | teach", "simple")
@@ -75,6 +86,7 @@ program
     if (!session) { console.error("No Codey sessions found yet."); process.exit(1); }
     turnOn(mode, session);
     console.log(`Codey narration on (${mode}).`);
+    console.log("Run `codey feed` in another terminal for the full history.");
   });
 
 program
