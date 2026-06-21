@@ -1,4 +1,4 @@
-import type { StatusSnapshot } from "./state.js";
+import type { StatusView } from "./view.js";
 import type { Mode } from "../types.js";
 
 // ANSI palette. Terminals that ignore color still read the plain text fine.
@@ -8,43 +8,40 @@ const DIM = "\x1b[2m";
 const BRAND = "\x1b[38;5;75m"; // the codey name, always sky blue
 const GOLD = "\x1b[38;5;214m"; // the "task" label
 const LAV = "\x1b[38;5;147m"; // the "why" label
-const GRAY = "\x1b[38;5;250m"; // action sentence and the mode badge
+const GRAY = "\x1b[38;5;250m"; // action sentence and prev rows
 const TEXT = "\x1b[38;5;253m"; // the specific target / why body
 const RED = "\x1b[38;5;203m"; // warning
 
-// The frame and badge take the mode's color so each mode reads differently
-// at a glance: calm blue for simple, violet for deep, green for teach.
+// The frame and banner take the mode's color so each mode reads differently at a
+// glance: calm blue for simple, violet for deep, green for teach.
 const MODE_COLOR: Record<Mode, string> = {
   simple: "\x1b[38;5;75m",
   deep: "\x1b[38;5;141m",
   teach: "\x1b[38;5;150m",
 };
 
-const WRAP = 120; // wrap the why near this many characters
-const MAX_WHY_LINES = 5; // enough to show a full explanation, not endless
-const COL = 5; // label column width so "task" / "why" / "stuck" line up
+const WRAP = 120;
+const MAX_WHY_LINES = 5;
+const COL = 5; // label column width so "task" / "why" / "prev" line up
+const RULE = 26; // divider rule length
 
-// A vertical-left frame: the header sits on the top corner, body rows hang off
-// the bar, and a bottom corner closes the card. It groups the section without a
-// right edge, so it never breaks on a narrow or oddly sized terminal.
-function frame(railColor: string) {
-  const edge = (ch: string) => `${railColor}${ch}${RESET} `;
+function frame(rail: string) {
+  const edge = (ch: string) => `${rail}${ch}${RESET} `;
   return {
-    // The branded title row, e.g. "codey · deep".
     header(mode: Mode): string {
-      return `${edge("╭")}${BOLD}${BRAND}codey${RESET} ${DIM}${GRAY}· ${mode}${RESET}`;
+      return `${edge("╭")}${BOLD}${BRAND}CODEY${RESET} ${DIM}${GRAY}· ${mode.toUpperCase()}${RESET}`;
     },
-    // A labeled body row: padded color label, then the body two spaces over.
     row(label: string, labelStyle: string, body: string): string {
       return `${edge("│")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
     },
-    // A wrapped-why continuation line, aligned under the why body.
     cont(body: string): string {
       return `${edge("│")}${" ".repeat(COL)}  ${body}`;
     },
-    // The closing corner under the last row.
+    divider(): string {
+      return `${rail}├${"─".repeat(RULE)}${RESET}`;
+    },
     bottom(): string {
-      return `${railColor}╰${RESET}`;
+      return `${rail}╰${RESET}`;
     },
   };
 }
@@ -75,27 +72,44 @@ function wrapWhy(text: string, width: number, maxLines: number): string[] {
   return lines;
 }
 
-export function renderStatus(snap: StatusSnapshot, width = WRAP): string {
-  const f = frame(MODE_COLOR[snap.mode] ?? MODE_COLOR.simple);
-  const out: string[] = [f.header(snap.mode)];
+export function renderStatus(view: StatusView, width = WRAP): string {
+  const f = frame(MODE_COLOR[view.mode] ?? MODE_COLOR.simple);
+  const out: string[] = [f.header(view.mode)];
 
-  if (!snap.action) {
+  if (!view.current) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${DIM}waiting for Claude${RESET}`));
     out.push(f.bottom());
     return out.join("\n");
   }
 
-  const { tag, target } = snap.action;
-  out.push(f.row("task", `${BOLD}${GOLD}`, `${GRAY}Claude is ${tag}${RESET} ${TEXT}${target}${RESET}`));
+  if (view.prev.length) {
+    for (const p of view.prev) {
+      out.push(f.row("prev", `${DIM}${GRAY}`, `${DIM}✓ #${p.seq} ${p.tag} ${p.target}${RESET}`));
+    }
+    out.push(f.divider());
+  }
 
-  if (snap.warning) {
-    out.push(f.row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${snap.warning}${RESET}`));
+  if (view.current.raw) {
+    out.push(f.row("raw", `${DIM}${GRAY}`, `${DIM}${TEXT}${view.current.raw}${RESET}`));
+  }
+  out.push(
+    f.row(
+      "task",
+      `${BOLD}${GOLD}`,
+      `${GRAY}#${view.current.seq} Claude is ${view.current.tag}${RESET} ${TEXT}${view.current.target}${RESET}`,
+    ),
+  );
+
+  if (view.warning) {
+    out.push(f.divider());
+    out.push(f.row("stuck", `${BOLD}${RED}`, `${BOLD}${RED}${view.warning}${RESET}`));
     out.push(f.bottom());
     return out.join("\n");
   }
 
-  if (snap.why) {
-    wrapWhy(snap.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
+  if (view.why) {
+    out.push(f.divider());
+    wrapWhy(view.why, width, MAX_WHY_LINES).forEach((ln, idx) => {
       const body = `${BOLD}${TEXT}${ln}${RESET}`;
       out.push(idx === 0 ? f.row("why", `${BOLD}${LAV}`, body) : f.cont(body));
     });
