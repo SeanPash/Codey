@@ -12,6 +12,7 @@ const base: StatusView = {
   warning: null,
   thinking: false,
   summary: null,
+  budgetLeft: null,
 };
 
 describe("renderStatus", () => {
@@ -69,7 +70,7 @@ describe("renderStatus", () => {
   });
 
   it("renders a waiting placeholder when there is no current card", () => {
-    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false, summary: null }));
+    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false, summary: null, budgetLeft: null }));
     expect(out).toContain("Codey");
     expect(out).toContain("waiting for Claude");
   });
@@ -147,5 +148,10 @@ describe("renderStatus", () => {
     const simple = renderStatus({ ...base, mode: "simple" });
     const deep = renderStatus({ ...base, mode: "deep" });
     expect(simple).not.toEqual(deep);
+  });
+
+  it("renders the Ask banner for ask mode", () => {
+    const out = plain(renderStatus({ ...base, mode: "ask" }));
+    expect(out).toContain("Ask");
   });
 });
