@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseTranscript, firstUserPrompt, userPrompts, cleanPromptText } from "./transcript.js";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { parseTranscript, userPrompts, cleanPromptText, readFirstPrompt } from "./transcript.js";
 
 // One assistant turn that calls Write, then a user turn carrying its tool_result (success),
 // then an assistant turn that calls Bash, then a failing tool_result for it.
@@ -96,22 +99,54 @@ describe("parseTranscript", () => {
   });
 });
 
-describe("firstUserPrompt", () => {
-  it("returns the first human user message text", () => {
-    const text = [
+describe("readFirstPrompt", () => {
+  function write(lines: string[]): string {
+    const dir = mkdtempSync(join(tmpdir(), "codey-fp-"));
+    const path = join(dir, "transcript.jsonl");
+    writeFileSync(path, lines.join("\n"));
+    return path;
+  }
+
+  it("returns the first human prompt for naming", () => {
+    const path = write([
       JSON.stringify({ type: "user", message: { role: "user", content: "fix the timeline please" }, timestamp: "2026-06-21T00:00:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [] } }),
-    ].join("\n");
-    expect(firstUserPrompt(text)).toBe("fix the timeline please");
+    ]);
+    expect(readFirstPrompt(path)).toBe("fix the timeline please");
   });
 
-  it("reads text from a content-array user message", () => {
-    const text = JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "hello there" }] } });
-    expect(firstUserPrompt(text)).toBe("hello there");
+  it("skips an opening system reminder and names off the real prompt", () => {
+    const path = write([
+      JSON.stringify({ type: "user", message: { role: "user", content: "<system-reminder>context blob</system-reminder>" }, timestamp: "2026-06-22T00:00:00Z" }),
+      JSON.stringify({ type: "user", message: { role: "user", content: "hi" }, timestamp: "2026-06-22T00:00:01Z" }),
+    ]);
+    expect(readFirstPrompt(path)).toBe("hi");
   });
 
-  it("returns null when there is no user message", () => {
-    expect(firstUserPrompt("")).toBeNull();
+  it("collapses a slash command to its name", () => {
+    const path = write([
+      JSON.stringify({ type: "user", message: { role: "user", content: "<command-name>code-review</command-name>" }, timestamp: "2026-06-22T00:00:00Z" }),
+    ]);
+    expect(readFirstPrompt(path)).toBe("/code-review");
+  });
+
+  it("names off the first real prompt after a /clear, not the control command", () => {
+    const path = write([
+      JSON.stringify({ type: "user", message: { role: "user", content: "<local-command-caveat>Caveat: blah</local-command-caveat>" }, timestamp: "2026-06-22T00:00:00Z" }),
+      JSON.stringify({ type: "user", message: { role: "user", content: "<command-name>/clear</command-name>" }, timestamp: "2026-06-22T00:00:01Z" }),
+      JSON.stringify({ type: "user", message: { role: "user", content: "hi" }, timestamp: "2026-06-22T00:00:02Z" }),
+    ]);
+    expect(readFirstPrompt(path)).toBe("hi");
+  });
+
+  it("falls back to the control command when it is the only prompt", () => {
+    const path = write([
+      JSON.stringify({ type: "user", message: { role: "user", content: "<command-name>/clear</command-name>" }, timestamp: "2026-06-22T00:00:00Z" }),
+    ]);
+    expect(readFirstPrompt(path)).toBe("/clear");
+  });
+
+  it("returns null when there is no human prompt", () => {
+    expect(readFirstPrompt(write([]))).toBeNull();
   });
 });
 
@@ -153,6 +188,9 @@ describe("cleanPromptText", () => {
     expect(cleanPromptText("<system-reminder>x</system-reminder>")).toBe("");
     expect(cleanPromptText("<command-message>codey:timeline</command-message>")).toBe("");
     expect(cleanPromptText("Base directory for this skill: C:/x/y")).toBe("");
+  });
+  it("drops the local-command caveat that wraps a slash command", () => {
+    expect(cleanPromptText("<local-command-caveat>Caveat: do not respond</local-command-caveat>")).toBe("");
   });
   it("strips a leading terminal-prompt glyph", () => {
     expect(cleanPromptText("❯ continue working")).toBe("continue working");

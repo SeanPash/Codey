@@ -3165,31 +3165,11 @@ function parseTranscript(text) {
   }
   return turns;
 }
-function firstUserPrompt(text) {
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    if (!line) continue;
-    let r;
-    try {
-      r = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (r.type !== "user") continue;
-    const c = r.message?.content;
-    if (typeof c === "string" && c.trim()) return c.trim();
-    if (Array.isArray(c)) {
-      const t = c.find((b) => b && typeof b === "object" && b.type === "text");
-      if (t && typeof t.text === "string" && t.text.trim()) return t.text.trim();
-    }
-  }
-  return null;
-}
 function cleanPromptText(s) {
   const cmd = /<command-name>([^<]+)<\/command-name>/.exec(s);
   if (cmd) return "/" + cmd[1].trim().replace(/^\//, "");
   const head = s.trim();
-  if (/^<(command-message|command-args|local-command-stdout|bash-input|bash-stdout)/.test(head)) return "";
+  if (/^<(command-message|command-args|local-command-stdout|local-command-caveat|bash-input|bash-stdout)/.test(head)) return "";
   if (/^<system-reminder>/.test(head) || head.startsWith("Caveat:")) return "";
   if (/^\[request interrupted by user/i.test(head)) return "";
   if (head.startsWith("Base directory for this skill:")) return "";
@@ -3232,11 +3212,14 @@ function readUserPrompts(path) {
     return [];
   }
 }
+var CONTROL_COMMANDS = /* @__PURE__ */ new Set(["/clear", "/compact"]);
 function readFirstPrompt(path) {
   if (!path) return null;
   try {
     if (!existsSync3(path)) return null;
-    return firstUserPrompt(readFileSync3(path, "utf8"));
+    const ps = userPrompts(readFileSync3(path, "utf8"));
+    const named = ps.find((p) => !CONTROL_COMMANDS.has(p.text)) ?? ps[0];
+    return named?.text ?? null;
   } catch {
     return null;
   }
@@ -4483,7 +4466,7 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
 }
 
 // src/statusline/active-mode.ts
-import { readFileSync as readFileSync12, writeFileSync as writeFileSync6, existsSync as existsSync13, rmSync as rmSync3, mkdirSync as mkdirSync6, readdirSync as readdirSync2 } from "node:fs";
+import { readFileSync as readFileSync12, writeFileSync as writeFileSync6, existsSync as existsSync13, rmSync as rmSync3, mkdirSync as mkdirSync6, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
 import { join as join10 } from "node:path";
 function modeFile(sessionDir) {
   return join10(sessionDir, "mode");
@@ -4698,7 +4681,7 @@ function buildIdFrom(entryPath) {
 }
 
 // src/serve/load-snapshot.ts
-import { statSync as statSync2 } from "node:fs";
+import { statSync as statSync3 } from "node:fs";
 import { join as join15 } from "node:path";
 
 // src/timeline/attribution.ts
@@ -5332,7 +5315,7 @@ function restore(root, id) {
 function isRunning(dir, now) {
   let evMtime = 0;
   try {
-    evMtime = statSync2(join15(dir, "events.jsonl")).mtimeMs;
+    evMtime = statSync3(join15(dir, "events.jsonl")).mtimeMs;
   } catch {
     evMtime = 0;
   }
@@ -5362,7 +5345,7 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex });
   let mtimeMs = 0;
   try {
-    mtimeMs = statSync2(store.path).mtimeMs;
+    mtimeMs = statSync3(store.path).mtimeMs;
   } catch {
     mtimeMs = 0;
   }
@@ -5485,10 +5468,10 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 }
 
 // src/store/session-prune.ts
-import { readdirSync as readdirSync3, statSync as statSync3, existsSync as existsSync18, rmSync as rmSync5 } from "node:fs";
+import { readdirSync as readdirSync3, statSync as statSync4, existsSync as existsSync18, rmSync as rmSync5 } from "node:fs";
 import { join as join17 } from "node:path";
 function newestMtime(dir) {
-  let newest = statSync3(dir).mtimeMs;
+  let newest = statSync4(dir).mtimeMs;
   let entries;
   try {
     entries = readdirSync3(dir);
@@ -5497,7 +5480,7 @@ function newestMtime(dir) {
   }
   for (const name of entries) {
     try {
-      const ms = statSync3(join17(dir, name)).mtimeMs;
+      const ms = statSync4(join17(dir, name)).mtimeMs;
       if (ms > newest) newest = ms;
     } catch {
     }
@@ -5516,7 +5499,7 @@ function pruneEventless(root, now, maxAgeMs) {
   for (const name of entries) {
     const dir = join17(root, name);
     try {
-      if (!statSync3(dir).isDirectory()) continue;
+      if (!statSync4(dir).isDirectory()) continue;
       if (existsSync18(join17(dir, "events.jsonl"))) continue;
       const age = now - newestMtime(dir);
       if (age < maxAgeMs) continue;
