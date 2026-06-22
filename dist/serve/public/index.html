@@ -73,6 +73,23 @@
       border-radius:8px; padding:7px 10px; font:inherit; font-size:12px; }
     .railsearch::placeholder { color:var(--muted); }
     .railsearch:focus { outline:none; border-color:var(--sky-dim); }
+    /* date range filter: a quiet disclosure so it never crowds the list */
+    .datefilter { margin:0 0 10px; }
+    .datefilter > summary { list-style:none; cursor:pointer; font-size:11px; color:var(--muted); padding:2px 3px;
+      display:flex; align-items:center; gap:6px; user-select:none; }
+    .datefilter > summary::-webkit-details-marker { display:none; }
+    .datefilter > summary::before { content:"\25b8"; font-size:9px; color:#5b6470; }
+    .datefilter[open] > summary::before { content:"\25be"; }
+    .datefilter > summary:hover { color:var(--ink2); }
+    .datefilter .on { color:var(--sky); }
+    .daterow { display:flex; gap:7px; margin:8px 0 6px; }
+    .dlab { flex:1; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600;
+      display:flex; flex-direction:column; gap:4px; }
+    .dinput { background:var(--inset); border:1px solid #283246; color:var(--ink); border-radius:7px; padding:5px 7px;
+      font:inherit; font-size:11.5px; color-scheme:dark; }
+    .dinput:focus { outline:none; border-color:var(--sky-dim); }
+    .dclear { font:inherit; font-size:10.5px; color:var(--muted); background:transparent; border:none; cursor:pointer; padding:2px 3px; }
+    .dclear:hover { color:var(--sky); }
     .dayhd { font-size:8.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700;
       margin:11px 0 5px 4px; }
     .dayhd:first-of-type { margin-top:2px; }
@@ -126,6 +143,8 @@
     /* per-prompt group: an outer card that visibly contains its task cards */
     .grp { background:#0f1219; border:1px solid var(--line); border-radius:14px; padding:14px 15px 11px; margin-bottom:18px; }
     .grp.live { border-color:#2f4f74; box-shadow:0 0 0 1px rgba(95,176,255,.10); }
+    /* a quiet glow on the group being followed, so it is obvious where the live view is anchored */
+    .grp.live.following { border-color:#3a6498; box-shadow:0 0 0 1px rgba(95,176,255,.22), 0 0 26px rgba(95,176,255,.09); }
     .grphd { display:flex; align-items:flex-start; gap:14px; padding:0 1px 12px; margin-bottom:13px; border-bottom:1px solid var(--line); }
     .grphd .gp { flex:1; min-width:0; }
     .geyebrow { display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--sky); margin-bottom:5px; font-weight:600; }
@@ -171,6 +190,12 @@
     .st { width:20px; text-align:right; font-size:11px; color:#5b6470; }
     .st.ok { color:var(--green); }
     .st.fail { color:var(--coral); font-weight:600; }
+    /* the step Claude is on right now, inside the auto-opened live task */
+    .rline.cur { background:rgba(95,176,255,.07); border-radius:6px; }
+    .rline.cur .lbl { color:#bfe0ff; font-weight:600; }
+    .rline.cur .sw { background:var(--sky); box-shadow:0 0 0 0 rgba(95,176,255,.5); animation:pp 1.5s infinite; }
+    .rline.cur .st { color:var(--sky); }
+    .curpip { width:6px; height:6px; border-radius:50%; background:var(--sky); animation:pp 1.4s infinite; flex:none; }
     /* plain-English failure note, shown inline under a failed line */
     .failnote { padding:0 14px 9px 47px; margin-top:-4px; border-bottom:1px solid #141b27; font-size:11.5px; color:#e7b0a6; }
     .failnote .note { color:var(--muted); }
@@ -397,7 +422,9 @@
     // A live, ticking elapsed span (updated by the 1s ticker); used for running tasks/groups.
     const liveTimer = (sinceTs) => `<span class="timer" data-since="${sinceTs}">${fmtDur(Date.now() - sinceTs)}</span>`;
 
-    const open = new Set();        // expanded chunk ids (whole card)
+    const open = new Set();        // chunk ids the user manually expanded
+    const closedByUser = new Set();// live chunk ids the user manually collapsed (overrides auto-open)
+    let liveOpenId = null;         // the running task, auto-opened so its current step shows
     const lineOpen = new Set();    // expanded work lines, key "chunkId:idx"
     const workCollapsed = new Set();// folded work lists, by chunk id (default expanded)
     const confirmed = new Map();   // chunk id -> intervention action (survives the live re-render)
@@ -408,6 +435,9 @@
     let splitPinned = false;
     let lastSessions = [];         // last /api/sessions payload, for search re-render without refetch
     let railFilter = "";           // sidebar search text
+    let dateFrom = "";             // sidebar date filter, lower bound (YYYY-MM-DD, "" = open)
+    let dateTo = "";               // sidebar date filter, upper bound (YYYY-MM-DD, "" = open)
+    let railWired = false;         // the rail shell (search + date inputs) is built once, then reused
     let renamingId = null;         // session id being renamed inline (pauses rail refresh)
 
     // ---- Explanations: generated why/how and per-prompt summaries ----
@@ -529,6 +559,8 @@
     function setFollow(on) {
       followLive = on;
       renderNow(nowState);
+      // Reflect the followed anchor right away without a full re-render.
+      document.querySelectorAll(".grp.live").forEach((el) => el.classList.toggle("following", on));
       if (on) scrollToLive();
     }
 
@@ -594,6 +626,22 @@
       return "";
     }
 
+    // A card is open when the user opened it, or when it is the running task we auto-open to show
+    // the current step (unless the user has explicitly collapsed that one).
+    function isCardOpen(id) {
+      if (open.has(id)) return true;
+      return id === liveOpenId && !closedByUser.has(id);
+    }
+
+    // The step Claude is on inside the running task: the latest line with no result yet, or just
+    // the latest line if everything so far has finished.
+    function currentLineIndex(lines) {
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (lines[i].status !== "ok" && lines[i].status !== "fail") return i;
+      }
+      return lines.length - 1;
+    }
+
     // ---- Receipt ----
     function actionCount(receipt) { return receipt.workLines.filter((l) => l.status !== "none").length; }
 
@@ -619,11 +667,13 @@
       return `<div class="ldetail">${parts.join("")}</div>`;
     }
 
-    function workLineHtml(c, l, idx) {
+    function workLineHtml(c, l, idx, isCur) {
       const think = l.tool === "thinking";
       const sw = l.status === "fail" ? "sw fail" : think ? "sw think" : "sw";
       const tag = think ? `<span class="tag think">thinking</span>` : `<span class="tag tool">${esc(l.tool)}</span>`;
-      const st = l.status === "fail" ? '<span class="st fail">fail</span>'
+      // The running step shows a live pip instead of a status mark.
+      const st = isCur ? '<span class="curpip" title="running now"></span>'
+        : l.status === "fail" ? '<span class="st fail">fail</span>'
         : l.status === "ok" ? '<span class="st ok">&#10003;</span>' : '<span class="st">&middot;</span>';
       const key = c.id + ":" + idx;
       const lo = lineOpen.has(key);
@@ -632,16 +682,17 @@
       const chev = canExpand ? `<span class="lchev">${lo ? "&#9662;" : "&#9656;"}</span>` : `<span class="lchev sp"></span>`;
       const fail = l.status === "fail" && l.failSummary
         ? `<div class="failnote">${esc(l.failSummary)}${l.resolved ? ' <span class="note">&middot; recovered on the next try</span>' : ""}</div>` : "";
-      return `<div class="rline${canExpand ? " can" : ""}${lo ? " lo" : ""}" data-line="${esc(key)}">`
+      return `<div class="rline${canExpand ? " can" : ""}${lo ? " lo" : ""}${isCur ? " cur" : ""}" data-line="${esc(key)}">`
         + `${chev}<span class="${sw}"></span><span class="lbl">${esc(l.label)}</span>${tag}<span class="num">${fmt(l.tokens)}</span>${st}</div>`
         + fail + (lo ? lineDetail(c, l, idx) : "");
     }
 
-    function receiptHtml(c) {
+    function receiptHtml(c, liveTask) {
       const r = c.receipt;
       const collapsed = workCollapsed.has(c.id);
       const wchev = collapsed ? "&#9656;" : "&#9662;";
-      const work = collapsed ? "" : r.workLines.map((l, idx) => workLineHtml(c, l, idx)).join("");
+      const curIdx = liveTask ? currentLineIndex(r.workLines) : -1;
+      const work = collapsed ? "" : r.workLines.map((l, idx) => workLineHtml(c, l, idx, idx === curIdx)).join("");
       return `<div class="rcpt">`
         + `<div class="rhead js-work" role="button" tabindex="0" aria-expanded="${!collapsed}" data-id="${c.id}">`
         + `<span class="x">${wchev}</span><span class="ttl">Work Claude did</span><span class="colh">tokens</span><span class="tot">${fmt(c.workTotal)}</span></div>`
@@ -659,7 +710,8 @@
     }
 
     function cardHtml(c, maxWork, barWarning, snap) {
-      const isOpen = open.has(c.id);
+      const isOpen = isCardOpen(c.id);
+      const liveTask = snap.live && c.id === liveOpenId;
       const pct = maxWork > 0 ? Math.round((c.workTotal / maxWork) * 100) : 0;
       const cls = "card" + (isOpen ? " open" : "") + (c.warnings.length ? " warn" : "");
       const chev = isOpen ? "&#9662;" : "&#9656;";
@@ -672,7 +724,7 @@
         + `<div class="right"><div class="meta"><div class="mtime">${fmtClock(c.startTs)}</div><div class="mdur">${durLabel(c, snap)}</div><div>${acts} action${acts === 1 ? "" : "s"} ${done}</div></div>`
         + `<div class="chip"><div class="top"><span class="tok">${fmt(c.workTotal)}</span><span class="u">tokens</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`
         + `</div></div>`
-        + (isOpen ? explainBlock("task", c.id) + receiptHtml(c) : "")
+        + (isOpen ? explainBlock("task", c.id) + receiptHtml(c, liveTask) : "")
         + (barWarning ? interventionBar(barWarning, c.id) : "")
         + `</div>`;
     }
@@ -690,7 +742,8 @@
       const sumKey = ekey("summary", g.id);
       const sum = explCache.get(sumKey);
       const echo = (!g.live && sum && view === "single") ? `<div class="gecho">${esc(firstSentence(sum))}</div>` : "";
-      return `<section class="grp${g.live ? " live" : ""}">`
+      const following = g.live && followLive ? " following" : "";
+      return `<section class="grp${g.live ? " live" : ""}${following}">`
         + `<div class="grphd"><div class="gp">${eyebrow}<span class="gtext">${esc(g.prompt)}</span>${echo}</div>`
         + `<div class="grpmeta">${fmtClock(g.startTs)} &middot; ${dur} &middot; <span class="gtok">${fmt(g.workTotal)} tokens</span> &middot; ${g.taskCount} task${g.taskCount === 1 ? "" : "s"}</div>`
         + `</div>${cards}${summaryBlock(g)}</section>`;
@@ -733,11 +786,67 @@
         + `</button>`;
     }
 
+    // True when a session's time falls inside the From/To date filter (either bound may be open).
+    function inDateRange(s) {
+      const from = dateFrom ? new Date(dateFrom + "T00:00:00").getTime() : null;
+      const to = dateTo ? new Date(dateTo + "T23:59:59.999").getTime() : null;
+      if (from != null && s.mtime < from) return false;
+      if (to != null && s.mtime > to) return false;
+      return true;
+    }
+
+    function updateDateSummary() {
+      const sum = document.getElementById("datesummary");
+      if (!sum) return;
+      const active = dateFrom || dateTo;
+      sum.classList.toggle("on", !!active);
+      sum.textContent = active ? `Dates: ${dateFrom || "any"} to ${dateTo || "any"}` : "Filter by date";
+    }
+
+    // Build the rail's static shell once: the search box and date filter must be stable elements
+    // so typing in them is never interrupted by a list refresh. The list itself lives in #raillist
+    // and is the only part that re-renders on each poll.
+    function ensureRailShell() {
+      if (railWired) return;
+      document.getElementById("rail").innerHTML =
+        `<p class="rh">Sessions</p>`
+        + `<input class="railsearch" id="railsearch" type="search" placeholder="Search terminals" autocomplete="off" />`
+        + `<details class="datefilter" id="datefilter"><summary id="datesummary">Filter by date</summary>`
+        + `<div class="daterow">`
+        + `<label class="dlab">From<input type="date" id="date-from" class="dinput" /></label>`
+        + `<label class="dlab">To<input type="date" id="date-to" class="dinput" /></label></div>`
+        + `<button class="dclear" id="date-clear" type="button">Clear dates</button></details>`
+        + `<div id="raillist"></div>`;
+
+      const search = document.getElementById("railsearch");
+      search.value = railFilter;
+      search.addEventListener("input", (e) => { railFilter = e.target.value; renderRailList(lastSessions); });
+
+      const from = document.getElementById("date-from");
+      const to = document.getElementById("date-to");
+      from.value = dateFrom; to.value = dateTo;
+      from.addEventListener("change", (e) => { dateFrom = e.target.value; updateDateSummary(); renderRailList(lastSessions); });
+      to.addEventListener("change", (e) => { dateTo = e.target.value; updateDateSummary(); renderRailList(lastSessions); });
+      document.getElementById("date-clear").addEventListener("click", () => {
+        dateFrom = ""; dateTo = ""; from.value = ""; to.value = "";
+        updateDateSummary(); renderRailList(lastSessions);
+      });
+      updateDateSummary();
+      railWired = true;
+    }
+
     function renderRail(sessions) {
+      ensureRailShell();
+      renderRailList(sessions);
+    }
+
+    // Re-render just the session list (never the inputs), grouped by day.
+    function renderRailList(sessions) {
+      const list = document.getElementById("raillist");
+      if (!list) return;
       const q = railFilter.trim().toLowerCase();
-      const shown = q
-        ? sessions.filter((s) => (s.name + " " + (s.project || "")).toLowerCase().includes(q))
-        : sessions;
+      const shown = sessions.filter((s) =>
+        (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q)) && inDateRange(s));
       // Group by day, preserving the most-recent-first order the server already sorted by.
       const days = [];
       const byDay = new Map();
@@ -748,36 +857,30 @@
       }
       const groups = days.map((d) =>
         `<div class="dayhd">${esc(d)}</div>` + byDay.get(d).map(sessRowHtml).join("")).join("");
-      const empty = q ? "No terminals match." : "No terminals yet.";
-      document.getElementById("rail").innerHTML =
-        `<p class="rh">Sessions</p>`
-        + `<input class="railsearch" id="railsearch" type="search" placeholder="Search terminals" value="${esc(railFilter)}" />`
-        + (shown.length ? groups : `<p class="smeta" style="padding-left:3px">${empty}</p>`);
+      const empty = (q || dateFrom || dateTo) ? "No terminals match." : "No terminals yet.";
+      list.innerHTML = shown.length ? groups : `<p class="smeta" style="padding-left:3px">${empty}</p>`;
 
-      const search = document.getElementById("railsearch");
-      if (search) search.addEventListener("input", (e) => { railFilter = e.target.value; renderRail(lastSessions); });
-
-      document.querySelectorAll("#rail .sess").forEach((el) => {
+      list.querySelectorAll(".sess").forEach((el) => {
         el.addEventListener("click", () => {
           currentId = el.dataset.id; pinned = true; followLive = true;
-          open.clear(); tickSingle(); tickNow();
+          open.clear(); closedByUser.clear(); tickSingle(); tickNow();
         });
       });
 
-      const input = document.querySelector("#rail .rename-in");
+      const input = list.querySelector(".rename-in");
       if (input) {
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
         const commit = () => commitRename(renamingId, input.value);
         input.addEventListener("keydown", (e) => {
           if (e.key === "Enter") { e.preventDefault(); commit(); }
-          else if (e.key === "Escape") { e.preventDefault(); renamingId = null; renderRail(lastSessions); }
+          else if (e.key === "Escape") { e.preventDefault(); renamingId = null; renderRailList(lastSessions); }
         });
         input.addEventListener("blur", commit);
       }
     }
 
-    function startRename(id) { renamingId = id; renderRail(lastSessions); }
+    function startRename(id) { renamingId = id; renderRailList(lastSessions); }
 
     async function commitRename(id, name) {
       if (!id) return;
@@ -809,6 +912,8 @@
       const chunks = snap.chunks || [];
       const groups = snap.groups || [];
       const maxWork = Math.max(1, ...chunks.map((c) => c.workTotal));
+      // The running task is the last chunk while the session is live; we auto-open it below.
+      liveOpenId = snap.live && chunks.length ? chunks[chunks.length - 1].id : null;
       const main = document.getElementById("main");
       if (!snap.activeWarning) confirmed.clear();
       const lastId = chunks.length ? chunks[chunks.length - 1].id : null;
@@ -854,7 +959,12 @@
         el.addEventListener("click", (e) => { e.stopPropagation(); run(); });
         el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); } });
       });
-      wire(".js-toggle", (el) => { const id = el.closest(".card").dataset.id; open.has(id) ? open.delete(id) : open.add(id); });
+      wire(".js-toggle", (el) => {
+        const id = el.closest(".card").dataset.id;
+        // Toggle against what is actually showing, so collapsing the auto-opened live task sticks.
+        if (isCardOpen(id)) { open.delete(id); closedByUser.add(id); }
+        else { open.add(id); closedByUser.delete(id); }
+      });
       wire(".js-work", (el) => { const id = el.dataset.id; workCollapsed.has(id) ? workCollapsed.delete(id) : workCollapsed.add(id); });
       wire(".rline.can", (el) => { const k = el.dataset.line; lineOpen.has(k) ? lineOpen.delete(k) : lineOpen.add(k); });
     }
@@ -889,6 +999,7 @@
     async function tickSingle() {
       let sessions = [];
       try { sessions = await (await fetch("/api/sessions")).json(); } catch { sessions = []; }
+      if (view !== "single") return; // a view switch landed while this fetch was in flight
       lastSessions = sessions;
       if (!pinned && sessions[0]) currentId = sessions[0].id;
       const anyRunning = sessions.some((s) => s.running);
@@ -900,6 +1011,7 @@
       if (!currentId) { document.getElementById("main").innerHTML = '<div class="empty">No sessions found.</div>'; return; }
       try {
         const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId))).json();
+        if (view !== "single") return;
         renderSingle(snap);
       } catch { /* keep last view on a transient error */ }
     }
@@ -924,6 +1036,14 @@
       document.getElementById("summary").style.display = v === "split" ? "none" : "";
       document.getElementById("jumplive").hidden = true;
       renderNow(view === "single" ? nowState : null);
+      // Paint the target view from cache immediately so the previous view's content never lingers
+      // or flashes while the fresh data is in flight.
+      const main = document.getElementById("main");
+      if (v === "split") {
+        if (lastLive) renderSplit(lastLive); else main.innerHTML = '<div class="empty">Loading…</div>';
+      } else {
+        if (lastSnap) renderSingle(lastSnap); else main.innerHTML = '<div class="empty">Loading…</div>';
+      }
       tick();
     }
 
@@ -997,7 +1117,9 @@
     function tick() { if (view === "single") return tickSingle(); return tickSplit(); }
     async function tickSplit() {
       try {
-        lastLive = await (await fetch("/api/live")).json();
+        const live = await (await fetch("/api/live")).json();
+        if (view !== "split") return; // a view switch landed while this fetch was in flight
+        lastLive = live;
         renderSplit(lastLive);
       } catch { /* keep the last view on a transient error */ }
     }

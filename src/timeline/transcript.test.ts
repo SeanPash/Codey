@@ -157,4 +157,8 @@ describe("cleanPromptText", () => {
   it("strips a leading terminal-prompt glyph", () => {
     expect(cleanPromptText("❯ continue working")).toBe("continue working");
   });
+  it("drops a user interrupt so it never becomes a phantom prompt", () => {
+    expect(cleanPromptText("[Request interrupted by user]")).toBe("");
+    expect(cleanPromptText("[Request interrupted by user for tool use]")).toBe("");
+  });
 });

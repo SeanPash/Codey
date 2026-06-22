@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { defaultRoot } from "../store/session-store.js";
+import { stripDashes } from "../util/text.js";
 import type { ExplainDepth } from "./explain-prompt.js";
 
 // What a cached explanation is attached to. Task and action explanations and per-prompt
@@ -39,7 +40,9 @@ export function readExplanation(
   root: string = defaultRoot(),
 ): string | null {
   const store = read(sessionId, root);
-  return store[key(scope, id, contentHash, depth)] ?? null;
+  const hit = store[key(scope, id, contentHash, depth)];
+  // Clean on the way out too, so entries written before the no-dash rule still surface clean.
+  return hit == null ? null : stripDashes(hit);
 }
 
 export function writeExplanation(
@@ -54,7 +57,7 @@ export function writeExplanation(
   for (const k of Object.keys(store)) {
     if (k.startsWith(prefix) && !k.startsWith(`${prefix}${contentHash}:`) && k !== live) delete store[k];
   }
-  store[live] = text;
+  store[live] = stripDashes(text);
   mkdirSync(join(root, sessionId), { recursive: true });
   writeFileSync(cachePath(sessionId, root), JSON.stringify(store));
 }

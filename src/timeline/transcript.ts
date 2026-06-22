@@ -118,6 +118,9 @@ export function cleanPromptText(s: string): string {
   const head = s.trim();
   if (/^<(command-message|command-args|local-command-stdout|bash-input|bash-stdout)/.test(head)) return "";
   if (/^<system-reminder>/.test(head) || head.startsWith("Caveat:")) return "";
+  // An interrupt is not a prompt. Claude Code writes "[Request interrupted by user]" (sometimes
+  // "...for tool use") as a user turn when you cancel; left in, it becomes a phantom live group.
+  if (/^\[request interrupted by user/i.test(head)) return "";
   // Skill activations and command bodies arrive as user turns but are not human prompts.
   if (head.startsWith("Base directory for this skill:")) return "";
   const t = s

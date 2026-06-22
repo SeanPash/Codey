@@ -1,6 +1,7 @@
 import type { ToolEvent, Mode } from "../types.js";
 import { buildNarrationPrompt } from "./prompt.js";
 import { shouldNarrate } from "./throttle.js";
+import { stripDashes } from "../util/text.js";
 
 export type NarrateFn = (prompt: string) => Promise<string | null>;
 
@@ -24,6 +25,6 @@ export class NarrationEngine {
 
     this.lastCount = events.length;
     this.lastAtMs = nowMs;
-    return text;
+    return text ? stripDashes(text) : text;
   }
 }

@@ -3191,6 +3191,7 @@ function cleanPromptText(s) {
   const head = s.trim();
   if (/^<(command-message|command-args|local-command-stdout|bash-input|bash-stdout)/.test(head)) return "";
   if (/^<system-reminder>/.test(head) || head.startsWith("Caveat:")) return "";
+  if (/^\[request interrupted by user/i.test(head)) return "";
   if (head.startsWith("Base directory for this skill:")) return "";
   const t = s.replace(/\[Image #\d+\]/g, " ").replace(/\[Image:[^\]]*\]/g, " ").replace(/^\s*[❯>]\s+/, "").replace(/\s+/g, " ").trim();
   return t;
@@ -3396,7 +3397,7 @@ function buildNarrationPrompt(events, mode) {
 ${lines}
 
 ${instruction2}
-Write plain English. Never use em dashes; use a period or a comma instead. Reply with only the explanation, no preamble.`;
+Write plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }
 
 // src/narration/throttle.ts
@@ -3411,6 +3412,11 @@ var PACING = {
 function shouldNarrate(mode, state) {
   const p = PACING[mode];
   return state.newEvents >= p.everyN && state.msSinceLast >= p.minMs;
+}
+
+// src/util/text.ts
+function stripDashes(s) {
+  return s.replace(/\s*[—–]\s*/g, ", ").replace(/ - /g, ", ").replace(/ ,/g, ",").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
 }
 
 // src/narration/engine.ts
@@ -3432,7 +3438,7 @@ var NarrationEngine = class {
     const text = await this.narrate(prompt);
     this.lastCount = events.length;
     this.lastAtMs = nowMs;
-    return text;
+    return text ? stripDashes(text) : text;
   }
 };
 
@@ -5002,7 +5008,7 @@ function actionInstruction(depth) {
       return "In a few plain English sentences for a non-technical person, explain what Claude did in this single step, why it matters, and how it works.";
   }
 }
-var TAIL = "Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation, no preamble.";
+var TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation, no preamble.";
 function buildTaskExplainPrompt(taskName, lines, depth) {
   const body = lines.map(actionContext).join("\n");
   return [
@@ -5044,7 +5050,7 @@ function buildSummaryPrompt(promptText, tasks, depth) {
     "It worked through these tasks, with its own reasoning:",
     body,
     "",
-    `${instruction(depth)} Focus on the outcome, do not list the tools. Use plain hyphens, not em dashes. Reply with only the recap, no preamble.`
+    `${instruction(depth)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`
   ].join("\n");
 }
 
@@ -5072,7 +5078,8 @@ function read(sessionId, root) {
 }
 function readExplanation(sessionId, scope, id, contentHash, depth, root = defaultRoot()) {
   const store = read(sessionId, root);
-  return store[key(scope, id, contentHash, depth)] ?? null;
+  const hit = store[key(scope, id, contentHash, depth)];
+  return hit == null ? null : stripDashes(hit);
 }
 function writeExplanation(sessionId, scope, id, contentHash, depth, text, root = defaultRoot()) {
   const store = read(sessionId, root);
@@ -5081,7 +5088,7 @@ function writeExplanation(sessionId, scope, id, contentHash, depth, text, root =
   for (const k of Object.keys(store)) {
     if (k.startsWith(prefix) && !k.startsWith(`${prefix}${contentHash}:`) && k !== live) delete store[k];
   }
-  store[live] = text;
+  store[live] = stripDashes(text);
   mkdirSync7(join13(root, sessionId), { recursive: true });
   writeFileSync7(cachePath2(sessionId, root), JSON.stringify(store));
 }
@@ -5154,7 +5161,7 @@ async function explain(snap, req, deps) {
   const res = await deps.narrate(loc.prompt);
   if (!res || !res.text.trim()) return { text: null, cached: false, paused: false };
   addSpend(deps.sessionDir, res.tokens);
-  const text = res.text.trim();
+  const text = stripDashes(res.text.trim());
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
   return { text, cached: false, paused: false };
 }
@@ -5742,7 +5749,7 @@ function buildExplainPrompt(events, priorPasses, depth = "deep") {
     return `These are the actions an AI coding agent took for the current task:
 ${lines}
 
-${instruction2} Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation.`;
+${instruction2} Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation.`;
   }
   const heard = priorPasses.map((p, i) => `${i + 1}. ${p}`).join("\n");
   return `These are the actions an AI coding agent took for the current task:
@@ -5751,7 +5758,7 @@ ${lines}
 The user has already been told:
 ${heard}
 
-Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction2} Use plain hyphens, not em dashes. Reply with only the explanation.`;
+Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction2} Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation.`;
 }
 
 // src/narration/explain-log.ts
