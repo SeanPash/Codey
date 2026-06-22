@@ -5,6 +5,8 @@ import { buildIdFrom } from "../serve/build-id.js";
 import { loadSnapshot, loadLive } from "../serve/load-snapshot.js";
 import { recordIntervention } from "../intervene/record.js";
 import { listSessions } from "./sessions.js";
+import { defaultRoot } from "../store/session-store.js";
+import { pruneEventless } from "../store/session-prune.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // dist/cli/serve.js and dist/serve/public/index.html after build; src mirrors the layout.
@@ -13,6 +15,13 @@ function publicDir(): string {
 }
 
 export function runServe(opts: { session?: string; port: number }): void {
+  // Remove stale event-less session folders left by phantom headless invocations.
+  try {
+    pruneEventless(defaultRoot(), Date.now(), 30 * 60_000);
+  } catch {
+    // Never block serving due to a prune failure.
+  }
+
   const server = createServer({
     pagePath: join(publicDir(), "index.html"),
     fontsDir: join(publicDir(), "fonts"),
