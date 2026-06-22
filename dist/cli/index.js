@@ -3809,9 +3809,9 @@ function readBudget(dir) {
     return null;
   }
 }
-function armBudget(dir, cap) {
+function armBudget(dir, cap2) {
   mkdirSync3(dir, { recursive: true });
-  writeFileSync3(file3(dir), JSON.stringify({ cap, spent: 0 }));
+  writeFileSync3(file3(dir), JSON.stringify({ cap: cap2, spent: 0 }));
 }
 function clearBudget(dir) {
   rmSync(file3(dir), { force: true });
@@ -4547,6 +4547,8 @@ function resolveRoute(method, url) {
     if (path === "/api/live") return { type: "live" };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
+    const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
+    if (mnow) return { type: "now", id: decodeURIComponent(mnow[1]) };
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
     if (m) return { type: "session", id: decodeURIComponent(m[1]) };
   }
@@ -4589,6 +4591,8 @@ function createServer(deps) {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
         sendJson(res, 200, deps.getSnapshot(route.id));
+      } else if (route.type === "now") {
+        sendJson(res, 200, deps.getNow(route.id));
       } else if (route.type === "live") {
         sendJson(res, 200, deps.getLive());
       } else if (route.type === "font") {
@@ -5169,6 +5173,56 @@ function fillCachedExplanations(snap, depth, root) {
   return { ...snap, chunks, groups };
 }
 
+// src/serve/now.ts
+var TRAIL = 3;
+function cap(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function currentLabel(tool, input) {
+  const a = actionLabel(tool, input);
+  return cap(`${a.tag} ${shortTarget(a.target)}`).trim();
+}
+function pastLabel(tool, input) {
+  const a = actionLabel(tool, input);
+  return cap(`${pastTense(a.tag)} ${shortTarget(a.target)}`).trim();
+}
+function completedSteps(events) {
+  const open = /* @__PURE__ */ new Map();
+  const done = [];
+  for (const e of events) {
+    const q = open.get(e.tool) ?? [];
+    if (e.phase === "pre") {
+      q.push(e);
+      open.set(e.tool, q);
+    } else {
+      const pre = q.shift();
+      open.set(e.tool, q);
+      done.push({ label: pastLabel(e.tool, pre?.input ?? null), status: e.isError ? "fail" : "ok" });
+    }
+  }
+  return done;
+}
+function buildNowView(events, status, now) {
+  const empty = { live: false, action: null, since: 0, thinking: false, steps: [] };
+  if (events.length === 0 && !status) return empty;
+  const lastActivity = events.reduce((m, e) => Math.max(m, e.timestamp), 0);
+  const closed = status?.closedAt != null && status.closedAt >= Math.max(lastActivity, status.promptAt ?? 0);
+  if (closed) return { ...empty, steps: completedSteps(events).slice(-TRAIL).reverse() };
+  const openCalls = computeOpenCalls(events);
+  const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
+  const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
+  const recent = lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS;
+  const live = !!current || thinking || recent;
+  const steps = completedSteps(events).slice(-TRAIL).reverse();
+  if (current) {
+    return { live, action: { label: currentLabel(current.tool, current.input), tool: current.tool }, since: current.timestamp, thinking: false, steps };
+  }
+  if (thinking) {
+    return { live, action: null, since: status.promptAt, thinking: true, steps };
+  }
+  return { live, action: null, since: lastActivity, thinking: false, steps };
+}
+
 // src/serve/load-snapshot.ts
 function isRunning(dir, now) {
   let evMtime = 0;
@@ -5231,6 +5285,10 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     budgetLeft: budgetLeftLabel(readBudget(store.dir))
   };
   return fillCachedExplanations(withMeta, seedDepth, root);
+}
+function loadNow(sessionId, root = defaultRoot()) {
+  const store = new SessionStore(sessionId, root);
+  return buildNowView(store.readAll(), readStatus(store.dir), Date.now());
 }
 function isScope(s) {
   return s === "task" || s === "action" || s === "summary";
@@ -5366,6 +5424,7 @@ function runServe(opts) {
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
     getSnapshot: (id) => loadSnapshot(id),
+    getNow: (id) => loadNow(id),
     getLive: () => loadLive(),
     intervene: (id, action) => recordIntervention(id, action),
     rename: (id, name) => {

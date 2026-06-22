@@ -9,6 +9,7 @@ export type RouteResult =
   | { type: "health" }
   | { type: "sessions" }
   | { type: "session"; id: string }
+  | { type: "now"; id: string }
   | { type: "intervene"; id: string }
   | { type: "rename"; id: string }
   | { type: "explain"; id: string }
@@ -28,6 +29,8 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (path === "/api/live") return { type: "live" };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
+    const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
+    if (mnow) return { type: "now", id: decodeURIComponent(mnow[1]) };
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
     if (m) return { type: "session", id: decodeURIComponent(m[1]) };
   }
@@ -57,6 +60,7 @@ export interface ServerDeps {
   buildId: string;          // identity the launcher checks to detect a stale server
   listSessions: () => SessionListItem[];
   getSnapshot: (id: string) => SessionSnapshot;
+  getNow: (id: string) => unknown;
   getLive: () => LiveSnapshot;
   intervene: (id: string, action: string) => boolean;
   rename: (id: string, name: string) => boolean;
@@ -86,6 +90,8 @@ export function createServer(deps: ServerDeps): Server {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
         sendJson(res, 200, deps.getSnapshot(route.id));
+      } else if (route.type === "now") {
+        sendJson(res, 200, deps.getNow(route.id));
       } else if (route.type === "live") {
         sendJson(res, 200, deps.getLive());
       } else if (route.type === "font") {

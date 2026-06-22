@@ -19,6 +19,7 @@ import type { ExplainScope } from "../timeline/explain-cache.js";
 import type { ExplainDepth } from "../timeline/explain-prompt.js";
 import { runClaudeMetered } from "../narration/claude-metered.js";
 import { readBudget, budgetLeftLabel } from "../budget/budget.js";
+import { buildNowView, type NowView } from "./now.js";
 import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
 
 // Running = the freshest of a captured tool call or a submitted prompt is within the window,
@@ -86,6 +87,13 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   };
   // Show any explanations already generated at the seed depth without another round-trip.
   return fillCachedExplanations(withMeta, seedDepth, root);
+}
+
+// Cheap live view for the NOW strip: events tail + statusline only, no transcript or
+// segmentation, so it is safe to poll about once a second while a session is live.
+export function loadNow(sessionId: string, root: string = defaultRoot()): NowView {
+  const store = new SessionStore(sessionId, root);
+  return buildNowView(store.readAll(), readStatus(store.dir), Date.now());
 }
 
 function isScope(s: unknown): s is ExplainScope {

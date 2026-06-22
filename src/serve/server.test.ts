@@ -15,6 +15,10 @@ describe("resolveRoute", () => {
     expect(resolveRoute("GET", "/api/session/abc?t=1")).toEqual({ type: "session", id: "abc" });
   });
 
+  it("routes GET /api/session/:id/now to now, not snapshot", () => {
+    expect(resolveRoute("GET", "/api/session/abc/now")).toEqual({ type: "now", id: "abc" });
+  });
+
   it("rejects non-GET and unknown paths", () => {
     expect(resolveRoute("POST", "/")).toEqual({ type: "notfound" });
     expect(resolveRoute("GET", "/nope")).toEqual({ type: "notfound" });

@@ -205,6 +205,27 @@
     .expl { font-size:9.5px; color:var(--body); line-height:1.55; }
     .expl .t { color:var(--sky); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:8px; display:block; margin-bottom:5px; }
 
+    /* live NOW strip: what Claude is on right now, sticky at the top of the single view */
+    .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
+      background:linear-gradient(180deg,#0f1726,#0d1320); border:1px solid #2f4f74; border-radius:12px;
+      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38); }
+    .nowstrip .nowtop { display:flex; align-items:center; gap:12px; }
+    .nowstrip .neye { font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--sky);
+      font-weight:700; display:inline-flex; align-items:center; gap:7px; flex:none; }
+    .nowstrip .ndot { width:8px; height:8px; border-radius:50%; background:var(--sky); animation:pp 1.6s infinite; }
+    .nowstrip .nact { font-size:14.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .nowstrip .nact.think { color:#b3a8ff; }
+    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:var(--ink2); font-size:13px; flex:none; }
+    .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
+      background:#0c0f16; border:1px solid #283246; color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
+    .nowstrip .follow.on { background:rgba(95,176,255,.14); color:#bfe0ff; border-color:rgba(95,176,255,.4); }
+    .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
+    .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
+    .nowstrip .ntrail .lab { color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:9px; font-weight:600; }
+    .nowstrip .ntrail .k { color:var(--green); } .nowstrip .ntrail .k.f { color:var(--coral); }
+    @media (prefers-reduced-motion: reduce) { .nowstrip .ndot { animation:none; } }
+
     /* depth + summaries controls in the title row */
     .tlctl { margin-left:auto; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
     .ctlgrp { display:flex; align-items:center; gap:7px; }
@@ -339,7 +360,10 @@
 
   <div class="cols">
     <aside class="rail" id="rail" aria-label="Sessions"></aside>
-    <main class="center" id="main"></main>
+    <main class="center">
+      <div id="nowstrip" class="nowstrip" hidden></div>
+      <div id="main"></div>
+    </main>
     <aside class="summary" id="summary"></aside>
   </div>
 
@@ -475,6 +499,57 @@
       if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached. Raise it with /codey:budget, then summarize.</span></div>`;
       return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
         + `<div class="genhint">Generates a ${esc(curDepth())} recap. Uses your Codey tokens.</div></div>`;
+    }
+
+    // ---- Live NOW strip + Follow Live ----
+    let followLive = true;   // when live, keep the newest activity in view
+    let nowState = null;     // last /now payload, for re-rendering the strip on toggle
+
+    function renderNow(n) {
+      const strip = document.getElementById("nowstrip");
+      if (!strip) return;
+      if (!n || !n.live || view !== "single") { strip.hidden = true; return; }
+      strip.hidden = false;
+      const act = n.action
+        ? `<span class="nact">${esc(n.action.label)}</span>`
+        : n.thinking ? `<span class="nact think">Thinking it through</span>` : `<span class="nact">Working</span>`;
+      const timer = n.since ? `<span class="ntime timer" data-since="${n.since}">${fmtDur(Date.now() - n.since)}</span>` : "";
+      const follow = `<button class="follow${followLive ? " on" : ""}" id="follow-toggle" type="button">`
+        + `<span class="fd"></span>${followLive ? "Following" : "Follow live"}</button>`;
+      const trail = (n.steps && n.steps.length)
+        ? `<div class="ntrail"><span class="lab">just did</span>`
+          + n.steps.map((s) => `<span class="stp"><span class="k${s.status === "fail" ? " f" : ""}">`
+            + `${s.status === "fail" ? "&#10007;" : "&#10003;"}</span> ${esc(s.label)}</span>`).join("")
+          + `</div>`
+        : "";
+      strip.innerHTML = `<div class="nowtop"><span class="neye"><span class="ndot"></span>Now</span>${act}${timer}${follow}</div>${trail}`;
+      document.getElementById("follow-toggle").addEventListener("click", () => setFollow(!followLive));
+    }
+
+    function setFollow(on) {
+      followLive = on;
+      renderNow(nowState);
+      if (on) scrollToLive();
+    }
+
+    // Keep the newest activity in view, but only nudge when new content has pushed it off the
+    // bottom, so a user reading at the end is not yanked every second.
+    function scrollToLive() {
+      if (!followLive) return;
+      const fromBottom = document.body.scrollHeight - (window.scrollY + window.innerHeight);
+      if (fromBottom > 40) window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    }
+
+    // A deliberate scroll up means "let me read"; pause following until the user opts back in.
+    window.addEventListener("wheel", (e) => { if (e.deltaY < 0 && followLive) setFollow(false); }, { passive: true });
+
+    async function tickNow() {
+      if (view !== "single" || !currentId) { renderNow(null); return; }
+      try {
+        nowState = await (await fetch("/api/session/" + encodeURIComponent(currentId) + "/now")).json();
+        renderNow(nowState);
+        if (nowState.live && followLive) scrollToLive();
+      } catch { /* keep the last strip on a transient error */ }
     }
 
     // ---- Intervention (Plan 3), preserved ----
@@ -684,8 +759,8 @@
 
       document.querySelectorAll("#rail .sess").forEach((el) => {
         el.addEventListener("click", () => {
-          currentId = el.dataset.id; pinned = true;
-          open.clear(); tickSingle();
+          currentId = el.dataset.id; pinned = true; followLive = true;
+          open.clear(); tickSingle(); tickNow();
         });
       });
 
@@ -848,6 +923,7 @@
       document.getElementById("rail").style.display = v === "split" ? "none" : "";
       document.getElementById("summary").style.display = v === "split" ? "none" : "";
       document.getElementById("jumplive").hidden = true;
+      renderNow(view === "single" ? nowState : null);
       tick();
     }
 
@@ -937,6 +1013,10 @@
 
     tick();
     setInterval(tick, 2000);
+    // The NOW strip polls a cheap endpoint about once a second so the current step feels live,
+    // without fetching the full snapshot that often.
+    tickNow();
+    setInterval(tickNow, 1000);
   </script>
 </body>
 </html>
