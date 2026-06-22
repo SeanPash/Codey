@@ -21,7 +21,7 @@ describe("buildNarrationPrompt", () => {
 
   it("tells the narrator to avoid em dashes", () => {
     const p = buildNarrationPrompt([ev({})], "simple");
-    expect(p.toLowerCase()).toContain("em dash");
+    expect(p).toContain("Never use em dashes");
   });
 });
 
