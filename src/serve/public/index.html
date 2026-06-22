@@ -145,11 +145,11 @@
     .grp.live { border-color:#2f4f74; box-shadow:0 0 0 1px rgba(95,176,255,.10); }
     /* a quiet glow on the group being followed, so it is obvious where the live view is anchored */
     .grp.live.following { border-color:#3a6498; box-shadow:0 0 0 1px rgba(95,176,255,.22), 0 0 26px rgba(95,176,255,.09); }
-    /* while following live, hovers inside the live group take a sky tint so it reads as "live mode"
-       instead of the same flat grey used everywhere else */
-    .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:rgba(95,176,255,.10); }
-    .grp.following .rcpt .rhead:hover { background:rgba(95,176,255,.07); }
-    .grp.following .card:hover { background:#141c2b; }
+    /* Hover stays a neutral grey everywhere, including inside the live group, so it can never be
+       mistaken for the live element. Live uses the sky accent + pulse below; hover does not. */
+    .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:#161b24; }
+    .grp.following .rcpt .rhead:hover { background:#141923; }
+    .grp.following .card:hover { background:#161a22; }
     .grphd { display:flex; align-items:flex-start; gap:14px; padding:0 1px 12px; margin-bottom:13px; border-bottom:1px solid var(--line); }
     .grphd .gp { flex:1; min-width:0; }
     .geyebrow { display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--sky); margin-bottom:5px; font-weight:600; }
@@ -200,11 +200,14 @@
     .st { width:20px; text-align:right; font-size:11px; color:#5b6470; }
     .st.ok { color:var(--green); }
     .st.fail { color:var(--coral); font-weight:600; }
-    /* the step Claude is on right now, inside the auto-opened live task */
-    .rline.cur { background:rgba(95,176,255,.07); border-radius:6px; }
-    .rline.cur .lbl { color:#bfe0ff; font-weight:600; }
+    /* the step Claude is on right now: a solid sky accent bar, a clearly brighter background, and
+       a gentle pulse, so the live step stands out from any hovered row at a glance */
+    .rline.cur { background:rgba(95,176,255,.16); border-radius:6px; box-shadow:inset 3px 0 0 var(--sky); animation:livepulse 1.8s ease-in-out infinite; }
+    .rline.cur .lbl { color:#dcefff; font-weight:700; }
     .rline.cur .sw { background:var(--sky); box-shadow:0 0 0 0 rgba(95,176,255,.5); animation:pp 1.5s infinite; }
     .rline.cur .st { color:var(--sky); }
+    @keyframes livepulse { 0%,100% { background:rgba(95,176,255,.16); } 50% { background:rgba(95,176,255,.10); } }
+    @media (prefers-reduced-motion: reduce) { .rline.cur { animation:none; } }
     .curpip { width:6px; height:6px; border-radius:50%; background:var(--sky); animation:pp 1.4s infinite; flex:none; }
     /* plain-English failure note, shown inline under a failed line */
     .failnote { padding:0 14px 9px 47px; margin-top:-4px; border-bottom:1px solid #141b27; font-size:11.5px; color:#e7b0a6; }
@@ -322,13 +325,15 @@
 
     .empty { color:var(--muted); padding:48px 0; text-align:center; }
 
-    /* Active Terminals grid: fills the page, adapts to how many are open */
+    /* Active Terminals: a vertical stack of full-size terminals. The stack scrolls as a whole,
+       and each terminal keeps a comfortable height and scrolls its own breakdowns, so a busy
+       terminal never squishes the others. The controls (pager, hidden tray) stay pinned above. */
     .splitwrap { display:flex; flex-direction:column; gap:10px; height:calc(100vh - var(--head) - 32px); }
-    .grid { display:grid; gap:12px; flex:1; min-height:0; grid-auto-rows:minmax(0,1fr); }
-    .grid.n1 { grid-template-columns:1fr; }
-    .grid.n2 { grid-template-columns:repeat(2,1fr); }
-    .grid.n3 { grid-template-columns:repeat(3,1fr); }
-    .pane { position:relative; background:#0f131b; border:1px solid #232c3c; border-radius:11px; overflow:hidden; display:flex; flex-direction:column; min-height:0; height:100%; }
+    .tstack { display:flex; flex-direction:column; gap:14px; flex:1; min-height:0; overflow-y:auto; padding-right:4px;
+      scrollbar-width:thin; scrollbar-color:#2a3344 transparent; }
+    .tstack::-webkit-scrollbar { width:10px; }
+    .tstack::-webkit-scrollbar-thumb { background:#28303f; border-radius:5px; }
+    .pane { position:relative; background:#0f131b; border:1px solid #232c3c; border-radius:11px; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:none; height:clamp(360px, 62vh, 560px); }
     .pane.run { border-color:#2f4f74; }
     .pane.run::before { content:""; position:absolute; inset:0; border-radius:11px; padding:1px; pointer-events:none;
       background:linear-gradient(110deg,transparent 25%,var(--sky) 50%,transparent 75%); background-size:200% 100%;
@@ -338,6 +343,21 @@
     .phead .pproj { font-size:10px; color:var(--body); background:#11151d; border:1px solid #232c3c; border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--sky); }
     .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:#bfe0ff; background:rgba(95,176,255,.12); border:1px solid rgba(95,176,255,.32); }
+    /* a terminal that has been prompted but has not run a tool yet: present but visibly idle */
+    .pane.idle { opacity:.62; border-style:dashed; }
+    .pane.idle .phead { background:#0b0e14; }
+    .idlebadge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:var(--muted); background:#11151d; border:1px solid #232c3c; }
+    /* dismiss (X) to hide a terminal from the grid; non-destructive, restorable below */
+    .pdismiss { flex:none; width:20px; height:20px; line-height:1; display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid #232c3c; background:#0c1018; color:var(--muted); border-radius:6px; cursor:pointer; font-size:13px; }
+    .pdismiss:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
+    /* the "Hidden (N)" tray under the grid, listing dismissed terminals with a restore action */
+    .hiddentray { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 2px 0; font-size:11px; color:var(--muted); }
+    .hiddentray .htlab { letter-spacing:.04em; }
+    .hidchip { display:inline-flex; align-items:center; gap:7px; padding:4px 9px; border-radius:8px; background:#0f131b; border:1px solid #232c3c; color:var(--ink2); }
+    .hidchip .hcdot { width:7px; height:7px; border-radius:50%; flex:none; }
+    .hidchip button { font:inherit; font-size:10.5px; color:var(--sky); background:transparent; border:none; cursor:pointer; padding:0; }
+    .hidchip button:hover { text-decoration:underline; }
     /* Each pane scrolls on its own, so one busy terminal never crushes the others. min-height:0
        lets the flex child actually shrink and hand its overflow to this scroller. */
     .pbody { padding:9px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1 1 0; min-height:0;
@@ -369,11 +389,9 @@
     }
     @media (max-width: 1000px) {
       .summary { display:none; }
-      .grid.n3 { grid-template-columns:repeat(2,1fr); }
     }
     @media (max-width: 680px) {
       .rail { display:none; }
-      .grid.n2, .grid.n3 { grid-template-columns:1fr; }
       .rline .tag { display:none; }
     }
   </style>
@@ -676,6 +694,7 @@
 
     function lineDetail(c, l, idx) {
       const parts = [];
+      if (l.thoughtFirst) parts.push(`<div class="ld"><span class="lk">first</span><span class="lv">Thought it through, then did this.</span></div>`);
       if (l.ts) parts.push(`<div class="ld"><span class="lk">at</span><span class="lv">${fmtClockSec(l.ts)}</span></div>`);
       if (l.raw) parts.push(`<div class="ld"><span class="lk">ran</span><code>${esc(l.raw)}</code></div>`);
       if (l.why) parts.push(`<div class="ld"><span class="lk">Claude's note</span><span class="lv">${esc(l.why)}</span></div>`);
@@ -704,16 +723,13 @@
         + fail + (lo ? lineDetail(c, l, idx) : "");
     }
 
-    // The shared activity behind a work line, used to spot a run of the same kind of step. A
-    // thinking row is phrased "Thought it through, then searched the code"; we key it on the
-    // action it leads into ("searched the code") so it groups with the searches that follow. A
-    // lone "Thought about what to do next." keys to null and never merges.
+    // The shared activity behind a work line, used to spot a run of the same kind of step. We key
+    // on the tool, so consecutive steps of the same kind fold even when their targets differ
+    // (three reads of different files become one "Read 3 files" dropdown). A lone "Thought about
+    // what to do next." row keys to null and never merges.
     function activityKey(l) {
-      if (l.tool === "thinking") {
-        const m = /^thought it through, then (.+)$/i.exec(l.label || "");
-        return m ? m[1].toLowerCase().trim() : null;
-      }
-      return (l.label || "").toLowerCase().trim();
+      if (l.tool === "thinking") return null;
+      return (l.tool || "").toLowerCase().trim();
     }
 
     // Fold consecutive lines that share an activity key into a burst, but only when there are
@@ -738,6 +754,13 @@
       return out;
     }
 
+    // A human summary for a folded run of same-tool steps, e.g. "Read 3 files", "Ran 3 commands".
+    function burstSummary(tool, n) {
+      const m = { Read: "Read " + n + " files", Edit: "Edited " + n + " files", Write: "Wrote " + n + " files",
+        Bash: "Ran " + n + " commands", Grep: "Ran " + n + " searches", Glob: "Ran " + n + " searches" };
+      return m[tool] || (n + " " + tool + " steps");
+    }
+
     // One collapsed burst: a parent row that summarizes the run, expanding to the real child rows.
     function burstHtml(c, g, curIdx) {
       const key = c.id + "|b" + g.start;
@@ -754,7 +777,7 @@
       const children = isOpen
         ? `<div class="bchildren">${g.items.map((it) => workLineHtml(c, it.l, it.idx, it.idx === curIdx)).join("")}</div>` : "";
       return `<div class="rline brow${isOpen ? " lo" : ""}" data-burst="${esc(key)}">`
-        + `${chev}<span class="${sw}"></span><span class="lbl">${esc(head.label)}</span>`
+        + `${chev}<span class="${sw}"></span><span class="lbl">${esc(burstSummary(head.tool, g.items.length))}</span>`
         + `<span class="tag steps">${g.items.length} steps</span><span class="num">${fmt(tokens)}</span>${st}</div>`
         + children;
     }
@@ -1130,13 +1153,36 @@
     }
 
     // ---- Active Terminals (multi-session) ----
-    const SPLIT_PER_PAGE = 2;
+    // A page holds a few full-size terminals; the stack scrolls through them. Bounded so a
+    // machine with many open terminals does not re-render dozens of full receipts every tick.
+    const SPLIT_PER_PAGE = 4;
     let lastLive = null; // keep the last payload so pager clicks re-render without a refetch
 
+    async function dismissTerminal(id) {
+      try { await fetch("/api/session/" + encodeURIComponent(id) + "/dismiss", { method: "POST" }); } catch { /* refetch handles it */ }
+      tickSplit();
+    }
+    async function restoreTerminal(id) {
+      try { await fetch("/api/session/" + encodeURIComponent(id) + "/restore", { method: "POST" }); } catch { /* refetch handles it */ }
+      tickSplit();
+    }
+
+    // The "Hidden (N)" tray: dismissed terminals offered back for restore. Empty -> nothing shown.
+    function hiddenTrayHtml(hidden) {
+      if (!hidden || hidden.length === 0) return "";
+      const chips = hidden.map((h) =>
+        `<span class="hidchip"><span class="hcdot" style="background:${esc(h.color || "#5fb0ff")}"></span>${esc(h.name)}`
+        + `<button type="button" data-restore="${esc(h.sessionId)}">Restore</button></span>`).join("");
+      return `<div class="hiddentray"><span class="htlab">Hidden (${hidden.length}):</span>${chips}</div>`;
+    }
+
     function paneHtml(s, isFirst) {
-      const cls = "pane" + (s.runningTool ? " run" : "");
-      const pill = isFirst && s.running ? `<span class="badge">&#10022; Just prompted</span>` : "";
+      const idle = !s.acted;
+      const cls = "pane" + (s.runningTool ? " run" : "") + (idle ? " idle" : "");
+      const pill = idle ? `<span class="idlebadge">no actions yet</span>`
+        : isFirst && s.running ? `<span class="badge">&#10022; Just prompted</span>` : "";
       const proj = s.project ? `<span class="pproj">${esc(s.project)}</span>` : "";
+      const dismissBtn = `<button class="pdismiss" type="button" data-dismiss="${esc(s.sessionId)}" title="Hide this terminal" aria-label="Hide this terminal">&times;</button>`;
       // Namespace each chunk id with the session so the same card index in two panes does not
       // share expand state. Render the full Single-view card so panes get the same receipts.
       const chunks = s.chunks.map((c) => ({ ...c, id: s.sessionId + "~" + c.id }));
@@ -1152,7 +1198,7 @@
       const runl = s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
       return `<div class="${cls}"><div class="phead"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
         + `<span class="pname">${esc(s.name)}</span>${proj}${pill}`
-        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span></div>`
+        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${dismissBtn}</div>`
         + `<div class="pbody">${cards}${runl}</div></div>`;
     }
 
@@ -1161,8 +1207,11 @@
       updateLiveBadge(live.liveCount);
       document.getElementById("sname").textContent = "Active terminals";
       const main = document.getElementById("main");
+      const tray = hiddenTrayHtml(live.hidden);
       if (sessions.length === 0) {
-        main.innerHTML = '<div class="empty">No terminals are open right now. Prompt Claude in any terminal to see it appear here.</div>';
+        main.innerHTML = '<div class="splitwrap">' + tray
+          + '<div class="empty">No terminals are open right now. Prompt Claude in any terminal to see it appear here.</div></div>';
+        wireSplitControls(main);
         return;
       }
       const pages = Math.max(1, Math.ceil(sessions.length / SPLIT_PER_PAGE));
@@ -1171,21 +1220,31 @@
       const start = (splitPage - 1) * SPLIT_PER_PAGE;
       const pageItems = sessions.slice(start, start + SPLIT_PER_PAGE);
 
-      const grid = pageItems.map((s) => paneHtml(s, splitPage === 1 && s === sessions[0])).join("");
+      const stack = pageItems.map((s) => paneHtml(s, splitPage === 1 && s === sessions[0])).join("");
       const dots = Array.from({ length: pages }, (_, i) => `<span class="dot${i + 1 === splitPage ? " on" : ""}"></span>`).join("");
       const pager = pages > 1
         ? `<div class="pager"><button class="nav" id="pg-prev" type="button"${splitPage === 1 ? " disabled" : ""}>&#8249;</button>`
           + `<div class="dots">${dots}</div>`
           + `<button class="nav" id="pg-next" type="button"${splitPage === pages ? " disabled" : ""}>&#8250;</button>`
-          + `<span class="prange">Page ${splitPage} of ${pages} &middot; most recent first</span></div>`
+          + `<span class="prange">Page ${splitPage} of ${pages} &middot; most recent first &middot; scroll for the rest</span></div>`
         : "";
-      main.innerHTML = `<div class="splitwrap"><div class="grid n${pageItems.length}">${grid}</div>${pager}</div>`;
+      // Controls (pager + hidden tray) pinned above; the terminal stack scrolls on its own.
+      main.innerHTML = `<div class="splitwrap">${pager}${tray}<div class="tstack">${stack}</div></div>`;
 
       const prev = document.getElementById("pg-prev");
       const next = document.getElementById("pg-next");
       if (prev) prev.addEventListener("click", () => { splitPinned = true; splitPage--; renderSplit(lastLive); });
       if (next) next.addEventListener("click", () => { splitPinned = true; splitPage++; renderSplit(lastLive); });
+      wireSplitControls(main);
       wireCards(main, () => renderSplit(lastLive));
+    }
+
+    // Wire the dismiss (X) buttons and the hidden-tray restore buttons.
+    function wireSplitControls(main) {
+      main.querySelectorAll("[data-dismiss]").forEach((el) =>
+        el.addEventListener("click", (e) => { e.stopPropagation(); dismissTerminal(el.dataset.dismiss); }));
+      main.querySelectorAll("[data-restore]").forEach((el) =>
+        el.addEventListener("click", (e) => { e.stopPropagation(); restoreTerminal(el.dataset.restore); }));
     }
 
     function tick() { if (view === "single") return tickSingle(); return tickSplit(); }
@@ -1209,10 +1268,10 @@
 
     tick();
     setInterval(tick, 2000);
-    // The NOW strip polls a cheap endpoint about once a second so the current step feels live,
-    // without fetching the full snapshot that often.
+    // The NOW strip polls a cheap endpoint a bit under once a second so the current step and the
+    // quick steps in its trail feel live, without fetching the full snapshot that often.
     tickNow();
-    setInterval(tickNow, 1000);
+    setInterval(tickNow, 600);
   </script>
 </body>
 </html>

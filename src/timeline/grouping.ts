@@ -1,22 +1,17 @@
 import type { ReceiptLine } from "../types.js";
 
-// Lower-case the first character so the merged sentence flows naturally.
-function lc(s: string): string {
-  return s.charAt(0).toLowerCase() + s.slice(1);
+// A trailing run of thinking with no action to fold into: show it plainly on its own. No
+// thinking text exists to reveal, so the row is just a marker that Claude paused to think.
+function loneThinkRow(tokens: number, ts: number): ReceiptLine {
+  return { label: "Thought about what to do next.", tool: "thinking", tokens, status: "none",
+    errorText: null, resolved: false, raw: null, why: null, failSummary: null, ts, thoughtFirst: false };
 }
 
-function thinkingRow(tokens: number, ts: number, nextLine: ReceiptLine | null): ReceiptLine {
-  const label = nextLine
-    ? `Thought it through, then ${lc(nextLine.label)}`
-    : "Thought about what to do next.";
-  const why = nextLine?.why ?? null;
-  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false, raw: null, why, failSummary: null, ts };
-}
-
-// Collapse each run of consecutive thinking lines (status "none") into a single row.
-// The row is tied to the action it leads into, so the receipt reads as a story, not a
-// stack of identical "Thinking it through" lines. No thinking text exists to show. The
-// merged row keeps the timestamp of where the run started.
+// Fold each run of consecutive thinking lines (status "none") into the action that follows it,
+// rather than leaving a separate "Thought it through" row. The action row absorbs the thinking
+// tokens and is tagged `thoughtFirst`, so the receipt reads as one step ("Reading grouping.ts",
+// with a quiet "thought first" note on expand) instead of a duplicate think row plus the action.
+// A thinking run at the very end, with nothing to lead into, keeps its own plain row.
 export function groupThinking(lines: ReceiptLine[]): ReceiptLine[] {
   const out: ReceiptLine[] = [];
   let runTokens = 0;
@@ -24,9 +19,13 @@ export function groupThinking(lines: ReceiptLine[]): ReceiptLine[] {
   let inRun = false;
   for (const l of lines) {
     if (l.status === "none") { if (!inRun) runTs = l.ts; runTokens += l.tokens; inRun = true; continue; }
-    if (inRun) { out.push(thinkingRow(runTokens, runTs, l)); runTokens = 0; inRun = false; }
+    if (inRun) {
+      out.push({ ...l, tokens: l.tokens + runTokens, thoughtFirst: true });
+      runTokens = 0; inRun = false;
+      continue;
+    }
     out.push(l);
   }
-  if (inRun) out.push(thinkingRow(runTokens, runTs, null));
+  if (inRun) out.push(loneThinkRow(runTokens, runTs));
   return out;
 }

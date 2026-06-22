@@ -6,7 +6,7 @@ import type { ReceiptLine } from "../types.js";
 function line(why: string): ReceiptLine {
   return {
     label: "Editing budget.ts", tool: "Edit", tokens: 50, status: "ok", errorText: null,
-    resolved: false, raw: "src/budget/budget.ts", why, failSummary: null, ts: 1,
+    resolved: false, raw: "src/budget/budget.ts", why, failSummary: null, ts: 1, thoughtFirst: false,
   };
 }
 

@@ -4,7 +4,7 @@ import type { SessionListItem } from "../cli/sessions.js";
 
 function s(p: Partial<SessionListItem>): SessionListItem {
   return { id: "x", mtime: 0, name: "n", project: null, color: "c", taskCount: 0,
-    lastPromptTs: 0, running: false, open: false, live: false, day: "Today", ...p };
+    lastPromptTs: 0, running: false, open: false, acted: false, live: false, day: "Today", ...p };
 }
 
 describe("selectActive", () => {

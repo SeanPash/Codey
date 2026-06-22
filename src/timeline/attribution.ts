@@ -109,6 +109,7 @@ export function attributeChunk(turns: AssistantTurn[], startTs: number, endTs: n
       why: t.assistantText ?? null,
       failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
       ts: t.ts,
+      thoughtFirst: false,
     });
   }
   markResolved(workLines);

@@ -20,6 +20,7 @@ import type { ExplainDepth } from "../timeline/explain-prompt.js";
 import { runClaudeMetered } from "../narration/claude-metered.js";
 import { readBudget, budgetLeftLabel } from "../budget/budget.js";
 import { buildNowView, type NowView } from "./now.js";
+import { readDismissed } from "../store/dismissed-store.js";
 import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
 
 // Running = the freshest of a captured tool call or a submitted prompt is within the window,
@@ -131,7 +132,11 @@ export async function runExplain(sessionId: string, body: unknown, root: string 
 // Compact snapshot for Live Split: one entry per active session, already ordered most
 // recent prompt first. runningTool is the tool of a still-open pre-event (Claude is mid-call).
 export function loadLive(root: string = defaultRoot()): LiveSnapshot {
-  const active = selectActive(listSessions(root));
+  const all = selectActive(listSessions(root));
+  const dismissed = readDismissed(root);
+  // Hidden terminals the user dismissed: dropped from the grid but offered back for restore.
+  const hidden = all.filter((s) => dismissed.has(s.id)).map((s) => ({ sessionId: s.id, name: s.name, color: s.color }));
+  const active = all.filter((s) => !dismissed.has(s.id));
   const sessions: LiveSession[] = active.map((s) => {
     const snap = loadSnapshot(s.id, root);
     const events = new SessionStore(s.id, root).readAll();
@@ -148,8 +153,9 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
       runningTool,
+      acted: s.acted,
     };
   });
   // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".
-  return { sessions, liveCount: sessions.filter((s) => s.running).length };
+  return { sessions, liveCount: sessions.filter((s) => s.running).length, hidden };
 }

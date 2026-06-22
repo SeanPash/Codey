@@ -14,6 +14,8 @@ export type RouteResult =
   | { type: "rename"; id: string }
   | { type: "explain"; id: string }
   | { type: "delete"; id: string }
+  | { type: "dismiss"; id: string }
+  | { type: "restore"; id: string }
   | { type: "live" }
   | { type: "font"; file: string }
   | { type: "notfound" };
@@ -41,6 +43,10 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (mn) return { type: "rename", id: decodeURIComponent(mn[1]) };
     const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
     if (me) return { type: "explain", id: decodeURIComponent(me[1]) };
+    const md = /^\/api\/session\/([^/]+)\/dismiss$/.exec(path);
+    if (md) return { type: "dismiss", id: decodeURIComponent(md[1]) };
+    const mr = /^\/api\/session\/([^/]+)\/restore$/.exec(path);
+    if (mr) return { type: "restore", id: decodeURIComponent(mr[1]) };
   }
   if (method === "DELETE") {
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
@@ -65,6 +71,8 @@ export interface ServerDeps {
   intervene: (id: string, action: string) => boolean;
   rename: (id: string, name: string) => boolean;
   remove: (id: string) => boolean;
+  dismiss: (id: string) => boolean;
+  restore: (id: string) => boolean;
   explain: (id: string, body: unknown) => Promise<{ text: string | null; cached: boolean; paused: boolean }>;
 }
 
@@ -125,6 +133,12 @@ export function createServer(deps: ServerDeps): Server {
         });
       } else if (route.type === "delete") {
         const ok = deps.remove(route.id);
+        sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "dismiss") {
+        const ok = deps.dismiss(route.id);
+        sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "restore") {
+        const ok = deps.restore(route.id);
         sendJson(res, ok ? 200 : 400, { ok });
       } else {
         sendJson(res, 404, { error: "not found" });

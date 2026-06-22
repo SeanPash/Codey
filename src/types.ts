@@ -44,6 +44,7 @@ export interface ReceiptLine {
   why: string | null;            // the owning task's narration, reused (no extra tokens)
   failSummary: string | null;    // plain-English failure sentence shown inline on a fail
   ts: number;                    // when this action happened (ms since epoch)
+  thoughtFirst: boolean;         // a run of thinking was folded into this action row
 }
 
 export interface TokenBreakdown {
@@ -117,11 +118,20 @@ export interface LiveSession {
   lastPromptTs: number;        // ordering key (only moves on a new prompt)
   chunks: TimelineChunk[];     // compact timeline, rendered small
   runningTool: string | null;  // tool of the open pre-event, or null when idle
+  acted: boolean;              // has run a tool (false = prompted but no work yet, shown dimmed)
+}
+
+// A terminal the user hid from the grid, kept so it can be listed and restored.
+export interface HiddenTerminal {
+  sessionId: string;
+  name: string;
+  color: string;
 }
 
 export interface LiveSnapshot {
   sessions: LiveSession[];     // already ordered: most recent prompt first
   liveCount: number;
+  hidden: HiddenTerminal[];    // dismissed terminals, offered for restore
 }
 
 // --- Plan 3: loop-breaker / intervention ---

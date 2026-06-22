@@ -8,7 +8,7 @@ import type { SessionSnapshot, ReceiptLine, TimelineChunk, PromptGroup } from ".
 
 function rl(over: Partial<ReceiptLine> = {}): ReceiptLine {
   return { label: "Reading a.ts", tool: "Read", tokens: 10, status: "ok", errorText: null,
-    resolved: false, raw: "a.ts", why: "checking the shape", failSummary: null, ts: 1, ...over };
+    resolved: false, raw: "a.ts", why: "checking the shape", failSummary: null, ts: 1, thoughtFirst: false, ...over };
 }
 function chunk(id: string, lines: ReceiptLine[]): TimelineChunk {
   return { id, name: `Task ${id}`, narration: "did stuff", startTs: 0, endTs: 1, tokenTotal: 0,
