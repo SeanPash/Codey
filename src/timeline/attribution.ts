@@ -108,6 +108,7 @@ export function attributeChunk(turns: AssistantTurn[], startTs: number, endTs: n
       raw: rawDetail(t.tool, t.input),
       why: null, // filled in per chunk in buildSnapshot, from the chunk narration
       failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
+      ts: t.ts,
     });
   }
   markResolved(workLines);

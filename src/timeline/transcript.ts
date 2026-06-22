@@ -88,6 +88,67 @@ export function firstUserPrompt(text: string): string | null {
   return null;
 }
 
+export interface UserPrompt { ts: number; text: string; }
+
+// Turn a raw user message into a clean prompt heading, or "" if it is not a real human
+// prompt (a slash-command wrapper, an image-only paste, an injected system reminder). Slash
+// commands collapse to "/name"; image and command markup are stripped so the user's own
+// words show through.
+export function cleanPromptText(s: string): string {
+  const cmd = /<command-name>([^<]+)<\/command-name>/.exec(s);
+  if (cmd) return "/" + cmd[1].trim().replace(/^\//, "");
+  const head = s.trim();
+  if (/^<(command-message|command-args|local-command-stdout|bash-input|bash-stdout)/.test(head)) return "";
+  if (/^<system-reminder>/.test(head) || head.startsWith("Caveat:")) return "";
+  // Skill activations and command bodies arrive as user turns but are not human prompts.
+  if (head.startsWith("Base directory for this skill:")) return "";
+  const t = s
+    .replace(/\[Image #\d+\]/g, " ")
+    .replace(/\[Image:[^\]]*\]/g, " ")
+    .replace(/^\s*[❯>]\s+/, "")        // strip a leading terminal-prompt glyph
+    .replace(/\s+/g, " ")
+    .trim();
+  return t;
+}
+
+// Every human prompt in order, with its timestamp. These define the per-prompt groups in
+// the timeline. We skip tool_result messages (which also arrive as type "user") and any
+// message that cleans down to nothing (pure command/image/system markup).
+export function userPrompts(text: string): UserPrompt[] {
+  const out: UserPrompt[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    let r: Record<string, any>;
+    try { r = JSON.parse(line); } catch { continue; }
+    if (r.type !== "user") continue;
+    const c = r.message?.content;
+    let t: string | null = null;
+    if (typeof c === "string" && c.trim()) {
+      t = c.trim();
+    } else if (Array.isArray(c)) {
+      const hasToolResult = c.some((b) => b && typeof b === "object" && b.type === "tool_result");
+      const tb = c.find((b) => b && typeof b === "object" && b.type === "text");
+      if (!hasToolResult && tb && typeof tb.text === "string" && tb.text.trim()) t = tb.text.trim();
+    }
+    if (!t) continue;
+    const clean = cleanPromptText(t);
+    if (clean) out.push({ ts: Date.parse(r.timestamp ?? "") || 0, text: clean });
+  }
+  return out;
+}
+
+// Glue: read every user prompt off disk; tolerate a missing/unreadable path.
+export function readUserPrompts(path: string | null): UserPrompt[] {
+  if (!path) return [];
+  try {
+    if (!existsSync(path)) return [];
+    return userPrompts(readFileSync(path, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
 // Glue: read the first prompt off disk; tolerate a missing/unreadable path.
 export function readFirstPrompt(path: string | null): string | null {
   if (!path) return null;

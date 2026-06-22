@@ -4,19 +4,19 @@ import type { ReceiptLine } from "../types.js";
 
 function line(p: Partial<ReceiptLine>): ReceiptLine {
   return { label: "", tool: "thinking", tokens: 0, status: "none", errorText: null, resolved: false,
-    raw: null, why: null, failSummary: null, ...p };
+    raw: null, why: null, failSummary: null, ts: 0, ...p };
 }
 
 describe("groupThinking", () => {
   it("collapses a run of thinking lines into one row labelled by what follows", () => {
     const out = groupThinking([
-      line({ tokens: 10 }),
-      line({ tokens: 20 }),
-      line({ label: "Ran a command", tool: "Bash", tokens: 5, status: "ok" }),
+      line({ tokens: 10, ts: 100 }),
+      line({ tokens: 20, ts: 200 }),
+      line({ label: "Ran a command", tool: "Bash", tokens: 5, status: "ok", ts: 300 }),
     ]);
     expect(out).toEqual([
-      { label: "Planned before ran a command", tool: "thinking", tokens: 30, status: "none", errorText: null, resolved: false, raw: null, why: null, failSummary: null },
-      { label: "Ran a command", tool: "Bash", tokens: 5, status: "ok", errorText: null, resolved: false, raw: null, why: null, failSummary: null },
+      { label: "Planned before ran a command", tool: "thinking", tokens: 30, status: "none", errorText: null, resolved: false, raw: null, why: null, failSummary: null, ts: 100 },
+      { label: "Ran a command", tool: "Bash", tokens: 5, status: "ok", errorText: null, resolved: false, raw: null, why: null, failSummary: null, ts: 300 },
     ]);
   });
 

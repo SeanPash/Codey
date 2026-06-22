@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTranscript, firstUserPrompt } from "./transcript.js";
+import { parseTranscript, firstUserPrompt, userPrompts, cleanPromptText } from "./transcript.js";
 
 // One assistant turn that calls Write, then a user turn carrying its tool_result (success),
 // then an assistant turn that calls Bash, then a failing tool_result for it.
@@ -74,5 +74,49 @@ describe("firstUserPrompt", () => {
 
   it("returns null when there is no user message", () => {
     expect(firstUserPrompt("")).toBeNull();
+  });
+});
+
+describe("userPrompts", () => {
+  it("returns each human prompt with its timestamp, skipping tool_results", () => {
+    const text = [
+      JSON.stringify({ type: "user", message: { content: "hello" }, timestamp: "2026-06-21T00:00:01Z" }),
+      JSON.stringify({ type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "Read", input: {} }] }, timestamp: "2026-06-21T00:00:02Z" }),
+      JSON.stringify({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] }, timestamp: "2026-06-21T00:00:03Z" }),
+      JSON.stringify({ type: "user", message: { content: [{ type: "text", text: "goodbye" }] }, timestamp: "2026-06-21T00:00:04Z" }),
+    ].join("\n");
+    const p = userPrompts(text);
+    expect(p.map((x) => x.text)).toEqual(["hello", "goodbye"]);
+    expect(p[0].ts).toBe(Date.parse("2026-06-21T00:00:01Z"));
+  });
+
+  it("returns an empty array when there are no prompts", () => {
+    expect(userPrompts("")).toEqual([]);
+  });
+
+  it("cleans noisy prompts and skips wrapper-only messages", () => {
+    const text = [
+      JSON.stringify({ type: "user", message: { content: "<command-name>codey:timeline</command-name>" }, timestamp: "2026-06-21T00:00:01Z" }),
+      JSON.stringify({ type: "user", message: { content: "[Image #1] fix the layout please" }, timestamp: "2026-06-21T00:00:02Z" }),
+      JSON.stringify({ type: "user", message: { content: "<system-reminder>be good</system-reminder>" }, timestamp: "2026-06-21T00:00:03Z" }),
+    ].join("\n");
+    expect(userPrompts(text).map((p) => p.text)).toEqual(["/codey:timeline", "fix the layout please"]);
+  });
+});
+
+describe("cleanPromptText", () => {
+  it("collapses a slash command to /name", () => {
+    expect(cleanPromptText("<command-name>codey:timeline</command-name>")).toBe("/codey:timeline");
+  });
+  it("strips image markers, keeping the words", () => {
+    expect(cleanPromptText("[Image: source: C:\\x\\1.png] do the thing")).toBe("do the thing");
+  });
+  it("drops system reminders, command wrappers, and skill activations", () => {
+    expect(cleanPromptText("<system-reminder>x</system-reminder>")).toBe("");
+    expect(cleanPromptText("<command-message>codey:timeline</command-message>")).toBe("");
+    expect(cleanPromptText("Base directory for this skill: C:/x/y")).toBe("");
+  });
+  it("strips a leading terminal-prompt glyph", () => {
+    expect(cleanPromptText("❯ continue working")).toBe("continue working");
   });
 });

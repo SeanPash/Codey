@@ -30,7 +30,7 @@ describe("buildSnapshot", () => {
   ];
 
   it("builds one chunk per raw chunk with windowed receipts and totals", () => {
-    const snap = buildSnapshot({ sessionId: "s", sessionName: "Proj", project: null, color: "c", live: true, events, rawChunks, turns });
+    const snap = buildSnapshot({ sessionId: "s", sessionName: "Proj", project: null, color: "c", live: true, events, rawChunks, turns, prompts: [], now: 10000 });
     expect(snap.chunks).toHaveLength(2);
     expect(snap.chunks[0].receipt.workTotal).toBe(400);    // 300 + 100 in [100,5000)
     expect(snap.chunks[1].receipt.workTotal).toBe(50);     // 50 in [5000, inf)
@@ -53,13 +53,33 @@ describe("buildSnapshot", () => {
       { startIndex: 0, name: "Look around", narration: "" },
       { startIndex: 1, name: "Write the file", narration: "" },
     ];
-    const snap = buildSnapshot({ sessionId: "s", sessionName: "s", project: null, color: "c", live: false, events: e2, rawChunks: rc2, turns: t2 });
+    const snap = buildSnapshot({ sessionId: "s", sessionName: "s", project: null, color: "c", live: false, events: e2, rawChunks: rc2, turns: t2, prompts: [], now: 10000 });
     expect(snap.workTotal).toBe(450);
     expect(snap.totalTokens).toBe(10450);          // work 450 + context 10000, counted once
     expect(snap.priciestTaskName).toBe("Write the file"); // by work, not context
     expect(snap.chunks[0].workTotal).toBe(50);
     expect(snap.chunks[1].workTotal).toBe(400);
     expect(snap.chunks[0].contextTotal).toBe(5000);
+  });
+
+  it("splits one segmentation task across prompt boundaries so each group owns its tasks", () => {
+    const e3: ToolEvent[] = [
+      ev({ id: "0", timestamp: 1100, tool: "Read", inputHash: "r" }),
+      ev({ id: "1", timestamp: 5200, tool: "Write", inputHash: "w" }),
+    ];
+    const t3: AssistantTurn[] = [
+      turn({ ts: 1100, outputTokens: 100, tool: "Read", input: { file_path: "a.ts" } }),
+      turn({ ts: 5200, outputTokens: 200, tool: "Write", input: { file_path: "b.ts" } }),
+    ];
+    // One AI chunk covers the whole session, but two prompts span it.
+    const rc3: RawChunk[] = [{ startIndex: 0, name: "Do stuff", narration: "n" }];
+    const prompts = [{ ts: 1000, text: "hello" }, { ts: 5000, text: "goodbye" }];
+    const snap = buildSnapshot({ sessionId: "s", sessionName: "s", project: null, color: "c", live: false, events: e3, rawChunks: rc3, turns: t3, prompts, now: 9000 });
+    expect(snap.groups).toHaveLength(2);
+    expect(snap.groups[0].taskCount).toBe(1);
+    expect(snap.groups[1].taskCount).toBe(1);
+    expect(snap.groups[0].chunks[0].name).toBe("Do stuff"); // name carries onto both pieces
+    expect(snap.chunks).toHaveLength(2);
   });
 
   it("attaches a repeat-error warning to the chunk where it happened", () => {
@@ -71,6 +91,7 @@ describe("buildSnapshot", () => {
     const snap = buildSnapshot({
       sessionId: "s", sessionName: "P", project: null, color: "c", live: false,
       events: errEvents, rawChunks: [{ startIndex: 0, name: "Fix", narration: "" }], turns: [],
+      prompts: [], now: 10000,
     });
     expect(snap.chunks[0].warnings.some((w) => w.kind === "repeat_error")).toBe(true);
   });
