@@ -3171,6 +3171,52 @@ function firstUserPrompt(text) {
   }
   return null;
 }
+function cleanPromptText(s) {
+  const cmd = /<command-name>([^<]+)<\/command-name>/.exec(s);
+  if (cmd) return "/" + cmd[1].trim().replace(/^\//, "");
+  const head = s.trim();
+  if (/^<(command-message|command-args|local-command-stdout|bash-input|bash-stdout)/.test(head)) return "";
+  if (/^<system-reminder>/.test(head) || head.startsWith("Caveat:")) return "";
+  if (head.startsWith("Base directory for this skill:")) return "";
+  const t = s.replace(/\[Image #\d+\]/g, " ").replace(/\[Image:[^\]]*\]/g, " ").replace(/^\s*[❯>]\s+/, "").replace(/\s+/g, " ").trim();
+  return t;
+}
+function userPrompts(text) {
+  const out = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    let r;
+    try {
+      r = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (r.type !== "user") continue;
+    const c = r.message?.content;
+    let t = null;
+    if (typeof c === "string" && c.trim()) {
+      t = c.trim();
+    } else if (Array.isArray(c)) {
+      const hasToolResult = c.some((b) => b && typeof b === "object" && b.type === "tool_result");
+      const tb = c.find((b) => b && typeof b === "object" && b.type === "text");
+      if (!hasToolResult && tb && typeof tb.text === "string" && tb.text.trim()) t = tb.text.trim();
+    }
+    if (!t) continue;
+    const clean = cleanPromptText(t);
+    if (clean) out.push({ ts: Date.parse(r.timestamp ?? "") || 0, text: clean });
+  }
+  return out;
+}
+function readUserPrompts(path) {
+  if (!path) return [];
+  try {
+    if (!existsSync3(path)) return [];
+    return userPrompts(readFileSync3(path, "utf8"));
+  } catch {
+    return [];
+  }
+}
 function readFirstPrompt(path) {
   if (!path) return null;
   try {
@@ -3864,6 +3910,18 @@ function scheduleWhy(whys, now) {
   return whys[displayed].why;
 }
 
+// src/timeline/duration.ts
+function formatDuration(ms) {
+  const total = Math.max(0, Math.round(ms / 1e3));
+  if (total < 60) return `${total || 1}s`;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m < 60) return s ? `${m}m ${s}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  return `${h}h ${String(rm).padStart(2, "0")}m`;
+}
+
 // src/statusline/compose.ts
 var SUMMARY_ITEMS = 3;
 var GROUP_WINDOW_MS = 2500;
@@ -3928,11 +3986,16 @@ function composeView(events, snap, now, whys = [], budget = null) {
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
   const thinking = snap.promptAt != null && snap.promptAt > newestTs;
   const done = !thinking && snap.doneAt != null && snap.doneAt >= newestTs;
+  let elapsed = null;
+  if (snap.promptAt != null && snap.promptAt > 0) {
+    const endTs = done && snap.doneAt != null ? snap.doneAt : now;
+    elapsed = formatDuration(Math.max(0, endTs - snap.promptAt));
+  }
   const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
   const cards = cardsFromEvents(events.filter((e) => e.timestamp >= turnStart));
   if (thinking || done) {
     const summary = done ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) } : null;
-    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft };
+    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft, elapsed };
   }
   const { current, prev, isLatest } = schedule(cards, now, cardDwell);
   const heldWhy = scheduleWhy(whys, now) ?? snap.why;
@@ -3945,7 +4008,8 @@ function composeView(events, snap, now, whys = [], budget = null) {
     warning: isLatest ? snap.warning : null,
     thinking: false,
     summary: null,
-    budgetLeft
+    budgetLeft,
+    elapsed
   };
 }
 
@@ -3987,10 +4051,11 @@ function modeLabel(mode) {
 function frame(rail) {
   const edge = (ch) => `${rail}${ch}${RESET} `;
   return {
-    header(mode, budgetLeft) {
+    header(mode, budgetLeft, elapsed) {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
+      const time = elapsed ? ` ${DOT}\xB7${RESET} ${GRAY}\u23F1 ${elapsed}${RESET}` : "";
       const suffix = budgetLeft ? ` ${DOT}\xB7${RESET} ${GRAY}${budgetLeft}${RESET}` : "";
-      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}${suffix}`;
+      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}${time}${suffix}`;
       return `${edge("\u256D")}${title} ${rail}${"\u2500".repeat(8)}${RESET}`;
     },
     row(label, labelStyle, body) {
@@ -4058,7 +4123,7 @@ function tasknum(c) {
 function renderStatus(view, width = WRAP) {
   const accent = MODE_COLOR[view.mode] ?? MODE_COLOR.simple;
   const f = frame(accent);
-  const out = [f.header(view.mode, view.budgetLeft)];
+  const out = [f.header(view.mode, view.budgetLeft, view.elapsed)];
   if (view.thinking) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${LAV}Claude is thinking through your request\u2026${RESET}`));
     out.push(f.bottom());
@@ -4578,7 +4643,8 @@ function attributeChunk(turns, startTs, endTs) {
       raw: rawDetail(t.tool, t.input),
       why: null,
       // filled in per chunk in buildSnapshot, from the chunk narration
-      failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null
+      failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
+      ts: t.ts
     });
   }
   markResolved(workLines);
@@ -4597,29 +4663,90 @@ function sessionTotals(turns) {
 }
 
 // src/timeline/grouping.ts
-function thinkingRow(tokens, nextLabel) {
+function thinkingRow(tokens, ts, nextLabel) {
   const label = nextLabel ? `Planned before ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}` : "Planned the next steps";
-  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false, raw: null, why: null, failSummary: null };
+  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false, raw: null, why: null, failSummary: null, ts };
 }
 function groupThinking(lines) {
   const out = [];
   let runTokens = 0;
+  let runTs = 0;
   let inRun = false;
   for (const l of lines) {
     if (l.status === "none") {
+      if (!inRun) runTs = l.ts;
       runTokens += l.tokens;
       inRun = true;
       continue;
     }
     if (inRun) {
-      out.push(thinkingRow(runTokens, l.label));
+      out.push(thinkingRow(runTokens, runTs, l.label));
       runTokens = 0;
       inRun = false;
     }
     out.push(l);
   }
-  if (inRun) out.push(thinkingRow(runTokens, null));
+  if (inRun) out.push(thinkingRow(runTokens, runTs, null));
   return out;
+}
+
+// src/timeline/prompt-groups.ts
+function clampPrompt(s, n = 80) {
+  const oneLine = s.replace(/\s+/g, " ").trim();
+  return oneLine.length > n ? oneLine.slice(0, n - 1).trimEnd() + "\u2026" : oneLine;
+}
+function windowTotals(turns, startTs, endTs) {
+  let work = 0, context = 0;
+  for (const t of turns) {
+    if (t.ts < startTs || t.ts >= endTs) continue;
+    work += t.outputTokens;
+    context += t.inputTokens + t.cacheReadTokens + t.cacheCreationTokens;
+  }
+  return { work, context };
+}
+function groupByPrompt(prompts, chunks, turns, sessionEndTs, live) {
+  const boundaries = [];
+  const sorted = [...prompts].filter((p) => p.ts > 0).sort((a, b) => a.ts - b.ts);
+  const firstActivity = Math.min(
+    chunks.length ? chunks[0].startTs : Number.MAX_SAFE_INTEGER,
+    turns.length ? turns[0].ts : Number.MAX_SAFE_INTEGER
+  );
+  if (sorted.length === 0 || firstActivity !== Number.MAX_SAFE_INTEGER && firstActivity < sorted[0].ts) {
+    boundaries.push({
+      id: "p0",
+      label: sorted.length === 0 ? "This session" : "Earlier in this session",
+      startTs: firstActivity === Number.MAX_SAFE_INTEGER ? sorted[0]?.ts ?? 0 : firstActivity
+    });
+  }
+  sorted.forEach((p, i) => {
+    boundaries.push({
+      id: `p${boundaries.length}`,
+      label: clampPrompt(p.text) || `Prompt ${i + 1}`,
+      startTs: p.ts
+    });
+  });
+  if (boundaries.length === 0) return [];
+  return boundaries.map((b, i) => {
+    const next = boundaries[i + 1];
+    const endTs = next ? next.startTs : sessionEndTs;
+    const isLast = i === boundaries.length - 1;
+    const groupChunks = chunks.filter((c) => c.startTs >= b.startTs && (next ? c.startTs < next.startTs : true));
+    const { work, context } = windowTotals(turns, b.startTs, next ? next.startTs : Number.MAX_SAFE_INTEGER);
+    const liveGroup = live && isLast;
+    return {
+      id: b.id,
+      prompt: b.label,
+      startTs: b.startTs,
+      endTs,
+      durationMs: liveGroup ? null : Math.max(0, endTs - b.startTs),
+      workTotal: work,
+      contextTotal: context,
+      tokenTotal: work + context,
+      taskCount: groupChunks.length,
+      chunks: groupChunks,
+      live: liveGroup
+    };
+  });
 }
 
 // src/serve/snapshot.ts
@@ -4634,10 +4761,30 @@ function chunkWarnings(slice, turns) {
   if (repeat) out.push(repeat);
   return out;
 }
+function chunkBoundaries(rawChunks, events, prompts) {
+  if (events.length === 0) return [];
+  const rc = [...rawChunks].sort((a, b) => a.startIndex - b.startIndex);
+  const indices = /* @__PURE__ */ new Set([0]);
+  for (const c of rc) if (c.startIndex > 0 && c.startIndex < events.length) indices.add(c.startIndex);
+  for (const p of prompts) {
+    if (p.ts <= 0) continue;
+    const i = events.findIndex((e) => e.timestamp >= p.ts);
+    if (i > 0) indices.add(i);
+  }
+  return [...indices].sort((a, b) => a - b).map((i) => {
+    let cover = rc[0];
+    for (const c of rc) {
+      if (c.startIndex <= i) cover = c;
+      else break;
+    }
+    return { startIndex: i, name: cover?.name ?? "Working", narration: cover?.narration ?? "" };
+  });
+}
 function buildSnapshot(input) {
   const { events, rawChunks, turns } = input;
-  const chunks = rawChunks.map((rc, idx) => {
-    const next = rawChunks[idx + 1];
+  const boundaries = chunkBoundaries(rawChunks, events, input.prompts);
+  const chunks = boundaries.map((rc, idx) => {
+    const next = boundaries[idx + 1];
     const startTs = events[rc.startIndex]?.timestamp ?? 0;
     const endIndex = next ? next.startIndex : events.length;
     const endTs = next ? events[next.startIndex]?.timestamp ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
@@ -4664,17 +4811,30 @@ function buildSnapshot(input) {
     (m, c) => c.workTotal > 0 && (!m || c.workTotal > m.workTotal) ? c : m,
     null
   );
+  const stamps = [
+    ...events.map((e) => e.timestamp),
+    ...turns.map((t) => t.ts),
+    ...input.prompts.map((p) => p.ts)
+  ].filter((t) => t > 0);
+  const startedAt = stamps.length ? Math.min(...stamps) : 0;
+  const activity = [...events.map((e) => e.timestamp), ...turns.map((t) => t.ts)].filter((t) => t > 0);
+  const lastActivityAt = activity.length ? Math.max(...activity) : startedAt;
+  const sessionEndTs = input.live ? input.now : lastActivityAt || input.now;
+  const groups = groupByPrompt(input.prompts, chunks, turns, sessionEndTs, input.live);
   return {
     sessionId: input.sessionId,
     sessionName: input.sessionName,
     project: input.project,
     color: input.color,
     live: input.live,
+    startedAt,
+    lastActivityAt,
     totalTokens: totals.total,
     workTotal: totals.work,
     contextTotal: totals.context,
     taskCount: chunks.length,
     priciestTaskName: priciest ? priciest.name : null,
+    groups,
     chunks,
     activeWarning: null
   };
@@ -4711,7 +4871,8 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
   const rawChunks = chunksFor(sessionId, events, root);
-  const live = isRunning(store.dir, Date.now());
+  const now = Date.now();
+  const live = isRunning(store.dir, now);
   let mtimeMs = 0;
   try {
     mtimeMs = statSync2(store.path).mtimeMs;
@@ -4724,6 +4885,8 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     sessionId,
     mtimeMs
   });
+  let prompts = readUserPrompts(meta?.transcriptPath ?? null);
+  if (prompts.length === 0) prompts = readPrompts(store.dir).map((ts) => ({ ts, text: "" }));
   const snap = buildSnapshot({
     sessionId,
     sessionName: name,
@@ -4732,7 +4895,9 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     live,
     events,
     rawChunks,
-    turns
+    turns,
+    prompts,
+    now
   });
   const reconciled = reconcileErrors(events, turns);
   return { ...snap, activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null };

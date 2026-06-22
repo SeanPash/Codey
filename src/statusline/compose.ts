@@ -2,6 +2,7 @@ import type { ToolEvent } from "../types.js";
 import { actionLabel, rawTarget } from "./labels.js";
 import { schedule, type Card } from "./schedule.js";
 import { readMs, scheduleWhy } from "./read-time.js";
+import { formatDuration } from "../timeline/duration.js";
 import type { StatusSnapshot } from "./state.js";
 import type { CardView, StatusView, SummaryView } from "./view.js";
 import type { WhyEntry } from "../narration/history.js";
@@ -110,6 +111,14 @@ export function composeView(
   // newer prompt is pending. Then we recap instead of pointing at a live task.
   const done = !thinking && snap.doneAt != null && snap.doneAt >= newestTs;
 
+  // Time on the current turn: ticks while Claude works, freezes at the turn's total length
+  // once it finishes. Null before any prompt is stamped.
+  let elapsed: string | null = null;
+  if (snap.promptAt != null && snap.promptAt > 0) {
+    const endTs = done && snap.doneAt != null ? snap.doneAt : now;
+    elapsed = formatDuration(Math.max(0, endTs - snap.promptAt));
+  }
+
   // The live line is scoped to the current turn so the numbers restart at #1 each prompt;
   // a status line that climbs to #87 is noise. The full cross-session history lives in the
   // feed. Before any prompt is stamped, the whole session counts as one turn.
@@ -123,7 +132,7 @@ export function composeView(
     const summary: SummaryView | null = done
       ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) }
       : null;
-    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft };
+    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft, elapsed };
   }
 
   const { current, prev, isLatest } = schedule(cards, now, cardDwell);
@@ -138,5 +147,6 @@ export function composeView(
     thinking: false,
     summary: null,
     budgetLeft,
+    elapsed,
   };
 }

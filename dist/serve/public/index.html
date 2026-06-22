@@ -88,6 +88,25 @@
     .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
     .pill.amber { background:#2a2113; color:var(--amber); }
 
+    /* per-prompt group */
+    .grp { margin-bottom:20px; }
+    .grphd { display:flex; align-items:flex-start; gap:12px; padding:0 2px 9px; margin-bottom:4px; border-bottom:1px solid var(--line); }
+    .grphd .gp { flex:1; min-width:0; font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.4;
+      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+    .grphd .gp .gq { color:var(--sky-dim); margin-right:5px; font-weight:700; }
+    .grpmeta { flex:none; text-align:right; font-size:10px; color:var(--muted); line-height:1.6; white-space:nowrap; }
+    .grpmeta .gtok { color:var(--ink2); font-weight:600; }
+    .grpmeta .running { color:var(--sky); font-weight:600; }
+    .grpmeta .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--sky);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
+    .grpnote { color:var(--muted); font-size:11.5px; padding:8px 4px 2px; }
+    /* time bits on a task card */
+    .meta .mtime { color:var(--body); }
+    .meta .mdur { color:var(--ink2); }
+    .meta .mdur .rdot { display:inline-block; width:5px;height:5px;border-radius:50%;background:var(--sky);margin-right:3px;animation:pp 1.6s infinite; }
+    .running { color:var(--sky); font-weight:600; }
+    .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--sky);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
+    .timer { font-variant-numeric:tabular-nums; }
+
     /* receipt */
     .rcpt { margin-top:13px; background:var(--inset); border:1px solid #1e2636; border-radius:9px; overflow:hidden; }
     .rhead { display:flex; align-items:center; gap:8px; padding:9px 14px; background:#0e131d; border-bottom:1px solid #1c2433; cursor:pointer; user-select:none; }
@@ -253,6 +272,19 @@
       if (s < 86400) return Math.floor(s / 3600) + "h ago";
       return Math.floor(s / 86400) + "d ago";
     }
+    // Matches the TS formatDuration: "45s", "3m 12s", "1h 04m".
+    function fmtDur(ms) {
+      const total = Math.max(0, Math.round(ms / 1000));
+      if (total < 60) return (total || 1) + "s";
+      const m = Math.floor(total / 60), s = total % 60;
+      if (m < 60) return s ? m + "m " + s + "s" : m + "m";
+      const h = Math.floor(m / 60), rm = m % 60;
+      return h + "h " + String(rm).padStart(2, "0") + "m";
+    }
+    const fmtClock = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+    const fmtClockSec = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" }) : "";
+    // A live, ticking elapsed span (updated by the 1s ticker); used for running tasks/groups.
+    const liveTimer = (sinceTs) => `<span class="timer" data-since="${sinceTs}">${fmtDur(Date.now() - sinceTs)}</span>`;
 
     const open = new Set();        // expanded chunk ids (whole card)
     const ctxOpen = new Set();     // expanded background-context panels, by chunk id
@@ -312,6 +344,7 @@
 
     function lineDetail(l) {
       const parts = [];
+      if (l.ts) parts.push(`<div class="ld"><span class="lk">at</span><span class="lv">${fmtClockSec(l.ts)}</span></div>`);
       if (l.raw) parts.push(`<div class="ld"><span class="lk">ran</span><code>${esc(l.raw)}</code></div>`);
       if (l.why) parts.push(`<div class="ld"><span class="lk">why</span><span class="lv">${esc(l.why)}</span></div>`);
       if (l.status === "fail" && l.errorText) parts.push(`<div class="ld err"><span class="lk">error</span><code>${esc(l.errorText)}</code></div>`);
@@ -327,7 +360,7 @@
         : l.status === "ok" ? '<span class="st ok">&#10003;</span>' : '<span class="st">&middot;</span>';
       const key = c.id + ":" + idx;
       const lo = lineOpen.has(key);
-      const canExpand = !!(l.raw || l.why || (l.status === "fail" && l.errorText));
+      const canExpand = !!(l.raw || l.why || l.ts || (l.status === "fail" && l.errorText));
       const chev = canExpand ? `<span class="lchev">${lo ? "&#9662;" : "&#9656;"}</span>` : `<span class="lchev sp"></span>`;
       const fail = l.status === "fail" && l.failSummary
         ? `<div class="failnote">${esc(l.failSummary)}${l.resolved ? ' <span class="note">&middot; recovered on the next try</span>' : ""}</div>` : "";
@@ -353,7 +386,16 @@
         + `</div></div>`;
     }
 
-    function cardHtml(c, maxWork, barWarning) {
+    // A task is still open (running) when its end is past the last recorded activity; in a
+    // live session that one ticks, otherwise we show how long it took.
+    function durLabel(c, snap) {
+      const openEnd = c.endTs > snap.lastActivityAt;
+      if (openEnd && snap.live) return `<span class="running"><span class="rdot"></span>${liveTimer(c.startTs)}</span>`;
+      const end = openEnd ? snap.lastActivityAt : c.endTs;
+      return c.startTs ? `took ${fmtDur(end - c.startTs)}` : "";
+    }
+
+    function cardHtml(c, maxWork, barWarning, snap) {
       const isOpen = open.has(c.id);
       const pct = maxWork > 0 ? Math.round((c.workTotal / maxWork) * 100) : 0;
       const cls = "card" + (isOpen ? " open" : "") + (c.warnings.length ? " warn" : "");
@@ -364,7 +406,7 @@
         + `<div class="row js-toggle" role="button" tabindex="0" aria-expanded="${isOpen}">`
         + `<span class="chev">${chev}</span>`
         + `<div class="nm"><div class="name">${esc(c.name)} ${warningPill(c.warnings)}</div><div class="sub">${esc(c.narration)}</div></div>`
-        + `<div class="right"><div class="meta">${acts} action${acts === 1 ? "" : "s"}<br>${done}</div>`
+        + `<div class="right"><div class="meta"><div class="mtime">${fmtClock(c.startTs)}</div><div class="mdur">${durLabel(c, snap)}</div><div>${acts} action${acts === 1 ? "" : "s"} ${done}</div></div>`
         + `<div class="chip"><div class="top"><span class="tok">${fmt(c.workTotal)}</span><span class="u">tokens</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`
         + `</div></div>`
         + (isOpen ? receiptHtml(c) : "")
@@ -372,14 +414,30 @@
         + `</div>`;
     }
 
+    function groupHtml(g, maxWork, snap, barFor) {
+      const dur = g.live
+        ? `<span class="running"><span class="rdot"></span>${liveTimer(g.startTs)}</span>`
+        : fmtDur(g.durationMs || 0);
+      const cards = g.chunks.map((c) => cardHtml(c, maxWork, barFor(c), snap)).join("")
+        || `<div class="grpnote">${g.live ? "Working…" : "Answered directly, no tools used."}</div>`;
+      return `<section class="grp">`
+        + `<div class="grphd"><div class="gp">${esc(g.prompt)}</div>`
+        + `<div class="grpmeta">${fmtClock(g.startTs)} &middot; ${dur} &middot; <span class="gtok">${fmt(g.tokenTotal)} tok</span> &middot; ${g.taskCount} task${g.taskCount === 1 ? "" : "s"}</div>`
+        + `</div>${cards}</section>`;
+    }
+
     function renderSummary(snap) {
       const stuck = snap.activeWarning;
       const status = stuck
         ? `<div class="status-stuck">&#9888; ${esc(stuckPhrase(snap.activeWarning))}</div>`
         : `<div class="status-ok">&#10003; On track</div>`;
+      const sessDur = snap.live
+        ? `<span class="running"><span class="rdot"></span>${liveTimer(snap.startedAt)}</span>`
+        : fmtDur((snap.lastActivityAt || snap.startedAt) - snap.startedAt);
       document.getElementById("summary").innerHTML =
         `<p class="rh">This session</p>`
         + `<div class="scard"><div class="k">Work done</div><div class="big">${fmt(snap.workTotal)} <span class="u">tokens</span></div><div class="subline">${kfmt(snap.totalTokens)} total with context</div></div>`
+        + `<div class="scard"><div class="k">Time</div><div class="big" style="font-size:18px">${sessDur}</div><div class="subline">${snap.live ? "running now" : "total session time"}</div></div>`
         + `<div class="scard"><div class="k">Overview</div><div class="pair"><span>Tasks</span><b>${snap.taskCount}</b></div>`
         + `<div class="pair"><span>Priciest</span><b>${esc(snap.priciestTaskName || "–")}</b></div></div>`
         + `<div class="scard"><div class="k">Status</div>${status}</div>`
@@ -413,15 +471,19 @@
     function renderSingle(snap) {
       renderHeader(snap);
       renderSummary(snap);
-      const maxWork = Math.max(1, ...snap.chunks.map((c) => c.workTotal));
+      const chunks = snap.chunks || [];
+      const groups = snap.groups || [];
+      const maxWork = Math.max(1, ...chunks.map((c) => c.workTotal));
       const main = document.getElementById("main");
       if (!snap.activeWarning) confirmed.clear();
-      const lastId = snap.chunks.length ? snap.chunks[snap.chunks.length - 1].id : null;
+      const lastId = chunks.length ? chunks[chunks.length - 1].id : null;
       const barFor = (c) => (snap.live && snap.activeWarning && c.id === lastId ? snap.activeWarning : null);
 
-      main.innerHTML = snap.chunks.length
-        ? snap.chunks.map((c) => cardHtml(c, maxWork, barFor(c))).join("")
-        : '<div class="empty">No activity recorded for this session yet.</div>';
+      main.innerHTML = groups.length
+        ? groups.map((g) => groupHtml(g, maxWork, snap, barFor)).join("")
+        : (chunks.length
+          ? chunks.map((c) => cardHtml(c, maxWork, barFor(c), snap)).join("")
+          : '<div class="empty">No activity recorded for this session yet.</div>');
 
       const rerender = () => renderSingle(snap);
       const wire = (sel, fn) => main.querySelectorAll(sel).forEach((el) => {
@@ -559,6 +621,15 @@
         renderSplit(lastLive);
       } catch { /* keep the last view on a transient error */ }
     }
+
+    // Tick live elapsed timers once a second between the 2s data polls, so running tasks,
+    // groups and the session timer count up smoothly without hammering the server.
+    setInterval(() => {
+      document.querySelectorAll(".timer[data-since]").forEach((el) => {
+        const since = Number(el.dataset.since);
+        if (since > 0) el.textContent = fmtDur(Date.now() - since);
+      });
+    }, 1000);
 
     tick();
     setInterval(tick, 2000);

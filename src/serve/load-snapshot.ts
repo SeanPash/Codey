@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { SessionStore, defaultRoot } from "../store/session-store.js";
 import { readMeta } from "../store/session-meta.js";
 import { readPrompts } from "../capture/prompts.js";
-import { readTranscriptTurns, readFirstPrompt } from "../timeline/transcript.js";
+import { readTranscriptTurns, readFirstPrompt, readUserPrompts, type UserPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
@@ -30,7 +30,8 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
   const rawChunks = chunksFor(sessionId, events, root);
-  const live = isRunning(store.dir, Date.now());
+  const now = Date.now();
+  const live = isRunning(store.dir, now);
   let mtimeMs = 0;
   try { mtimeMs = statSync(store.path).mtimeMs; } catch { mtimeMs = 0; }
   const name = sessionDisplayName({
@@ -39,6 +40,10 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     sessionId,
     mtimeMs,
   });
+  // Prompt boundaries come from the transcript (it has the text). Fall back to the prompt-log
+  // timestamps, labeled generically, when no transcript is available.
+  let prompts: UserPrompt[] = readUserPrompts(meta?.transcriptPath ?? null);
+  if (prompts.length === 0) prompts = readPrompts(store.dir).map((ts) => ({ ts, text: "" }));
   const snap = buildSnapshot({
     sessionId,
     sessionName: name,
@@ -48,6 +53,8 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     events,
     rawChunks,
     turns,
+    prompts,
+    now,
   });
   const reconciled = reconcileErrors(events, turns);
   return { ...snap, activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null };

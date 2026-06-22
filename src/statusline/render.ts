@@ -50,10 +50,11 @@ function modeLabel(mode: Mode): string {
 function frame(rail: string) {
   const edge = (ch: string) => `${rail}${ch}${RESET} `;
   return {
-    header(mode: Mode, budgetLeft: string | null): string {
+    header(mode: Mode, budgetLeft: string | null, elapsed: string | null): string {
       const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
+      const time = elapsed ? ` ${DOT}·${RESET} ${GRAY}⏱ ${elapsed}${RESET}` : "";
       const suffix = budgetLeft ? ` ${DOT}·${RESET} ${GRAY}${budgetLeft}${RESET}` : "";
-      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}·${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}${suffix}`;
+      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}·${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}${time}${suffix}`;
       return `${edge("╭")}${title} ${rail}${"─".repeat(8)}${RESET}`;
     },
     row(label: string, labelStyle: string, body: string): string {
@@ -126,7 +127,7 @@ function tasknum(c: { seq: number; endSeq?: number }): string {
 export function renderStatus(view: StatusView, width = WRAP): string {
   const accent = MODE_COLOR[view.mode] ?? MODE_COLOR.simple;
   const f = frame(accent);
-  const out: string[] = [f.header(view.mode, view.budgetLeft)];
+  const out: string[] = [f.header(view.mode, view.budgetLeft, view.elapsed)];
 
   if (view.thinking) {
     out.push(f.row("task", `${BOLD}${GOLD}`, `${LAV}Claude is thinking through your request…${RESET}`));

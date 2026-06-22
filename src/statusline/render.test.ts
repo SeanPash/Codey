@@ -13,6 +13,7 @@ const base: StatusView = {
   thinking: false,
   summary: null,
   budgetLeft: null,
+  elapsed: null,
 };
 
 describe("renderStatus", () => {
@@ -70,9 +71,14 @@ describe("renderStatus", () => {
   });
 
   it("renders a waiting placeholder when there is no current card", () => {
-    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false, summary: null, budgetLeft: null }));
+    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false, summary: null, budgetLeft: null, elapsed: null }));
     expect(out).toContain("Codey");
     expect(out).toContain("waiting for Claude");
+  });
+
+  it("shows the turn timer in the header when elapsed is set", () => {
+    const out = plain(renderStatus({ ...base, elapsed: "2m 10s" }));
+    expect(out).toContain("2m 10s");
   });
 
   it("shows a thinking line between a prompt and the first tool", () => {

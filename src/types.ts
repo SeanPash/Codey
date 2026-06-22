@@ -43,6 +43,7 @@ export interface ReceiptLine {
   raw: string | null;            // full command or file path, revealed when the row expands
   why: string | null;            // the owning task's narration, reused (no extra tokens)
   failSummary: string | null;    // plain-English failure sentence shown inline on a fail
+  ts: number;                    // when this action happened (ms since epoch)
 }
 
 export interface TokenBreakdown {
@@ -64,18 +65,37 @@ export interface TimelineChunk {
   receipt: TokenBreakdown;
 }
 
+// One user prompt and everything it set off: its tasks, cost, and how long it ran. A
+// session is a stack of these, newest interaction building on the last.
+export interface PromptGroup {
+  id: string;                    // "p0", "p1", ...
+  prompt: string;                // the user's words (clamped), or a fallback label
+  startTs: number;
+  endTs: number;                 // next prompt's start, or the session end (open while live)
+  durationMs: number | null;     // null while this is the live/active group (browser ticks it)
+  workTotal: number;
+  contextTotal: number;
+  tokenTotal: number;
+  taskCount: number;
+  chunks: TimelineChunk[];
+  live: boolean;                 // the active group of a live session
+}
+
 export interface SessionSnapshot {
   sessionId: string;
   sessionName: string;
   project: string | null;          // cwd basename, an at-a-glance terminal tag
   color: string;                   // stable color from the session id, for recognition
   live: boolean;
+  startedAt: number;               // first activity (ms epoch), for the total session timer
+  lastActivityAt: number;          // latest activity (ms epoch)
   totalTokens: number;             // the TRUE session total counted once (work + context)
   workTotal: number;               // session work tokens, the headline
   contextTotal: number;            // session context tokens (input + cache)
   taskCount: number;
   priciestTaskName: string | null; // ranked by work tokens, not context
-  chunks: TimelineChunk[];
+  groups: PromptGroup[];           // per-prompt grouping, the Single view's structure
+  chunks: TimelineChunk[];         // flat task list, still used by the Active Terminals view
   activeWarning: Warning | null;   // Plan 3: the live "stuck" warning, or null; drives the bar
 }
 

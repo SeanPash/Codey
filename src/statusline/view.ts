@@ -22,4 +22,5 @@ export interface StatusView {
   thinking: boolean; // true between a prompt and Claude's first tool call
   summary: SummaryView | null; // present once Claude has finished a turn
   budgetLeft: string | null; // e.g. "3.8k left" when a budget cap is armed, else null
+  elapsed: string | null; // time on the current turn (live), or its final length when done
 }
