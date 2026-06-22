@@ -129,9 +129,15 @@ export async function runTimeline(): Promise<void> {
   }
   if (plan.action === "replace") {
     // A stale server (old build) is holding the port. Stop it and wait for the port to free
-    // before we bind, so the new build is what the browser actually talks to.
+    // before we bind, so the new build is what the browser actually talks to. We kill by the
+    // recorded pid; the OS could in theory have recycled it, but we only reach here after
+    // confirming a server with a stale build is actually answering on the port, so the risk is
+    // small. If the port refuses to free, bail loudly rather than reconnect to the survivor.
     killPid(plan.pid);
-    await waitForPortFree(plan.port);
+    if (!(await waitForPortFree(plan.port))) {
+      console.error(`Could not free port ${plan.port}; the old timeline server is still running. Close it and try again.`);
+      process.exit(1);
+    }
   }
 
   const port = DEFAULT_PORT;
@@ -142,9 +148,17 @@ export async function runTimeline(): Promise<void> {
     windowsHide: true,
   });
   child.unref();
-  writeFileSync(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
 
   const ready = await waitForPort(port);
+  // Confirm it is OUR build answering, not a survivor we failed to displace. Without this, a
+  // stale server still on the port would make waitForPort succeed and we'd hand back the old
+  // page, the very bug this is meant to prevent.
+  const build = ready ? await fetchBuild(port) : null;
+  if (ready && build && build !== currentBuild) {
+    console.error(`A different timeline build is serving port ${port}. Close it and try again.`);
+    process.exit(1);
+  }
+  writeFileSync(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
   if (ready) console.log(`Codey timeline at http://localhost:${port}`);
   else console.log(`Codey timeline starting at http://localhost:${port} (give it a moment to open).`);
 }

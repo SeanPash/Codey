@@ -5323,7 +5323,10 @@ async function runTimeline() {
   }
   if (plan.action === "replace") {
     killPid(plan.pid);
-    await waitForPortFree(plan.port);
+    if (!await waitForPortFree(plan.port)) {
+      console.error(`Could not free port ${plan.port}; the old timeline server is still running. Close it and try again.`);
+      process.exit(1);
+    }
   }
   const port = DEFAULT_PORT;
   const self = process.argv[1];
@@ -5333,8 +5336,13 @@ async function runTimeline() {
     windowsHide: true
   });
   child.unref();
-  writeFileSync8(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
   const ready = await waitForPort(port);
+  const build = ready ? await fetchBuild(port) : null;
+  if (ready && build && build !== currentBuild) {
+    console.error(`A different timeline build is serving port ${port}. Close it and try again.`);
+    process.exit(1);
+  }
+  writeFileSync8(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
   if (ready) console.log(`Codey timeline at http://localhost:${port}`);
   else console.log(`Codey timeline starting at http://localhost:${port} (give it a moment to open).`);
 }
