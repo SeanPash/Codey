@@ -1028,8 +1028,12 @@
       const chunks = snap.chunks || [];
       const groups = snap.groups || [];
       const maxWork = Math.max(1, ...chunks.map((c) => c.workTotal));
-      // The running task is the last chunk while the session is live; we auto-open it below.
-      liveOpenId = snap.live && chunks.length ? chunks[chunks.length - 1].id : null;
+      // The running task is the last task of the live prompt group, auto-opened below. Scoping to
+      // the live group (not the last task overall) keeps a new prompt from lighting up the previous
+      // prompt's trailing step: a fresh group has no tasks yet, so nothing reads as "running now".
+      const liveGroup = groups.find((g) => g.live);
+      const liveChunks = liveGroup ? liveGroup.chunks : (groups.length ? [] : chunks);
+      liveOpenId = snap.live && liveChunks.length ? liveChunks[liveChunks.length - 1].id : null;
       const main = document.getElementById("main");
       if (!snap.activeWarning) confirmed.clear();
       const lastId = chunks.length ? chunks[chunks.length - 1].id : null;
