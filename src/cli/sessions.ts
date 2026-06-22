@@ -94,10 +94,10 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         _lastActivity: lastActivity,
       } as SessionListItem & { _hasEvents: boolean; _lastActivity: number };
     })
-    // Real terminals only: a session must have captured a tool call at some point, or have a
-    // prompt recent enough that it is plausibly a live terminal still spinning up. This drops
-    // the empty phantom folders left by headless narration calls.
-    .filter((s) => s._hasEvents || (s._lastActivity > 0 && now - s._lastActivity < OPEN_WINDOW_MS))
+    // Real terminals only: a session must have captured at least one tool call (events.jsonl).
+    // This drops the phantom folders that headless narration or the global prompt hook creates
+    // without ever running a tool.
+    .filter((s) => s._hasEvents)
     .map(({ _hasEvents, _lastActivity, ...s }) => s)
     .sort((a, b) => b.mtime - a.mtime);
 }

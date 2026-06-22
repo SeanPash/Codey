@@ -72,15 +72,31 @@ describe("listSessions", () => {
     expect(listSessions(dir).map((s) => s.id)).not.toContain("phantom");
   });
 
-  it("keeps a freshly prompted session even before its first tool call, marked running", () => {
+  it("only lists sessions that have captured at least one tool event (real terminals)", () => {
+    const now = Date.now();
+    // real: has events.jsonl
+    const real = join(dir, "real");
+    mkdirSync(real);
+    writeFileSync(join(real, "events.jsonl"), '{"phase":"pre"}\n');
+    // phantom: has a prompt but no events.jsonl
+    const phantom = join(dir, "phantom");
+    mkdirSync(phantom);
+    writeFileSync(join(phantom, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
+    const ids = listSessions(dir, now).map((s) => s.id);
+    expect(ids).toContain("real");
+    expect(ids).not.toContain("phantom");
+  });
+
+  // This test previously relied on a phantom (no events) being kept when recently prompted.
+  // Task 1.2 removes that allowance. The "fresh" scenario now only applies to real terminals
+  // (those with events.jsonl). The "thinking" state is covered by Task 2.1.
+  it("hides a freshly prompted session that has no events (phantom)", () => {
     const now = Date.now();
     const fresh = join(dir, "fresh");
     mkdirSync(fresh);
     writeFileSync(join(fresh, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
     const item = listSessions(dir, now).find((x) => x.id === "fresh");
-    expect(item).toBeDefined();
-    expect(item!.running).toBe(true);
-    expect(item!.open).toBe(true);
+    expect(item).toBeUndefined();
   });
 
   it("marks a recent-but-idle session open but not running", () => {
