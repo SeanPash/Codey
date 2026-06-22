@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { latestSessionId, listSessions } from "./sessions.js";
+import { latestSessionId, listSessions, dayBucket } from "./sessions.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -12,6 +12,32 @@ afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 function setMtime(p: string, epochSec: number): void {
   utimesSync(p, epochSec, epochSec);
 }
+
+describe("dayBucket", () => {
+  it("returns 'Today' when mtime is on the same calendar day as now", () => {
+    const now = new Date("2025-06-15T14:00:00").getTime();
+    expect(dayBucket(now, now)).toBe("Today");
+    // earlier the same day is still Today
+    const morningTs = new Date("2025-06-15T08:00:00").getTime();
+    expect(dayBucket(morningTs, now)).toBe("Today");
+  });
+
+  it("returns 'Yesterday' when mtime is on the previous calendar day", () => {
+    const now = new Date("2025-06-15T14:00:00").getTime();
+    const yesterdayNoon = new Date("2025-06-14T12:00:00").getTime();
+    expect(dayBucket(yesterdayNoon, now)).toBe("Yesterday");
+  });
+
+  it("returns a locale date string for older sessions", () => {
+    const now = new Date("2025-06-15T14:00:00").getTime();
+    const weekAgo = new Date("2025-06-08T10:00:00").getTime();
+    const result = dayBucket(weekAgo, now);
+    expect(result).not.toBe("Today");
+    expect(result).not.toBe("Yesterday");
+    // The string must be non-empty
+    expect(result.length).toBeGreaterThan(0);
+  });
+});
 
 describe("latestSessionId", () => {
   it("returns null when there are no sessions", () => {
@@ -153,5 +179,17 @@ describe("listSessions", () => {
     expect(item.taskCount).toBe(1);
     expect(item.lastPromptTs).toBe(1782070000000);
     expect(item.live).toBe(true);
+  });
+
+  it("sets a day field on each returned session item", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const s = join(dir, "daySess");
+    mkdirSync(s);
+    writeFileSync(join(s, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(s, "events.jsonl"), base);
+    const item = listSessions(dir, now).find((x) => x.id === "daySess")!;
+    expect(typeof item.day).toBe("string");
+    expect(item.day.length).toBeGreaterThan(0);
   });
 });

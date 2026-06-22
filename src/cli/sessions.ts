@@ -49,6 +49,7 @@ export interface SessionListItem {
   running: boolean;        // mid-tool or active within the running window (pulsing live)
   open: boolean;           // used recently, so the terminal is probably still open
   live: boolean;           // alias of running, kept for existing callers
+  day: string;             // "Today", "Yesterday", or a locale date string
 }
 
 // Two tiers of liveness. "running" is the pulsing indicator (Claude is actively working or
@@ -56,6 +57,22 @@ export interface SessionListItem {
 // the user may be composing their next prompt.
 export const RUNNING_WINDOW_MS = 15_000;
 export const OPEN_WINDOW_MS = 30 * 60_000;
+
+// Returns "Today", "Yesterday", or the locale date string for older sessions.
+// Based on calendar day boundaries, not a rolling 24h window.
+export function dayBucket(mtime: number, now: number): string {
+  // Strip to midnight of each day in local time by comparing date strings.
+  const d = new Date(mtime);
+  const n = new Date(now);
+  const mtimeDay = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const nowDay   = `${n.getFullYear()}-${n.getMonth()}-${n.getDate()}`;
+  if (mtimeDay === nowDay) return "Today";
+  // Check yesterday: midnight of now minus one day
+  const yesterday = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1);
+  const yDay = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+  if (mtimeDay === yDay) return "Yesterday";
+  return d.toLocaleDateString();
+}
 
 export function listSessions(root: string = defaultRoot(), now: number = Date.now()): SessionListItem[] {
   if (!existsSync(root)) return [];
@@ -95,6 +112,7 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         running,
         open: lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
         live: running,
+        day: dayBucket(mtime, now),
         // carried only for the filter below; not part of the public shape
         _hasEvents: evMtime != null,
         _lastActivity: lastActivity,
