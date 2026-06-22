@@ -10,6 +10,8 @@ export type RouteResult =
   | { type: "sessions" }
   | { type: "session"; id: string }
   | { type: "intervene"; id: string }
+  | { type: "rename"; id: string }
+  | { type: "delete"; id: string }
   | { type: "live" }
   | { type: "font"; file: string }
   | { type: "notfound" };
@@ -29,8 +31,14 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (m) return { type: "session", id: decodeURIComponent(m[1]) };
   }
   if (method === "POST") {
-    const m = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
-    if (m) return { type: "intervene", id: decodeURIComponent(m[1]) };
+    const mi = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
+    if (mi) return { type: "intervene", id: decodeURIComponent(mi[1]) };
+    const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
+    if (mn) return { type: "rename", id: decodeURIComponent(mn[1]) };
+  }
+  if (method === "DELETE") {
+    const m = /^\/api\/session\/([^/]+)$/.exec(path);
+    if (m) return { type: "delete", id: decodeURIComponent(m[1]) };
   }
   return { type: "notfound" };
 }
@@ -48,6 +56,8 @@ export interface ServerDeps {
   getSnapshot: (id: string) => SessionSnapshot;
   getLive: () => LiveSnapshot;
   intervene: (id: string, action: string) => boolean;
+  rename: (id: string, name: string) => boolean;
+  remove: (id: string) => boolean;
 }
 
 function readBody(req: import("node:http").IncomingMessage): Promise<string> {
@@ -85,6 +95,16 @@ export function createServer(deps: ServerDeps): Server {
           const ok = deps.intervene(route.id, action);
           sendJson(res, ok ? 200 : 400, { ok });
         });
+      } else if (route.type === "rename") {
+        void readBody(req).then((body) => {
+          let name = "";
+          try { name = String((JSON.parse(body || "{}") as { name?: unknown }).name ?? ""); } catch { name = ""; }
+          const ok = deps.rename(route.id, name);
+          sendJson(res, ok ? 200 : 400, { ok });
+        });
+      } else if (route.type === "delete") {
+        const ok = deps.remove(route.id);
+        sendJson(res, ok ? 200 : 400, { ok });
       } else {
         sendJson(res, 404, { error: "not found" });
       }
