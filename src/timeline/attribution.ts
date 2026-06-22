@@ -106,7 +106,7 @@ export function attributeChunk(turns: AssistantTurn[], startTs: number, endTs: n
       errorText: t.isError ? t.errorText : null,
       resolved: false,
       raw: rawDetail(t.tool, t.input),
-      why: null, // filled in per chunk in buildSnapshot, from the chunk narration
+      why: t.assistantText ?? null,
       failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
       ts: t.ts,
     });

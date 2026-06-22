@@ -4,7 +4,7 @@ import type { AssistantTurn } from "./transcript.js";
 
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
   return { ts: 0, outputTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
-    tool: null, input: null, isError: false, errorText: null, toolUseId: null, ...over };
+    tool: null, input: null, isError: false, errorText: null, toolUseId: null, assistantText: null, ...over };
 }
 
 describe("describeAction", () => {
@@ -73,5 +73,17 @@ describe("attributeChunk", () => {
   it("excludes turns outside the window", () => {
     const b = attributeChunk(turns, 0, 1000);
     expect(b.workLines.some((l) => l.label.includes("late.cs"))).toBe(false);
+  });
+
+  it("sets line why from assistantText when present", () => {
+    const t = [turn({ ts: 100, outputTokens: 50, tool: "Read", input: { file_path: "/x.ts" }, assistantText: "Let me check the config." })];
+    const b = attributeChunk(t, 0, 200);
+    expect(b.workLines[0].why).toBe("Let me check the config.");
+  });
+
+  it("leaves line why null when assistantText is absent", () => {
+    const t = [turn({ ts: 100, outputTokens: 50, tool: "Read", input: { file_path: "/x.ts" }, assistantText: null })];
+    const b = attributeChunk(t, 0, 200);
+    expect(b.workLines[0].why).toBeNull();
   });
 });
