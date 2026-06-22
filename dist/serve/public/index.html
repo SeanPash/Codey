@@ -354,6 +354,17 @@
     .phead .pname { font-weight:600; font-size:12.5px; color:var(--ink); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .phead .pproj { font-size:10px; color:var(--body); background:#11151d; border:1px solid #232c3c; border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--sky); }
+    /* A cancelled (interrupted) terminal is not running, so it gets a quiet static amber frame
+       instead of the live beam, to signal the turn was cut short. */
+    .pane.cancelled { border-color:rgba(230,162,78,.4); }
+    /* Pinned prompt strip: echoes the single view's "You asked" heading at the top of a pane and
+       stays put while the body scrolls. Clamped to a few lines so a long prompt never crowds out
+       the breakdowns below it. */
+    .pprompt { flex:none; padding:9px 12px; border-bottom:1px solid #1b2331; background:#0c1018; }
+    .pprompt .geyebrow { margin-bottom:4px; }
+    .pprompt .geyebrow.gcancel { color:var(--amber); }
+    .pptext { font-size:12.5px; font-weight:600; color:var(--ink); line-height:1.4;
+      display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:#bfe0ff; background:rgba(95,176,255,.12); border:1px solid rgba(95,176,255,.32); }
     /* live but no tool open yet: Claude is thinking. Framed in amber like any live element. */
     .badge.think { color:#cbbfff; background:rgba(155,140,255,.14); border-color:rgba(155,140,255,.34); }
@@ -1206,7 +1217,8 @@
 
     function paneHtml(s, isFirst) {
       // A pane is "live" (amber frame) whenever the terminal is running: mid-tool OR thinking.
-      const cls = "pane" + (s.running ? " run" : "");
+      // A cancelled turn gets a quiet amber frame too, so an interrupted terminal reads as such.
+      const cls = "pane" + (s.running ? " run" : "") + (s.cancelled && !s.running ? " cancelled" : "");
       const pill = s.thinking ? `<span class="badge think">&#9670; Thinking</span>`
         : isFirst && s.running ? `<span class="badge">&#10022; Just prompted</span>` : "";
       const proj = s.project ? `<span class="pproj">${esc(s.project)}</span>` : "";
@@ -1225,14 +1237,25 @@
       // terminal has done no tool work, say so plainly instead of dimming it like it is broken.
       const think = s.thinking ? `<div class="pthink"><span class="pip"></span>Thinking through the prompt…</div>` : "";
       const runl = s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
+      // Mirror the single view's end-of-turn note when the user pressed Esc mid-prompt.
+      const cancelNote = s.cancelled ? `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>` : "";
       let body;
-      if (chunks.length) body = `${think}${cards}${runl}`;
+      if (chunks.length) body = `${think}${cards}${runl}${cancelNote}`;
       else if (s.thinking) body = think;
+      else if (s.cancelled) body = cancelNote;
       else body = `<div class="pnote"><span class="pn1">Answered directly</span>No tools used for this prompt.</div>`;
+      // Pinned prompt strip: what the user asked, like the single view's "You asked" heading. It
+      // stays above the scrolling body so it never scrolls away while a busy pane fills up.
+      const eyebrow = s.running
+        ? `<span class="geyebrow glive"><span class="rdot"></span>You asked &middot; working now</span>`
+        : s.cancelled ? `<span class="geyebrow gcancel">You asked &middot; cancelled</span>`
+        : `<span class="geyebrow">You asked</span>`;
+      const promptStrip = s.prompt
+        ? `<div class="pprompt">${eyebrow}<div class="pptext">${esc(s.prompt)}</div></div>` : "";
       return `<div class="${cls}"><div class="phead"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
         + `<span class="pname">${esc(s.name)}</span>${proj}${pill}`
         + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${dismissBtn}</div>`
-        + `<div class="pbody">${body}</div></div>`;
+        + `${promptStrip}<div class="pbody">${body}</div></div>`;
     }
 
     function renderSplit(live) {

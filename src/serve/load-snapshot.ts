@@ -163,6 +163,12 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
     // terminal the user interrupted drops out of the pulse instead of lingering the full window.
     const running = s.running && snap.live;
     const runningTool = running && last && last.phase === "pre" ? last.tool : null;
+    // The newest prompt group is the current turn. Surface its prompt text and cancelled flag so
+    // a pane shows what the user asked and whether they interrupted it, like the single view does.
+    // Guard on a real prompt mark so the synthetic "This session" group never reads as a question.
+    const lastGroup = snap.groups[snap.groups.length - 1];
+    const prompt = s.lastPromptTs > 0 && lastGroup ? lastGroup.prompt : "";
+    const cancelled = lastGroup?.cancelled ?? false;
     return {
       sessionId: s.id,
       name: s.name,
@@ -177,6 +183,8 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
       acted: s.acted,
       // Live but no tool open: Claude is thinking (before the first tool) or between calls.
       thinking: running && !runningTool,
+      prompt,
+      cancelled,
     };
   });
   // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".
