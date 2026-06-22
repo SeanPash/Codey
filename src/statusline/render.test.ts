@@ -92,7 +92,7 @@ describe("renderStatus", () => {
       ...base,
       current: { seq: 3, endSeq: 7, tag: "reading", target: "5 files (a.ts, b.ts, +3)", raw: null },
     }));
-    expect(out).toContain("#3–7 Claude is reading 5 files (a.ts, b.ts, +3)");
+    expect(out).toContain("#3-7 Claude is reading 5 files (a.ts, b.ts, +3)");
   });
 
   it("clamps a very long raw command to a single line with an ellipsis", () => {

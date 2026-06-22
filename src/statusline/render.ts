@@ -121,7 +121,7 @@ function wrapWhy(text: string, width: number, maxLines: number): string[] {
 
 // Format the task number, widening to a range when the card stands for a burst.
 function tasknum(c: { seq: number; endSeq?: number }): string {
-  return c.endSeq && c.endSeq !== c.seq ? `#${c.seq}–${c.endSeq}` : `#${c.seq}`;
+  return c.endSeq && c.endSeq !== c.seq ? `#${c.seq}-${c.endSeq}` : `#${c.seq}`;
 }
 
 export function renderStatus(view: StatusView, width = WRAP): string {

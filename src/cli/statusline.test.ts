@@ -28,7 +28,7 @@ describe("statusLineFor", () => {
   it("renders the current task and why from events plus the snapshot", () => {
     const out = plain(statusLineFor(seed(), 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("#1 editing auth.ts");
+    expect(out).toContain("#1 Claude is editing the file auth.ts");
     expect(out).toContain("adding validation");
   });
 
@@ -50,7 +50,7 @@ describe("lineForSession", () => {
     writeSessionMode("simple", dir);
     const out = plain(lineForSession("s1", root, 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("#1 editing auth.ts");
+    expect(out).toContain("#1 Claude is editing the file auth.ts");
   });
 
   it("renders blank when no session is given (no payload session id)", () => {
