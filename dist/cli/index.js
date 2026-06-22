@@ -3381,7 +3381,8 @@ function buildClaudeArgs(prompt) {
 }
 function runClaude(prompt, timeoutMs = 15e3) {
   return new Promise((resolve) => {
-    execFile("claude", buildClaudeArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true }, (err, stdout) => {
+    const env = { ...process.env, CODEY_HEADLESS: "1" };
+    execFile("claude", buildClaudeArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env }, (err, stdout) => {
       if (err) return resolve(null);
       const out = stdout.trim();
       resolve(out.length > 0 ? out : null);
@@ -4240,14 +4241,28 @@ function readPrompts(dir) {
 
 // src/timeline/session-name.ts
 var PLACEHOLDER = /* @__PURE__ */ new Set(["Working", "Task 2", "Continued working."]);
+var MAX_TITLE = 38;
 function clamp(s, n) {
   const oneLine = s.split("\n")[0].trim();
-  return oneLine.length > n ? oneLine.slice(0, n - 1).trimEnd() + "\u2026" : oneLine;
+  if (oneLine.length <= n) return oneLine;
+  const cut = oneLine.slice(0, n - 1);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > n * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
 }
 function sessionDisplayName(i) {
-  if (i.firstChunkName && !PLACEHOLDER.has(i.firstChunkName)) return clamp(i.firstChunkName, 48);
-  if (i.firstPrompt) return clamp(i.firstPrompt, 48);
+  if (i.firstChunkName && !PLACEHOLDER.has(i.firstChunkName)) return clamp(i.firstChunkName, MAX_TITLE);
+  if (i.firstPrompt) return clamp(i.firstPrompt, MAX_TITLE);
   return `Session ${i.sessionId.slice(0, 8)}`;
+}
+function projectFrom(cwd) {
+  if (!cwd) return null;
+  const parts = cwd.split(/[\\/]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : null;
+}
+function sessionColor(sessionId) {
+  let h = 0;
+  for (let i = 0; i < sessionId.length; i++) h = h * 31 + sessionId.charCodeAt(i) >>> 0;
+  return `hsl(${h % 360} 70% 62%)`;
 }
 
 // src/cli/sessions.ts
@@ -4263,32 +4278,42 @@ function latestSessionId(root = defaultRoot()) {
   if (active.length > 0) return active[0].name;
   return names.map((name) => ({ name, mtime: statSync(join8(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
 }
-var LIVE_WINDOW_MS = 15e3;
-function listSessions(root = defaultRoot()) {
+var RUNNING_WINDOW_MS = 15e3;
+var OPEN_WINDOW_MS = 30 * 6e4;
+function listSessions(root = defaultRoot(), now = Date.now()) {
   if (!existsSync11(root)) return [];
-  const now = Date.now();
   return readdirSync(root).filter((name) => statSync(join8(root, name)).isDirectory()).map((id) => {
     const dir = join8(root, id);
     const evMtime = eventsMtime(dir);
-    const mtime = evMtime ?? statSync(dir).mtimeMs;
     const cache = readCache(id, root);
     const prompts = readPrompts(dir);
     const meta = readMeta(id, root);
+    const lastPromptTs = prompts.length ? prompts[prompts.length - 1] : 0;
+    const lastActivity = Math.max(evMtime ?? 0, lastPromptTs);
+    const mtime = evMtime ?? statSync(dir).mtimeMs;
     const name = sessionDisplayName({
       firstChunkName: cache?.chunks?.[0]?.name ?? null,
       firstPrompt: readFirstPrompt(meta?.transcriptPath ?? null),
       sessionId: id,
       mtimeMs: mtime
     });
+    const running = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
     return {
       id,
       mtime,
       name,
+      project: projectFrom(meta?.cwd ?? null),
+      color: sessionColor(id),
       taskCount: cache?.chunks?.length ?? 0,
-      lastPromptTs: prompts.length ? prompts[prompts.length - 1] : 0,
-      live: evMtime != null && now - evMtime < LIVE_WINDOW_MS
+      lastPromptTs,
+      running,
+      open: lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
+      live: running,
+      // carried only for the filter below; not part of the public shape
+      _hasEvents: evMtime != null,
+      _lastActivity: lastActivity
     };
-  }).sort((a, b) => b.mtime - a.mtime);
+  }).filter((s) => s._hasEvents || s._lastActivity > 0 && now - s._lastActivity < OPEN_WINDOW_MS).map(({ _hasEvents, _lastActivity, ...s }) => s).sort((a, b) => b.mtime - a.mtime);
 }
 
 // src/statusline/active-mode.ts
@@ -4368,7 +4393,7 @@ function runStatusLine() {
 
 // src/cli/serve.ts
 import { fileURLToPath } from "node:url";
-import { dirname as dirname2, join as join13 } from "node:path";
+import { dirname as dirname2, join as join14 } from "node:path";
 
 // src/serve/server.ts
 import { createServer as createHttpServer } from "node:http";
@@ -4379,6 +4404,7 @@ function resolveRoute(method, url) {
   const path = url.split("?")[0];
   if (method === "GET") {
     if (path === "/" || path === "/index.html") return { type: "page" };
+    if (path === "/health") return { type: "health" };
     if (path === "/api/sessions") return { type: "sessions" };
     if (path === "/api/live") return { type: "live" };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
@@ -4411,6 +4437,8 @@ function createServer(deps) {
       if (route.type === "page") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(readFileSync13(deps.pagePath, "utf8"));
+      } else if (route.type === "health") {
+        sendJson(res, 200, { build: deps.buildId });
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
@@ -4441,8 +4469,19 @@ function createServer(deps) {
   });
 }
 
+// src/serve/build-id.ts
+function buildIdFrom(entryPath) {
+  const norm = entryPath.replace(/\\/g, "/");
+  for (const marker of ["/dist/", "/src/"]) {
+    const i = norm.lastIndexOf(marker);
+    if (i >= 0) return norm.slice(0, i);
+  }
+  return norm;
+}
+
 // src/serve/load-snapshot.ts
 import { statSync as statSync2 } from "node:fs";
+import { join as join12 } from "node:path";
 
 // src/timeline/attribution.ts
 function basename2(p) {
@@ -4457,10 +4496,18 @@ function fileFrom(input) {
   }
   return null;
 }
-function commandFrom(input) {
+function fullCommand(input) {
   if (input && typeof input === "object") {
     const c = input.command;
-    if (typeof c === "string") return c.split("\n")[0].slice(0, 60);
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return null;
+}
+function fullPath(input) {
+  if (input && typeof input === "object") {
+    const r = input;
+    const p = r.file_path ?? r.path ?? r.notebook_path;
+    if (typeof p === "string" && p.trim()) return p.trim();
   }
   return null;
 }
@@ -4479,17 +4526,26 @@ function describeAction(tool, input) {
       return file6 ? `Editing ${file6}` : "Editing a file";
     case "Read":
       return file6 ? `Reading ${file6}` : "Reading a file";
-    case "Bash": {
-      const c = commandFrom(input);
-      return c ? `Running: ${c}` : "Running a command";
-    }
+    case "Bash":
+      return "Ran a command";
     case "Grep":
     case "Glob":
-      return "Searching the code";
+      return "Searched the code";
   }
   const m = /^mcp__([^_]+)__(.+)$/.exec(tool);
   if (m) return `${prettify(m[2])} via ${m[1]}`;
   return tool;
+}
+function rawDetail(tool, input) {
+  if (!tool) return null;
+  if (tool === "Bash") return fullCommand(input);
+  return fullPath(input);
+}
+function failSummaryFrom(tool, errorText) {
+  const m = errorText ? /exit code\s+(\d+)/i.exec(errorText) : null;
+  const what = tool === "Bash" ? "command" : tool ? "step" : "step";
+  if (m) return `This ${what} failed (exit code ${m[1]}).`;
+  return `This ${what} didn't succeed.`;
 }
 function markResolved(lines) {
   for (let i = 0; i < lines.length; i++) {
@@ -4511,13 +4567,18 @@ function attributeChunk(turns, startTs, endTs) {
     contextTotal += t.inputTokens + t.cacheReadTokens + t.cacheCreationTokens;
     if (t.outputTokens <= 0 && !t.tool) continue;
     workTotal += t.outputTokens;
+    const isFail = !!(t.tool && t.tool !== "thinking" && t.isError);
     workLines.push({
       label: describeAction(t.tool, t.input),
       tool: t.tool ?? "thinking",
       tokens: t.outputTokens,
       status: t.tool && t.tool !== "thinking" ? t.isError ? "fail" : "ok" : "none",
       errorText: t.isError ? t.errorText : null,
-      resolved: false
+      resolved: false,
+      raw: rawDetail(t.tool, t.input),
+      why: null,
+      // filled in per chunk in buildSnapshot, from the chunk narration
+      failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null
     });
   }
   markResolved(workLines);
@@ -4538,7 +4599,7 @@ function sessionTotals(turns) {
 // src/timeline/grouping.ts
 function thinkingRow(tokens, nextLabel) {
   const label = nextLabel ? `Planned before ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}` : "Planned the next steps";
-  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false };
+  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false, raw: null, why: null, failSummary: null };
 }
 function groupThinking(lines) {
   const out = [];
@@ -4582,7 +4643,9 @@ function buildSnapshot(input) {
     const endTs = next ? events[next.startIndex]?.timestamp ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
     const slice = events.slice(rc.startIndex, endIndex);
     const raw = attributeChunk(turns, startTs, endTs);
-    const receipt = { ...raw, workLines: groupThinking(raw.workLines) };
+    const why = rc.narration || null;
+    const workLines = groupThinking(raw.workLines).map((l) => ({ ...l, why }));
+    const receipt = { ...raw, workLines };
     return {
       id: `c${idx}`,
       name: rc.name,
@@ -4604,6 +4667,8 @@ function buildSnapshot(input) {
   return {
     sessionId: input.sessionId,
     sessionName: input.sessionName,
+    project: input.project,
+    color: input.color,
     live: input.live,
     totalTokens: totals.total,
     workTotal: totals.work,
@@ -4624,17 +4689,21 @@ function resolveActiveWarning(events, now) {
 
 // src/serve/active.ts
 function selectActive(items) {
-  return items.filter((s) => s.live).sort((a, b) => b.lastPromptTs - a.lastPromptTs);
+  return items.filter((s) => s.open).sort((a, b) => b.lastPromptTs - a.lastPromptTs);
 }
 
 // src/serve/load-snapshot.ts
-var LIVE_WINDOW_MS2 = 15e3;
-function isLive(path) {
+function isRunning(dir, now) {
+  let evMtime = 0;
   try {
-    return Date.now() - statSync2(path).mtimeMs < LIVE_WINDOW_MS2;
+    evMtime = statSync2(join12(dir, "events.jsonl")).mtimeMs;
   } catch {
-    return false;
+    evMtime = 0;
   }
+  const prompts = readPrompts(dir);
+  const lastPrompt = prompts.length ? prompts[prompts.length - 1] : 0;
+  const lastActivity = Math.max(evMtime, lastPrompt);
+  return lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
 }
 function loadSnapshot(sessionId, root = defaultRoot()) {
   const store = new SessionStore(sessionId, root);
@@ -4642,7 +4711,7 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
   const rawChunks = chunksFor(sessionId, events, root);
-  const live = isLive(store.path);
+  const live = isRunning(store.dir, Date.now());
   let mtimeMs = 0;
   try {
     mtimeMs = statSync2(store.path).mtimeMs;
@@ -4658,6 +4727,8 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   const snap = buildSnapshot({
     sessionId,
     sessionName: name,
+    project: projectFrom(meta?.cwd ?? null),
+    color: sessionColor(sessionId),
     live,
     events,
     rawChunks,
@@ -4672,28 +4743,31 @@ function loadLive(root = defaultRoot()) {
     const snap = loadSnapshot(s.id, root);
     const events = new SessionStore(s.id, root).readAll();
     const last = events[events.length - 1];
-    const runningTool = last && last.phase === "pre" ? last.tool : null;
+    const runningTool = s.running && last && last.phase === "pre" ? last.tool : null;
     return {
       sessionId: s.id,
       name: s.name,
+      project: s.project,
+      color: s.color,
       workTotal: snap.workTotal,
-      live: s.live,
+      running: s.running,
+      open: s.open,
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
       runningTool
     };
   });
-  return { sessions, liveCount: sessions.length };
+  return { sessions, liveCount: sessions.filter((s) => s.running).length };
 }
 
 // src/intervene/file-io.ts
 import { writeFileSync as writeFileSync6, readFileSync as readFileSync14, existsSync as existsSync14, rmSync as rmSync3, mkdirSync as mkdirSync6 } from "node:fs";
-import { join as join12 } from "node:path";
+import { join as join13 } from "node:path";
 function interventionPath(sessionId, root = defaultRoot()) {
-  return join12(root, sessionId, "intervene.json");
+  return join13(root, sessionId, "intervene.json");
 }
 function writeInterventionFile(sessionId, file6, root = defaultRoot()) {
-  mkdirSync6(join12(root, sessionId), { recursive: true });
+  mkdirSync6(join13(root, sessionId), { recursive: true });
   writeFileSync6(interventionPath(sessionId, root), JSON.stringify(file6));
 }
 
@@ -4718,16 +4792,25 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 // src/cli/serve.ts
 var here = dirname2(fileURLToPath(import.meta.url));
 function publicDir() {
-  return join13(here, "..", "serve", "public");
+  return join14(here, "..", "serve", "public");
 }
 function runServe(opts) {
   const server = createServer({
-    pagePath: join13(publicDir(), "index.html"),
-    fontsDir: join13(publicDir(), "fonts"),
+    pagePath: join14(publicDir(), "index.html"),
+    fontsDir: join14(publicDir(), "fonts"),
+    buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
     getSnapshot: (id) => loadSnapshot(id),
     getLive: () => loadLive(),
     intervene: (id, action) => recordIntervention(id, action)
+  });
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`Port ${opts.port} is already in use.`);
+    } else {
+      console.error(`Timeline server error: ${err.message}`);
+    }
+    process.exit(1);
   });
   server.listen(opts.port, () => {
     console.log(`Codey timeline at http://localhost:${opts.port}`);
@@ -4737,7 +4820,7 @@ function runServe(opts) {
 
 // src/cli/feed.ts
 import { existsSync as existsSync15, watchFile as watchFile3 } from "node:fs";
-import { join as join14 } from "node:path";
+import { join as join15 } from "node:path";
 
 // src/feed/render.ts
 var RESET2 = "\x1B[0m";
@@ -4833,8 +4916,8 @@ function advanceFeed(items, cursor, prompts) {
 // src/cli/feed.ts
 function runFeed(sessionId) {
   const store = new SessionStore(sessionId);
-  const narrationPath = join14(store.dir, "narration.jsonl");
-  const promptsPath = join14(store.dir, "prompts.jsonl");
+  const narrationPath = join15(store.dir, "narration.jsonl");
+  const promptsPath = join15(store.dir, "prompts.jsonl");
   let cursor = { lastSeq: 0, whysShownFor: /* @__PURE__ */ new Set(), turnsHeadered: /* @__PURE__ */ new Set(), turnsSummarized: /* @__PURE__ */ new Set() };
   const build = () => feedItems(cardsFromEvents(store.readAll()), readWhys(store.dir));
   const flush = () => {
@@ -4853,7 +4936,7 @@ function runFeed(sessionId) {
 // src/cli/toggle.ts
 import { readFileSync as readFileSync15, writeFileSync as writeFileSync7, existsSync as existsSync16, mkdirSync as mkdirSync7, rmSync as rmSync4 } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join15, dirname as dirname3 } from "node:path";
+import { join as join16, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
 function withStatusLine(s, command) {
   return { ...s, statusLine: { type: "command", command } };
@@ -4864,7 +4947,7 @@ function withoutStatusLine(s) {
   return next;
 }
 function settingsPath() {
-  return join15(homedir2(), ".claude", "settings.json");
+  return join16(homedir2(), ".claude", "settings.json");
 }
 function readSettings() {
   const p = settingsPath();
@@ -4884,7 +4967,7 @@ function statusLineCommand(self) {
   return `node "${self}" statusline`;
 }
 function pidPath(sessionDir) {
-  return join15(sessionDir, "narrator.pid");
+  return join16(sessionDir, "narrator.pid");
 }
 function stopNarrator(path, kill = (pid) => process.kill(pid)) {
   if (!existsSync16(path)) return;
@@ -4899,7 +4982,7 @@ function stopNarrator(path, kill = (pid) => process.kill(pid)) {
 }
 function turnOn(mode, session) {
   const self = process.argv[1];
-  const dir = join15(defaultRoot(), session);
+  const dir = join16(defaultRoot(), session);
   mkdirSync7(dir, { recursive: true });
   stopNarrator(pidPath(dir));
   writeSessionMode(mode, dir);
@@ -4914,7 +4997,7 @@ function turnOn(mode, session) {
   writeFileSync7(pidPath(dir), String(child.pid ?? ""));
 }
 function turnOff(session) {
-  const dir = join15(defaultRoot(), session);
+  const dir = join16(defaultRoot(), session);
   stopNarrator(pidPath(dir));
   clearBudget(dir);
   clearSessionMode(dir);
@@ -4922,7 +5005,7 @@ function turnOff(session) {
 }
 
 // src/cli/budget.ts
-import { join as join16 } from "node:path";
+import { join as join17 } from "node:path";
 function parseBudgetArg(raw) {
   const s = (raw ?? "").trim().toLowerCase();
   if (!s) return { kind: "report" };
@@ -4939,7 +5022,7 @@ function runBudget(raw) {
     console.error("No Codey sessions found yet.");
     process.exit(1);
   }
-  const dir = join16(defaultRoot(), session);
+  const dir = join17(defaultRoot(), session);
   const arg = parseBudgetArg(raw);
   switch (arg.kind) {
     case "report":
@@ -4960,7 +5043,7 @@ function runBudget(raw) {
 }
 
 // src/cli/explain.ts
-import { join as join18 } from "node:path";
+import { join as join19 } from "node:path";
 import { existsSync as existsSync18, readFileSync as readFileSync17 } from "node:fs";
 
 // src/narration/explain.ts
@@ -5030,9 +5113,9 @@ Go one level deeper than that. Add new detail or a clearer mental model, and do 
 
 // src/narration/explain-log.ts
 import { appendFileSync as appendFileSync4, readFileSync as readFileSync16, existsSync as existsSync17 } from "node:fs";
-import { join as join17 } from "node:path";
+import { join as join18 } from "node:path";
 function file5(dir) {
-  return join17(dir, "explain.jsonl");
+  return join18(dir, "explain.jsonl");
 }
 function appendPass(dir, scope, text) {
   appendFileSync4(file5(dir), JSON.stringify({ scope, text }) + "\n");
@@ -5054,7 +5137,7 @@ function passesForScope(dir, scope) {
 
 // src/cli/explain.ts
 function readEvents2(dir) {
-  const p = join18(dir, "events.jsonl");
+  const p = join19(dir, "events.jsonl");
   if (!existsSync18(p)) return [];
   const out = [];
   for (const line of readFileSync17(p, "utf8").split("\n")) {
@@ -5072,7 +5155,7 @@ async function runExplain(args = []) {
     console.error("No Codey sessions found yet.");
     process.exit(1);
   }
-  const dir = join18(defaultRoot(), session);
+  const dir = join19(defaultRoot(), session);
   const { depth, task } = parseExplainArgs(args);
   const start = currentTurnStart(readPrompts(dir));
   const turnEvents = eventsForCurrentTurn(readEvents2(dir), start);
@@ -5139,22 +5222,28 @@ function runCosts() {
 // src/cli/timeline.ts
 import { spawn as spawn2 } from "node:child_process";
 import { connect } from "node:net";
+import { get as httpGet } from "node:http";
 import { readFileSync as readFileSync18, writeFileSync as writeFileSync8, existsSync as existsSync19 } from "node:fs";
-import { join as join19 } from "node:path";
+import { join as join20 } from "node:path";
 var DEFAULT_PORT = 4317;
-function timelineDecision(lock, isPortUp) {
-  if (lock && isPortUp(lock.port)) return { reuse: true, port: lock.port };
-  return { reuse: false, port: DEFAULT_PORT };
+function timelineDecision(lock, currentBuild, probe) {
+  if (!lock) return { action: "spawn", port: DEFAULT_PORT };
+  const p = probe(lock.port);
+  if (!p.up) return { action: "spawn", port: DEFAULT_PORT };
+  if (p.build && p.build === currentBuild) return { action: "reuse", port: lock.port };
+  return { action: "replace", port: lock.port, pid: lock.pid };
 }
-function lockPath(dir) {
-  return join19(dir, "serve.lock");
+function lockPath(root) {
+  return join20(root, "serve.lock");
 }
-function readLock(dir) {
-  const p = lockPath(dir);
+function readLock(root) {
+  const p = lockPath(root);
   if (!existsSync19(p)) return null;
   try {
     const o = JSON.parse(readFileSync18(p, "utf8"));
-    if (typeof o.port === "number" && typeof o.pid === "number") return { port: o.port, pid: o.pid };
+    if (typeof o.port === "number" && typeof o.pid === "number") {
+      return { port: o.port, pid: o.pid, build: typeof o.build === "string" ? o.build : "" };
+    }
     return null;
   } catch {
     return null;
@@ -5173,6 +5262,26 @@ function probePort(port, timeoutMs = 300) {
     sock.once("error", () => done(false));
   });
 }
+function fetchBuild(port, timeoutMs = 500) {
+  return new Promise((resolve) => {
+    const req = httpGet({ host: "127.0.0.1", port, path: "/health", timeout: timeoutMs }, (res) => {
+      let data = "";
+      res.on("data", (c) => data += c);
+      res.on("end", () => {
+        try {
+          resolve(String(JSON.parse(data).build ?? "") || null);
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(null);
+    });
+    req.on("error", () => resolve(null));
+  });
+}
 async function waitForPort(port, attempts = 20, gapMs = 150) {
   for (let i = 0; i < attempts; i++) {
     if (await probePort(port)) return true;
@@ -5180,41 +5289,72 @@ async function waitForPort(port, attempts = 20, gapMs = 150) {
   }
   return false;
 }
+async function waitForPortFree(port, attempts = 20, gapMs = 150) {
+  for (let i = 0; i < attempts; i++) {
+    if (!await probePort(port)) return true;
+    await new Promise((r) => setTimeout(r, gapMs));
+  }
+  return false;
+}
+function killPid(pid) {
+  try {
+    process.kill(pid);
+  } catch {
+  }
+}
 async function runTimeline() {
   const session = latestSessionId();
   if (!session) {
     console.error("No Codey sessions found yet.");
     process.exit(1);
   }
-  const dir = join19(defaultRoot(), session);
-  const lock = readLock(dir);
-  const up = lock ? await probePort(lock.port) : false;
-  const plan = timelineDecision(lock, () => up);
-  if (plan.reuse) {
+  const root = defaultRoot();
+  const currentBuild = buildIdFrom(process.argv[1]);
+  const lock = readLock(root);
+  let probed = { up: false, build: null };
+  if (lock) {
+    const up = await probePort(lock.port);
+    probed = { up, build: up ? await fetchBuild(lock.port) : null };
+  }
+  const plan = timelineDecision(lock, currentBuild, () => probed);
+  if (plan.action === "reuse") {
     console.log(`Codey timeline already open at http://localhost:${plan.port}`);
     return;
   }
+  if (plan.action === "replace") {
+    killPid(plan.pid);
+    if (!await waitForPortFree(plan.port)) {
+      console.error(`Could not free port ${plan.port}; the old timeline server is still running. Close it and try again.`);
+      process.exit(1);
+    }
+  }
+  const port = DEFAULT_PORT;
   const self = process.argv[1];
-  const child = spawn2(process.execPath, [self, "serve", "--session", session, "--port", String(plan.port)], {
+  const child = spawn2(process.execPath, [self, "serve", "--session", session, "--port", String(port)], {
     detached: true,
     stdio: "ignore",
     windowsHide: true
   });
   child.unref();
-  writeFileSync8(lockPath(dir), JSON.stringify({ port: plan.port, pid: child.pid ?? 0 }));
-  const ready = await waitForPort(plan.port);
-  if (ready) console.log(`Codey timeline at http://localhost:${plan.port}`);
-  else console.log(`Codey timeline starting at http://localhost:${plan.port} (give it a moment to open).`);
+  const ready = await waitForPort(port);
+  const build = ready ? await fetchBuild(port) : null;
+  if (ready && build && build !== currentBuild) {
+    console.error(`A different timeline build is serving port ${port}. Close it and try again.`);
+    process.exit(1);
+  }
+  writeFileSync8(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
+  if (ready) console.log(`Codey timeline at http://localhost:${port}`);
+  else console.log(`Codey timeline starting at http://localhost:${port} (give it a moment to open).`);
 }
 
 // src/cli/index.ts
-import { join as join20 } from "node:path";
+import { join as join21 } from "node:path";
 function parseMode(m) {
   return ["simple", "deep", "teach", "ask"].includes(m) ? m : "simple";
 }
 function resolveWatchMode(opt, session) {
   if (opt) return parseMode(opt);
-  const snap = readStatus(join20(defaultRoot(), session));
+  const snap = readStatus(join21(defaultRoot(), session));
   return snap?.mode ?? "simple";
 }
 var program2 = new Command();

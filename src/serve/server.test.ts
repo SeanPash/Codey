@@ -32,6 +32,10 @@ describe("resolveRoute", () => {
     expect(resolveRoute("GET", "/api/live")).toEqual({ type: "live" });
   });
 
+  it("routes the health check", () => {
+    expect(resolveRoute("GET", "/health")).toEqual({ type: "health" });
+  });
+
   it("routes font requests and rejects traversal", () => {
     expect(resolveRoute("GET", "/fonts/Inter-400.woff2")).toEqual({ type: "font", file: "Inter-400.woff2" });
     expect(resolveRoute("GET", "/fonts/W95FA.woff")).toEqual({ type: "font", file: "W95FA.woff" });

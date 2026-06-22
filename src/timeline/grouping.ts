@@ -4,7 +4,7 @@ function thinkingRow(tokens: number, nextLabel: string | null): ReceiptLine {
   const label = nextLabel
     ? `Planned before ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}`
     : "Planned the next steps";
-  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false };
+  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false, raw: null, why: null, failSummary: null };
 }
 
 // Collapse each run of consecutive thinking lines (status "none") into a single row.

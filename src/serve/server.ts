@@ -6,6 +6,7 @@ import type { SessionListItem } from "../cli/sessions.js";
 
 export type RouteResult =
   | { type: "page" }
+  | { type: "health" }
   | { type: "sessions" }
   | { type: "session"; id: string }
   | { type: "intervene"; id: string }
@@ -19,6 +20,7 @@ export function resolveRoute(method: string | undefined, url: string | undefined
   const path = url.split("?")[0];
   if (method === "GET") {
     if (path === "/" || path === "/index.html") return { type: "page" };
+    if (path === "/health") return { type: "health" };
     if (path === "/api/sessions") return { type: "sessions" };
     if (path === "/api/live") return { type: "live" };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
@@ -41,6 +43,7 @@ function sendJson(res: ServerResponse, code: number, body: unknown): void {
 export interface ServerDeps {
   pagePath: string;
   fontsDir: string;
+  buildId: string;          // identity the launcher checks to detect a stale server
   listSessions: () => SessionListItem[];
   getSnapshot: (id: string) => SessionSnapshot;
   getLive: () => LiveSnapshot;
@@ -63,6 +66,8 @@ export function createServer(deps: ServerDeps): Server {
       if (route.type === "page") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(readFileSync(deps.pagePath, "utf8"));
+      } else if (route.type === "health") {
+        sendJson(res, 200, { build: deps.buildId });
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { describeAction, attributeChunk } from "./attribution.js";
+import { describeAction, rawDetail, failSummaryFrom, attributeChunk } from "./attribution.js";
 import type { AssistantTurn } from "./transcript.js";
 
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
@@ -13,8 +13,8 @@ describe("describeAction", () => {
     expect(describeAction("Edit", { file_path: "/p/a.cs" })).toBe("Editing a.cs");
     expect(describeAction("Read", { file_path: "/p/b.cs" })).toBe("Reading b.cs");
   });
-  it("names a bash action by its command", () => {
-    expect(describeAction("Bash", { command: "dotnet build MyGame.sln" })).toBe("Running: dotnet build MyGame.sln");
+  it("keeps the bash label plain; the command goes to raw", () => {
+    expect(describeAction("Bash", { command: "dotnet build MyGame.sln" })).toBe("Ran a command");
   });
   it("names an mcp action by action + server", () => {
     expect(describeAction("mcp__unity__execute_menu_item", { menu: "x" })).toBe("Execute menu item via unity");
@@ -22,6 +22,29 @@ describe("describeAction", () => {
   it("labels a non-tool / thinking turn", () => {
     expect(describeAction(null, null)).toBe("Thinking it through");
     expect(describeAction("thinking", null)).toBe("Thinking it through");
+  });
+});
+
+describe("rawDetail", () => {
+  it("returns the full untruncated command for bash", () => {
+    const cmd = "git log --oneline -10 && echo done";
+    expect(rawDetail("Bash", { command: cmd })).toBe(cmd);
+  });
+  it("returns the full path for file tools", () => {
+    expect(rawDetail("Read", { file_path: "/a/b/c.ts" })).toBe("/a/b/c.ts");
+  });
+  it("is null when there is nothing to show", () => {
+    expect(rawDetail("Grep", { pattern: "x" })).toBeNull();
+    expect(rawDetail(null, null)).toBeNull();
+  });
+});
+
+describe("failSummaryFrom", () => {
+  it("surfaces an exit code when present", () => {
+    expect(failSummaryFrom("Bash", "Exit code 2\nsome noise")).toBe("This command failed (exit code 2).");
+  });
+  it("stays generic without an exit code", () => {
+    expect(failSummaryFrom("Read", "ENOENT")).toBe("This step didn't succeed.");
   });
 });
 
