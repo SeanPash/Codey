@@ -106,7 +106,11 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
 // segmentation, so it is safe to poll about once a second while a session is live.
 export function loadNow(sessionId: string, root: string = defaultRoot()): NowView {
   const store = new SessionStore(sessionId, root);
-  return buildNowView(store.readAll(), readStatus(store.dir), Date.now());
+  // Scope to the current turn using the same prompt-mark boundary the snapshot uses, so the
+  // live strip flips to the new prompt the instant it lands instead of trailing the old turn.
+  const marks = readPrompts(store.dir);
+  const turnStart = marks.length ? marks[marks.length - 1] : Number.NEGATIVE_INFINITY;
+  return buildNowView(store.readAll(), readStatus(store.dir), Date.now(), turnStart);
 }
 
 function isScope(s: unknown): s is ExplainScope {

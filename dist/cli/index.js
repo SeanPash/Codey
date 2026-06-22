@@ -5264,9 +5264,10 @@ function completedSteps(events) {
   }
   return done;
 }
-function buildNowView(events, status, now) {
+function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINITY) {
   const empty = { live: false, action: null, since: 0, thinking: false, steps: [] };
-  if (events.length === 0 && !status) return empty;
+  if (allEvents.length === 0 && !status) return empty;
+  const events = allEvents.filter((e) => e.timestamp >= turnStart);
   const lastActivity = events.reduce((m, e) => Math.max(m, e.timestamp), 0);
   const closed = status?.closedAt != null && status.closedAt >= Math.max(lastActivity, status.promptAt ?? 0);
   if (closed) return { ...empty, steps: completedSteps(events).slice(-TRAIL).reverse() };
@@ -5399,7 +5400,9 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
 }
 function loadNow(sessionId, root = defaultRoot()) {
   const store = new SessionStore(sessionId, root);
-  return buildNowView(store.readAll(), readStatus(store.dir), Date.now());
+  const marks = readPrompts(store.dir);
+  const turnStart = marks.length ? marks[marks.length - 1] : Number.NEGATIVE_INFINITY;
+  return buildNowView(store.readAll(), readStatus(store.dir), Date.now(), turnStart);
 }
 function isScope(s) {
   return s === "task" || s === "action" || s === "summary";
