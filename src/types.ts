@@ -121,6 +121,8 @@ export interface LiveSession {
   runningTool: string | null;  // tool of the open pre-event, or null when idle
   acted: boolean;              // has run a tool (false = prompted but no work yet)
   thinking: boolean;           // live but not mid-tool: prompt in flight or between tool calls
+  prompt: string;              // the latest prompt text (what the user asked), clamped; "" if none
+  cancelled: boolean;          // the latest turn was interrupted by the user (Esc mid-prompt)
 }
 
 // A terminal the user hid from the grid, kept so it can be listed and restored.

@@ -5462,6 +5462,9 @@ function loadLive(root = defaultRoot()) {
     const last = events[events.length - 1];
     const running = s.running && snap.live;
     const runningTool = running && last && last.phase === "pre" ? last.tool : null;
+    const lastGroup = snap.groups[snap.groups.length - 1];
+    const prompt = s.lastPromptTs > 0 && lastGroup ? lastGroup.prompt : "";
+    const cancelled = lastGroup?.cancelled ?? false;
     return {
       sessionId: s.id,
       name: s.name,
@@ -5475,7 +5478,9 @@ function loadLive(root = defaultRoot()) {
       runningTool,
       acted: s.acted,
       // Live but no tool open: Claude is thinking (before the first tool) or between calls.
-      thinking: running && !runningTool
+      thinking: running && !runningTool,
+      prompt,
+      cancelled
     };
   });
   return { sessions, liveCount: sessions.filter((s) => s.running).length, hidden };
