@@ -9,6 +9,7 @@ import { listSessions } from "./sessions.js";
 import { defaultRoot } from "../store/session-store.js";
 import { pruneEventless } from "../store/session-prune.js";
 import { writeCustomName } from "../store/session-name-store.js";
+import { dismiss, restore } from "../store/dismissed-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // dist/cli/serve.js and dist/serve/public/index.html after build; src mirrors the layout.
@@ -51,6 +52,14 @@ export function runServe(opts: { session?: string; port: number }): void {
       } catch {
         return false;
       }
+    },
+    dismiss: (id) => {
+      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      try { dismiss(defaultRoot(), id); return true; } catch { return false; }
+    },
+    restore: (id) => {
+      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      try { restore(defaultRoot(), id); return true; } catch { return false; }
     },
     explain: (id, body) => runExplain(id, body),
   });

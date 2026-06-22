@@ -49,6 +49,7 @@ export interface SessionListItem {
   lastPromptTs: number;
   running: boolean;        // mid-tool or active within the running window (pulsing live)
   open: boolean;           // used recently, so the terminal is probably still open
+  acted: boolean;          // has captured at least one tool call (false = prompted, no work yet)
   live: boolean;           // alias of running, kept for existing callers
   day: string;             // "Today", "Yesterday", or a locale date string
 }
@@ -127,6 +128,7 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         lastPromptTs,
         running,
         open: !closed && lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
+        acted: evMtime != null,
         live: running,
         day: dayBucket(mtime, now),
         // carried only for the filter below; not part of the public shape
@@ -134,10 +136,11 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         _lastActivity: lastActivity,
       } as SessionListItem & { _hasEvents: boolean; _lastActivity: number };
     })
-    // Real terminals only: a session must have captured at least one tool call (events.jsonl).
-    // This drops the phantom folders that headless narration or the global prompt hook creates
-    // without ever running a tool.
-    .filter((s) => s._hasEvents)
+    // A session lists when it has captured a tool call (real work, kept forever) or when it was
+    // prompted recently (within the open window) even before any tool ran, so a terminal the user
+    // just opened and said "hi" in still shows up, dimmed. Ancient prompt-only folders and truly
+    // empty ones (phantoms from the global hooks) fall outside the window and stay hidden.
+    .filter((s) => s._hasEvents || (s._lastActivity > 0 && now - s._lastActivity < OPEN_WINDOW_MS))
     .map(({ _hasEvents, _lastActivity, ...s }) => s)
     .sort((a, b) => b.mtime - a.mtime);
 }

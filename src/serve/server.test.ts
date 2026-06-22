@@ -62,6 +62,15 @@ describe("resolveRoute", () => {
     expect(resolveRoute("DELETE", "/api/session/abc")).toEqual({ type: "delete", id: "abc" });
   });
 
+  it("routes POST /api/session/:id/dismiss and /restore", () => {
+    expect(resolveRoute("POST", "/api/session/abc/dismiss")).toEqual({ type: "dismiss", id: "abc" });
+    expect(resolveRoute("POST", "/api/session/abc/restore")).toEqual({ type: "restore", id: "abc" });
+  });
+
+  it("does not treat a GET on the dismiss path as a snapshot", () => {
+    expect(resolveRoute("GET", "/api/session/abc/dismiss")).toEqual({ type: "notfound" });
+  });
+
   it("GET /api/session/:id still resolves to session (not delete)", () => {
     expect(resolveRoute("GET", "/api/session/abc")).toEqual({ type: "session", id: "abc" });
   });

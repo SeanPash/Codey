@@ -98,31 +98,39 @@ describe("listSessions", () => {
     expect(listSessions(dir).map((s) => s.id)).not.toContain("phantom");
   });
 
-  it("only lists sessions that have captured at least one tool event (real terminals)", () => {
+  it("flags a session with events as having acted, and a prompt-only one as not", () => {
     const now = Date.now();
-    // real: has events.jsonl
+    // real: has events.jsonl -> acted
     const real = join(dir, "real");
     mkdirSync(real);
     writeFileSync(join(real, "events.jsonl"), '{"phase":"pre"}\n');
-    // phantom: has a prompt but no events.jsonl
-    const phantom = join(dir, "phantom");
-    mkdirSync(phantom);
-    writeFileSync(join(phantom, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
-    const ids = listSessions(dir, now).map((s) => s.id);
-    expect(ids).toContain("real");
-    expect(ids).not.toContain("phantom");
+    // prompted-only: a recent prompt, no tool yet -> listed but not acted
+    const prompted = join(dir, "prompted");
+    mkdirSync(prompted);
+    writeFileSync(join(prompted, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
+    const items = listSessions(dir, now);
+    expect(items.find((s) => s.id === "real")?.acted).toBe(true);
+    expect(items.find((s) => s.id === "prompted")?.acted).toBe(false);
   });
 
-  // This test previously relied on a phantom (no events) being kept when recently prompted.
-  // Task 1.2 removes that allowance. The "fresh" scenario now only applies to real terminals
-  // (those with events.jsonl). The "thinking" state is covered by Task 2.1.
-  it("hides a freshly prompted session that has no events (phantom)", () => {
+  // A terminal where the user only sent a prompt (e.g. just said "hi") shows up dimmed so it
+  // is tracked and openable, rather than vanishing until Claude runs its first tool.
+  it("shows a freshly prompted session before any events, idle and not yet acted", () => {
     const now = Date.now();
     const fresh = join(dir, "fresh");
     mkdirSync(fresh);
     writeFileSync(join(fresh, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
-    const item = listSessions(dir, now).find((x) => x.id === "fresh");
-    expect(item).toBeUndefined();
+    const item = listSessions(dir, now).find((x) => x.id === "fresh")!;
+    expect(item).toBeDefined();
+    expect(item.acted).toBe(false);
+    expect(item.open).toBe(true);
+    expect(item.running).toBe(false);
+  });
+
+  it("hides a truly empty folder with neither events nor prompts", () => {
+    const now = Date.now();
+    mkdirSync(join(dir, "empty"));
+    expect(listSessions(dir, now).map((s) => s.id)).not.toContain("empty");
   });
 
   it("marks a recent-but-idle session open but not running", () => {

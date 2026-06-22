@@ -19,7 +19,9 @@ export interface NowView {
   steps: NowStep[];                           // last few completed steps, newest first
 }
 
-const TRAIL = 3;
+// How many just-finished steps to keep in the trail. Set generously so a burst of quick
+// sub-second reads is never silently skipped between the longer step and the next poll.
+const TRAIL = 5;
 
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);

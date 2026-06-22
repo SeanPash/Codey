@@ -14,6 +14,7 @@ function line(over: Partial<ReceiptLine> = {}): ReceiptLine {
     why: "I'll add the route so the page can fetch explanations.",
     failSummary: null,
     ts: 1000,
+    thoughtFirst: false,
     ...over,
   };
 }
