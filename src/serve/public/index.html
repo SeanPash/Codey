@@ -64,8 +64,26 @@
     .cols { display:flex; align-items:flex-start; min-height:calc(100vh - var(--head)); }
     .rail { width:232px; flex:none; border-right:1px solid var(--line); padding:12px 10px; position:sticky; top:var(--head); align-self:stretch; max-height:calc(100vh - var(--head)); overflow-y:auto; }
     .rh { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin:0 0 9px 3px; font-weight:600; }
-    .sess { padding:8px 10px; border-radius:8px; margin-bottom:4px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:none; background:transparent; color:var(--ink); font:inherit; }
+    /* sessions search + day headers */
+    .railsearch { width:100%; margin:0 0 10px; background:var(--inset); border:1px solid #283246; color:var(--ink);
+      border-radius:8px; padding:7px 10px; font:inherit; font-size:12px; }
+    .railsearch::placeholder { color:var(--muted); }
+    .railsearch:focus { outline:none; border-color:var(--sky-dim); }
+    .dayhd { font-size:8.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700;
+      margin:11px 0 5px 4px; }
+    .dayhd:first-of-type { margin-top:2px; }
+    .sess { position:relative; padding:8px 10px; border-radius:8px; margin-bottom:4px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:none; background:transparent; color:var(--ink); font:inherit; }
     .sess:hover { background:#11141b; }
+    /* row action buttons, revealed on hover */
+    .sessacts { position:absolute; top:6px; right:6px; display:none; gap:3px; }
+    .sess:hover .sessacts { display:flex; }
+    .sessacts button { background:#10141d; border:1px solid #283246; color:var(--muted); border-radius:6px;
+      width:22px; height:22px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+    .sessacts button:hover { color:var(--sky); border-color:rgba(95,176,255,.4); }
+    .sessacts button.del:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
+    .sessrename { width:100%; display:flex; gap:5px; align-items:center; padding:5px 6px; }
+    .sessrename input { flex:1; min-width:0; background:var(--inset); border:1px solid var(--sky-dim); color:var(--ink);
+      border-radius:6px; padding:5px 7px; font:inherit; font-size:12px; }
     .sess.active { background:#141925; box-shadow:inset 0 0 0 1px var(--sky-dim); }
     .sess.active .sname { color:var(--sky); }
     .sess .sname { font-weight:600; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:7px; }
@@ -322,6 +340,9 @@
     let pinned = !!currentId;      // a manual pick stops follow-newest
     let splitPage = 1;
     let splitPinned = false;
+    let lastSessions = [];         // last /api/sessions payload, for search re-render without refetch
+    let railFilter = "";           // sidebar search text
+    let renamingId = null;         // session id being renamed inline (pauses rail refresh)
 
     // ---- Intervention (Plan 3), preserved ----
     const FALLBACK = {
@@ -474,21 +495,90 @@
         + (snap.project ? `<span class="ptag">${esc(snap.project)}</span>` : "");
     }
 
+    function sessRowHtml(s) {
+      const active = s.id === currentId ? " active" : "";
+      const proj = s.project ? ` &middot; ${esc(s.project)}` : "";
+      if (s.id === renamingId) {
+        return `<div class="sessrename" data-id="${esc(s.id)}">`
+          + `<input class="rename-in" type="text" value="${esc(s.name)}" aria-label="New name" /></div>`;
+      }
+      return `<button class="sess${active}" data-id="${esc(s.id)}" type="button">`
+        + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
+        + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span>`
+        + `<span class="sessacts">`
+        + `<button class="ren" type="button" title="Rename" aria-label="Rename">&#9998;</button>`
+        + `<button class="del" type="button" title="Delete" aria-label="Delete">&#128465;</button>`
+        + `</span></button>`;
+    }
+
     function renderRail(sessions) {
-      const html = sessions.map((s) => {
-        const active = s.id === currentId ? " active" : "";
-        const proj = s.project ? ` &middot; ${esc(s.project)}` : "";
-        return `<button class="sess${active}" data-id="${esc(s.id)}" type="button">`
-          + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
-          + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span></button>`;
-      }).join("");
-      document.getElementById("rail").innerHTML = `<p class="rh">Sessions</p>${html || '<p class="smeta" style="padding-left:3px">No sessions yet.</p>'}`;
+      const q = railFilter.trim().toLowerCase();
+      const shown = q
+        ? sessions.filter((s) => (s.name + " " + (s.project || "")).toLowerCase().includes(q))
+        : sessions;
+      // Group by day, preserving the most-recent-first order the server already sorted by.
+      const days = [];
+      const byDay = new Map();
+      for (const s of shown) {
+        const d = s.day || "Earlier";
+        if (!byDay.has(d)) { byDay.set(d, []); days.push(d); }
+        byDay.get(d).push(s);
+      }
+      const groups = days.map((d) =>
+        `<div class="dayhd">${esc(d)}</div>` + byDay.get(d).map(sessRowHtml).join("")).join("");
+      const empty = q ? "No terminals match." : "No terminals yet.";
+      document.getElementById("rail").innerHTML =
+        `<p class="rh">Sessions</p>`
+        + `<input class="railsearch" id="railsearch" type="search" placeholder="Search terminals" value="${esc(railFilter)}" />`
+        + (shown.length ? groups : `<p class="smeta" style="padding-left:3px">${empty}</p>`);
+
+      const search = document.getElementById("railsearch");
+      if (search) search.addEventListener("input", (e) => { railFilter = e.target.value; renderRail(lastSessions); });
+
       document.querySelectorAll("#rail .sess").forEach((el) => {
-        el.addEventListener("click", () => {
+        el.addEventListener("click", (e) => {
+          if (e.target.closest(".sessacts")) return; // a row-action click is not a select
           currentId = el.dataset.id; pinned = true;
           open.clear(); tickSingle();
         });
       });
+      document.querySelectorAll("#rail .sessacts .ren").forEach((b) =>
+        b.addEventListener("click", (e) => { e.stopPropagation(); startRename(b.closest(".sess").dataset.id); }));
+      document.querySelectorAll("#rail .sessacts .del").forEach((b) =>
+        b.addEventListener("click", (e) => { e.stopPropagation(); deleteSession(b.closest(".sess").dataset.id); }));
+
+      const input = document.querySelector("#rail .rename-in");
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        const commit = () => commitRename(renamingId, input.value);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          else if (e.key === "Escape") { e.preventDefault(); renamingId = null; renderRail(lastSessions); }
+        });
+        input.addEventListener("blur", commit);
+      }
+    }
+
+    function startRename(id) { renamingId = id; renderRail(lastSessions); }
+
+    async function commitRename(id, name) {
+      if (!id) return;
+      renamingId = null;
+      try {
+        await fetch("/api/session/" + encodeURIComponent(id) + "/name", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
+        });
+      } catch { /* keep going; the rail will refetch on the next tick */ }
+      tickSingle();
+    }
+
+    async function deleteSession(id) {
+      const s = lastSessions.find((x) => x.id === id);
+      if (!confirm("Delete " + (s ? s.name : "this terminal") + " from the timeline? This cannot be undone.")) return;
+      try { await fetch("/api/session/" + encodeURIComponent(id), { method: "DELETE" }); } catch { /* refetch handles it */ }
+      if (currentId === id) { currentId = null; pinned = false; }
+      tickSingle();
     }
 
     function renderSingle(snap) {
@@ -551,10 +641,12 @@
     async function tickSingle() {
       let sessions = [];
       try { sessions = await (await fetch("/api/sessions")).json(); } catch { sessions = []; }
+      lastSessions = sessions;
       if (!pinned && sessions[0]) currentId = sessions[0].id;
       const anyRunning = sessions.some((s) => s.running);
       updateLiveBadge(sessions.filter((s) => s.running).length);
-      renderRail(sessions);
+      // Don't redraw the rail mid-rename or the input loses focus and the typed text.
+      if (!renamingId) renderRail(sessions);
       // Only offer "Jump to live" when there is something live to jump to.
       document.getElementById("jumplive").hidden = !(pinned && anyRunning);
       if (!currentId) { document.getElementById("main").innerHTML = '<div class="empty">No sessions found.</div>'; return; }
@@ -569,20 +661,26 @@
     });
     document.getElementById("tb-single").addEventListener("click", () => setView("single"));
     document.getElementById("tb-split").addEventListener("click", () => setView("split"));
+    document.getElementById("rename-current").addEventListener("click", () => {
+      if (currentId) startRename(currentId);
+    });
     function setView(v) {
       view = v;
+      document.body.classList.toggle("split", v === "split");
       document.getElementById("tb-single").classList.toggle("on", v === "single");
       document.getElementById("tb-split").classList.toggle("on", v === "split");
       document.getElementById("rail").style.display = v === "split" ? "none" : "";
       document.getElementById("summary").style.display = v === "split" ? "none" : "";
-      document.getElementById("sproj").style.display = v === "split" ? "none" : "";
       document.getElementById("jumplive").hidden = true;
       tick();
     }
 
     function updateLiveBadge(n) {
       document.getElementById("livecount").textContent = n;
-      document.getElementById("livewrap").hidden = n === 0;
+      const wrap = document.getElementById("livewrap");
+      // Always visible: when 0 it shows a calm "idle" state so a still badge never looks frozen.
+      wrap.classList.toggle("idle", n === 0);
+      document.getElementById("livelabel").textContent = n === 0 ? "idle" : "live";
     }
 
     // ---- Active Terminals (multi-session) ----
