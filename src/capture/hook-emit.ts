@@ -6,6 +6,9 @@ import { patchStatus } from "../statusline/state.js";
 import { actionFromEvent } from "../statusline/from-event.js";
 
 export function handleHookInput(rawJson: string, root: string = defaultRoot()): void {
+  // Codey's own headless narration runs `claude` with CODEY_HEADLESS set. Skip those so we
+  // never capture our narration sub-calls as sessions of their own.
+  if (process.env.CODEY_HEADLESS) return;
   const text = rawJson.trim();
   if (!text) return;
   let raw: RawHookEvent;

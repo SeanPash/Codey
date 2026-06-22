@@ -30,7 +30,7 @@ describe("buildSnapshot", () => {
   ];
 
   it("builds one chunk per raw chunk with windowed receipts and totals", () => {
-    const snap = buildSnapshot({ sessionId: "s", sessionName: "Proj", live: true, events, rawChunks, turns });
+    const snap = buildSnapshot({ sessionId: "s", sessionName: "Proj", project: null, color: "c", live: true, events, rawChunks, turns });
     expect(snap.chunks).toHaveLength(2);
     expect(snap.chunks[0].receipt.workTotal).toBe(400);    // 300 + 100 in [100,5000)
     expect(snap.chunks[1].receipt.workTotal).toBe(50);     // 50 in [5000, inf)
@@ -53,7 +53,7 @@ describe("buildSnapshot", () => {
       { startIndex: 0, name: "Look around", narration: "" },
       { startIndex: 1, name: "Write the file", narration: "" },
     ];
-    const snap = buildSnapshot({ sessionId: "s", sessionName: "s", live: false, events: e2, rawChunks: rc2, turns: t2 });
+    const snap = buildSnapshot({ sessionId: "s", sessionName: "s", project: null, color: "c", live: false, events: e2, rawChunks: rc2, turns: t2 });
     expect(snap.workTotal).toBe(450);
     expect(snap.totalTokens).toBe(10450);          // work 450 + context 10000, counted once
     expect(snap.priciestTaskName).toBe("Write the file"); // by work, not context
@@ -69,7 +69,7 @@ describe("buildSnapshot", () => {
       ev({ id: "2", phase: "post", tool: "Bash", isError: true, errorText: "boom", timestamp: 300 }),
     ];
     const snap = buildSnapshot({
-      sessionId: "s", sessionName: "P", live: false,
+      sessionId: "s", sessionName: "P", project: null, color: "c", live: false,
       events: errEvents, rawChunks: [{ startIndex: 0, name: "Fix", narration: "" }], turns: [],
     });
     expect(snap.chunks[0].warnings.some((w) => w.kind === "repeat_error")).toBe(true);

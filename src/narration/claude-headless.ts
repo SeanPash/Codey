@@ -5,9 +5,12 @@ export function buildClaudeArgs(prompt: string): string[] {
 }
 
 // Runs the user's own Claude Code headless. Resolves to trimmed stdout, or null on failure.
+// CODEY_HEADLESS marks this child so its own hook calls skip capture; otherwise every
+// narration pass would record itself as a phantom session.
 export function runClaude(prompt: string, timeoutMs = 15000): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile("claude", buildClaudeArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true }, (err, stdout) => {
+    const env = { ...process.env, CODEY_HEADLESS: "1" };
+    execFile("claude", buildClaudeArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env }, (err, stdout) => {
       if (err) return resolve(null);
       const out = stdout.trim();
       resolve(out.length > 0 ? out : null);

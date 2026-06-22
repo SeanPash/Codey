@@ -38,8 +38,11 @@ export interface ReceiptLine {
   tool: string;                  // "Write" | "Bash" | "thinking" | ...
   tokens: number;                // output tokens attributed to this action
   status: "ok" | "fail" | "none"; // "none" = a non-tool turn (e.g. thinking)
-  errorText: string | null;      // the actual error, shown inline when status is "fail"
+  errorText: string | null;      // the actual error, shown only in the expanded row
   resolved: boolean;             // failed, but a later same-tool action in the chunk succeeded
+  raw: string | null;            // full command or file path, revealed when the row expands
+  why: string | null;            // the owning task's narration, reused (no extra tokens)
+  failSummary: string | null;    // plain-English failure sentence shown inline on a fail
 }
 
 export interface TokenBreakdown {
@@ -64,6 +67,8 @@ export interface TimelineChunk {
 export interface SessionSnapshot {
   sessionId: string;
   sessionName: string;
+  project: string | null;          // cwd basename, an at-a-glance terminal tag
+  color: string;                   // stable color from the session id, for recognition
   live: boolean;
   totalTokens: number;             // the TRUE session total counted once (work + context)
   workTotal: number;               // session work tokens, the headline
@@ -79,9 +84,12 @@ export interface SessionSnapshot {
 export interface LiveSession {
   sessionId: string;
   name: string;
+  project: string | null;      // cwd basename, an at-a-glance terminal tag
+  color: string;               // stable color from the session id, for recognition
   workTotal: number;
-  live: boolean;               // running within the live window
-  lastPromptTs: number;        // ordering key for Live Split (only moves on a new prompt)
+  running: boolean;            // mid-tool or active within the running window (pulsing)
+  open: boolean;               // recently used, terminal likely still open
+  lastPromptTs: number;        // ordering key (only moves on a new prompt)
   chunks: TimelineChunk[];     // compact timeline, rendered small
   runningTool: string | null;  // tool of the open pre-event, or null when idle
 }

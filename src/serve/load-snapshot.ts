@@ -1,24 +1,27 @@
 import { statSync } from "node:fs";
+import { join } from "node:path";
 import { SessionStore, defaultRoot } from "../store/session-store.js";
 import { readMeta } from "../store/session-meta.js";
+import { readPrompts } from "../capture/prompts.js";
 import { readTranscriptTurns, readFirstPrompt } from "../timeline/transcript.js";
-import { sessionDisplayName } from "../timeline/session-name.js";
+import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import { resolveActiveWarning } from "../intervene/active-warning.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
-import { listSessions } from "../cli/sessions.js";
+import { listSessions, RUNNING_WINDOW_MS } from "../cli/sessions.js";
 import { selectActive } from "./active.js";
 import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
 
-const LIVE_WINDOW_MS = 15_000; // file touched this recently => still live
-
-function isLive(path: string): boolean {
-  try {
-    return Date.now() - statSync(path).mtimeMs < LIVE_WINDOW_MS;
-  } catch {
-    return false;
-  }
+// Running = the freshest of a captured tool call or a submitted prompt is within the window,
+// so a session lights up the instant it is prompted, before any tool has run.
+function isRunning(dir: string, now: number): boolean {
+  let evMtime = 0;
+  try { evMtime = statSync(join(dir, "events.jsonl")).mtimeMs; } catch { evMtime = 0; }
+  const prompts = readPrompts(dir);
+  const lastPrompt = prompts.length ? prompts[prompts.length - 1] : 0;
+  const lastActivity = Math.max(evMtime, lastPrompt);
+  return lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
 }
 
 export function loadSnapshot(sessionId: string, root: string = defaultRoot()): SessionSnapshot {
@@ -27,7 +30,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
   const rawChunks = chunksFor(sessionId, events, root);
-  const live = isLive(store.path);
+  const live = isRunning(store.dir, Date.now());
   let mtimeMs = 0;
   try { mtimeMs = statSync(store.path).mtimeMs; } catch { mtimeMs = 0; }
   const name = sessionDisplayName({
@@ -39,6 +42,8 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const snap = buildSnapshot({
     sessionId,
     sessionName: name,
+    project: projectFrom(meta?.cwd ?? null),
+    color: sessionColor(sessionId),
     live,
     events,
     rawChunks,
@@ -56,16 +61,20 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
     const snap = loadSnapshot(s.id, root);
     const events = new SessionStore(s.id, root).readAll();
     const last = events[events.length - 1];
-    const runningTool = last && last.phase === "pre" ? last.tool : null;
+    const runningTool = s.running && last && last.phase === "pre" ? last.tool : null;
     return {
       sessionId: s.id,
       name: s.name,
+      project: s.project,
+      color: s.color,
       workTotal: snap.workTotal,
-      live: s.live,
+      running: s.running,
+      open: s.open,
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
       runningTool,
     };
   });
-  return { sessions, liveCount: sessions.length };
+  // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".
+  return { sessions, liveCount: sessions.filter((s) => s.running).length };
 }

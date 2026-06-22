@@ -9,6 +9,8 @@ import { appendPrompt } from "./prompts.js";
 // "thinking" state in the gap before Claude's first tool call. Kept separate from
 // the tool-capture hook because it carries no ToolEvent, just a timestamp.
 export function handlePromptInput(rawJson: string, now = Date.now(), root: string = defaultRoot()): void {
+  // Skip Codey's own headless narration (see hook-emit) so it never creates a phantom folder.
+  if (process.env.CODEY_HEADLESS) return;
   const text = rawJson.trim();
   if (!text) return;
   let raw: { session_id?: string };

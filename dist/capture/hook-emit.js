@@ -256,6 +256,7 @@ function actionFromEvent(e) {
 
 // src/capture/hook-emit.ts
 function handleHookInput(rawJson, root = defaultRoot()) {
+  if (process.env.CODEY_HEADLESS) return;
   const text = rawJson.trim();
   if (!text) return;
   let raw;

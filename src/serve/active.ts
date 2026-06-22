@@ -1,9 +1,11 @@
 import type { SessionListItem } from "../cli/sessions.js";
 
-// Live sessions only, ordered by most recent prompt. Ordering keys on lastPromptTs (not tool
-// activity) so tiles only move when the user actually prompts, never on each tool call.
+// Open terminals, ordered by most recent prompt. "Open" (not just "running") so a terminal
+// the user is sitting in, composing their next prompt, still shows. Ordering keys on
+// lastPromptTs so a tile only jumps to the front when the user actually prompts, never on
+// each tool call.
 export function selectActive(items: SessionListItem[]): SessionListItem[] {
-  return items.filter((s) => s.live).sort((a, b) => b.lastPromptTs - a.lastPromptTs);
+  return items.filter((s) => s.open).sort((a, b) => b.lastPromptTs - a.lastPromptTs);
 }
 
 export interface Page<T> { page: number; pages: number; perPage: number; items: T[]; }

@@ -3,15 +3,16 @@ import { selectActive, paginate } from "./active.js";
 import type { SessionListItem } from "../cli/sessions.js";
 
 function s(p: Partial<SessionListItem>): SessionListItem {
-  return { id: "x", mtime: 0, name: "n", taskCount: 0, lastPromptTs: 0, live: false, ...p };
+  return { id: "x", mtime: 0, name: "n", project: null, color: "c", taskCount: 0,
+    lastPromptTs: 0, running: false, open: false, live: false, ...p };
 }
 
 describe("selectActive", () => {
-  it("keeps only live sessions, most recent prompt first", () => {
+  it("keeps open terminals (not just running ones), most recent prompt first", () => {
     const items = [
-      s({ id: "a", live: true, lastPromptTs: 100 }),
-      s({ id: "b", live: false, lastPromptTs: 999 }),
-      s({ id: "c", live: true, lastPromptTs: 200 }),
+      s({ id: "a", open: true, lastPromptTs: 100 }),
+      s({ id: "b", open: false, lastPromptTs: 999 }),
+      s({ id: "c", open: true, lastPromptTs: 200 }),
     ];
     expect(selectActive(items).map((x) => x.id)).toEqual(["c", "a"]);
   });

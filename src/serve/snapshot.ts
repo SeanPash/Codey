@@ -25,6 +25,8 @@ function chunkWarnings(slice: ToolEvent[], turns: AssistantTurn[]): Warning[] {
 export interface SnapshotInput {
   sessionId: string;
   sessionName: string;
+  project: string | null;
+  color: string;
   live: boolean;
   events: ToolEvent[];
   rawChunks: RawChunk[];
@@ -41,7 +43,10 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     const endTs = next ? (events[next.startIndex]?.timestamp ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
     const slice = events.slice(rc.startIndex, endIndex);
     const raw = attributeChunk(turns, startTs, endTs);
-    const receipt = { ...raw, workLines: groupThinking(raw.workLines) };
+    // The "why" behind each action is the task's own narration. Reusing it costs no tokens.
+    const why = rc.narration || null;
+    const workLines = groupThinking(raw.workLines).map((l) => ({ ...l, why }));
+    const receipt = { ...raw, workLines };
     return {
       id: `c${idx}`,
       name: rc.name,
@@ -66,6 +71,8 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
   return {
     sessionId: input.sessionId,
     sessionName: input.sessionName,
+    project: input.project,
+    color: input.color,
     live: input.live,
     totalTokens: totals.total,
     workTotal: totals.work,

@@ -5,7 +5,7 @@ import { readCache } from "../timeline/segment-cache.js";
 import { readPrompts } from "../capture/prompts.js";
 import { readMeta } from "../store/session-meta.js";
 import { readFirstPrompt } from "../timeline/transcript.js";
-import { sessionDisplayName } from "../timeline/session-name.js";
+import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
 
 // The mtime of a session's events.jsonl, or null if it has none. This is the real
 // activity signal: the capture hook appends to it on every tool call. We can't use the
@@ -41,39 +41,63 @@ export interface SessionListItem {
   id: string;
   mtime: number;
   name: string;
+  project: string | null;  // cwd basename, an at-a-glance terminal tag
+  color: string;           // stable color from the id, for recognition
   taskCount: number;
   lastPromptTs: number;
-  live: boolean;
+  running: boolean;        // mid-tool or active within the running window (pulsing live)
+  open: boolean;           // used recently, so the terminal is probably still open
+  live: boolean;           // alias of running, kept for existing callers
 }
 
-const LIVE_WINDOW_MS = 15_000; // events file touched this recently => still live
+// Two tiers of liveness. "running" is the pulsing indicator (Claude is actively working or
+// just did something); "open" is a generous window where the terminal is likely still up and
+// the user may be composing their next prompt.
+export const RUNNING_WINDOW_MS = 15_000;
+export const OPEN_WINDOW_MS = 30 * 60_000;
 
-export function listSessions(root: string = defaultRoot()): SessionListItem[] {
+export function listSessions(root: string = defaultRoot(), now: number = Date.now()): SessionListItem[] {
   if (!existsSync(root)) return [];
-  const now = Date.now();
   return readdirSync(root)
     .filter((name) => statSync(join(root, name)).isDirectory())
     .map((id) => {
       const dir = join(root, id);
       const evMtime = eventsMtime(dir);
-      const mtime = evMtime ?? statSync(dir).mtimeMs;
       const cache = readCache(id, root);
       const prompts = readPrompts(dir);
       const meta = readMeta(id, root);
+      const lastPromptTs = prompts.length ? prompts[prompts.length - 1] : 0;
+      // Activity is the freshest of a captured tool call or a submitted prompt, so a session
+      // counts as live the moment it is prompted, before any tool has run.
+      const lastActivity = Math.max(evMtime ?? 0, lastPromptTs);
+      const mtime = evMtime ?? statSync(dir).mtimeMs;
       const name = sessionDisplayName({
         firstChunkName: cache?.chunks?.[0]?.name ?? null,
         firstPrompt: readFirstPrompt(meta?.transcriptPath ?? null),
         sessionId: id,
         mtimeMs: mtime,
       });
+      const running = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
       return {
         id,
         mtime,
         name,
+        project: projectFrom(meta?.cwd ?? null),
+        color: sessionColor(id),
         taskCount: cache?.chunks?.length ?? 0,
-        lastPromptTs: prompts.length ? prompts[prompts.length - 1] : 0,
-        live: evMtime != null && now - evMtime < LIVE_WINDOW_MS,
-      };
+        lastPromptTs,
+        running,
+        open: lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
+        live: running,
+        // carried only for the filter below; not part of the public shape
+        _hasEvents: evMtime != null,
+        _lastActivity: lastActivity,
+      } as SessionListItem & { _hasEvents: boolean; _lastActivity: number };
     })
+    // Real terminals only: a session must have captured a tool call at some point, or have a
+    // prompt recent enough that it is plausibly a live terminal still spinning up. This drops
+    // the empty phantom folders left by headless narration calls.
+    .filter((s) => s._hasEvents || (s._lastActivity > 0 && now - s._lastActivity < OPEN_WINDOW_MS))
+    .map(({ _hasEvents, _lastActivity, ...s }) => s)
     .sort((a, b) => b.mtime - a.mtime);
 }

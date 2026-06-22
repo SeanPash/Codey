@@ -51,12 +51,48 @@ describe("listSessions", () => {
     expect(listSessions(dir)).toEqual([]);
   });
 
-  it("lists session ids newest first", () => {
-    mkdirSync(join(dir, "old"));
-    mkdirSync(join(dir, "new"));
+  it("lists real (event-bearing) sessions newest first", () => {
+    const base = Math.floor(Date.now() / 1000);
+    for (const [name, t] of [["old", base - 100], ["new", base - 1]] as const) {
+      const p = join(dir, name);
+      mkdirSync(p);
+      writeFileSync(join(p, "events.jsonl"), '{"phase":"pre"}\n');
+      setMtime(join(p, "events.jsonl"), t);
+    }
     const ids = listSessions(dir).map((s) => s.id);
     expect(ids).toContain("old");
     expect(ids[0]).toBe("new");
+  });
+
+  it("hides phantom folders that never captured events and have no recent prompt", () => {
+    const phantom = join(dir, "phantom");
+    mkdirSync(phantom);
+    // an old prompt marker but no events, like a headless narration leftover
+    writeFileSync(join(phantom, "prompts.jsonl"), JSON.stringify({ ts: 1000 }) + "\n");
+    expect(listSessions(dir).map((s) => s.id)).not.toContain("phantom");
+  });
+
+  it("keeps a freshly prompted session even before its first tool call, marked running", () => {
+    const now = Date.now();
+    const fresh = join(dir, "fresh");
+    mkdirSync(fresh);
+    writeFileSync(join(fresh, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
+    const item = listSessions(dir, now).find((x) => x.id === "fresh");
+    expect(item).toBeDefined();
+    expect(item!.running).toBe(true);
+    expect(item!.open).toBe(true);
+  });
+
+  it("marks a recent-but-idle session open but not running", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const idle = join(dir, "idle");
+    mkdirSync(idle);
+    writeFileSync(join(idle, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(idle, "events.jsonl"), base - 60); // 60s ago: past running, within open
+    const item = listSessions(dir, now).find((x) => x.id === "idle")!;
+    expect(item.running).toBe(false);
+    expect(item.open).toBe(true);
   });
 
   it("enriches each session with name, taskCount, lastPromptTs and live flag", () => {

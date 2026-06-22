@@ -48,6 +48,7 @@ function appendPrompt(dir, ts) {
 
 // src/capture/prompt-mark.ts
 function handlePromptInput(rawJson, now = Date.now(), root = defaultRoot()) {
+  if (process.env.CODEY_HEADLESS) return;
   const text = rawJson.trim();
   if (!text) return;
   let raw;
