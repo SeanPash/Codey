@@ -111,6 +111,34 @@ describe("listSessions", () => {
     expect(item.open).toBe(true);
   });
 
+  it("counts as running when prompted but not yet stopped, even outside the activity window", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const thinking = join(dir, "thinking");
+    mkdirSync(thinking);
+    writeFileSync(join(thinking, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(thinking, "events.jsonl"), base - 60); // last event 60s ago, outside 15s window
+    // Status: prompt at 30s ago, no doneAt -- Claude is still thinking
+    writeFileSync(join(thinking, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 30_000,
+      doneAt: null,
+      updatedAt: now - 30_000,
+    }));
+    const itemThinking = listSessions(dir, now).find((x) => x.id === "thinking")!;
+    expect(itemThinking.running).toBe(true);
+
+    // Now mark it done: doneAt newer than promptAt
+    writeFileSync(join(thinking, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 30_000,
+      doneAt: now - 5_000,
+      updatedAt: now - 5_000,
+    }));
+    const itemDone = listSessions(dir, now).find((x) => x.id === "thinking")!;
+    expect(itemDone.running).toBe(false);
+  });
+
   it("enriches each session with name, taskCount, lastPromptTs and live flag", () => {
     const base = Math.floor(Date.now() / 1000);
     const s = join(dir, "sess1");

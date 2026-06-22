@@ -6,6 +6,7 @@ import { readPrompts } from "../capture/prompts.js";
 import { readMeta } from "../store/session-meta.js";
 import { readFirstPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
+import { readStatus } from "../statusline/state.js";
 
 // The mtime of a session's events.jsonl, or null if it has none. This is the real
 // activity signal: the capture hook appends to it on every tool call. We can't use the
@@ -77,7 +78,12 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         sessionId: id,
         mtimeMs: mtime,
       });
-      const running = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
+      // "thinking" covers the gap when Claude is working but hasn't emitted a tool call for
+      // more than RUNNING_WINDOW_MS: a prompt newer than the last stop means it is still live.
+      const status = readStatus(dir);
+      const thinking = evMtime != null && status?.promptAt != null && status.promptAt > (status.doneAt ?? 0);
+      const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
+      const running = evMtime != null && (thinking || recentActivity);
       return {
         id,
         mtime,
