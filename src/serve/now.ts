@@ -74,9 +74,19 @@ function completedSteps(events: ToolEvent[]): NowStep[] {
   return done;
 }
 
-export function buildNowView(events: ToolEvent[], status: StatusSnapshot | null, now: number): NowView {
+export function buildNowView(
+  allEvents: ToolEvent[],
+  status: StatusSnapshot | null,
+  now: number,
+  turnStart: number = Number.NEGATIVE_INFINITY,
+): NowView {
   const empty: NowView = { live: false, action: null, since: 0, thinking: false, steps: [] };
-  if (events.length === 0 && !status) return empty;
+  if (allEvents.length === 0 && !status) return empty;
+
+  // The strip means "right now", so it only ever reflects the current turn. Scoping to events
+  // on or after the latest prompt mark means a fresh prompt instantly drops the previous turn's
+  // trail and any dangling open call, instead of showing the old step until new work lands.
+  const events = allEvents.filter((e) => e.timestamp >= turnStart);
 
   const lastActivity = events.reduce((m, e) => Math.max(m, e.timestamp), 0);
   // A SessionEnd stamp newer than any activity means the terminal closed: never live.

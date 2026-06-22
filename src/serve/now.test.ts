@@ -129,4 +129,34 @@ describe("buildNowView", () => {
     expect(v.action).toBeNull();
     expect(v.steps).toEqual([]);
   });
+
+  it("scopes the strip to the current turn so a new prompt drops the old turn's trail at once", () => {
+    const now = 30_000;
+    // The previous turn ran two tools; then a new prompt arrived at 29s and nothing has run yet.
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Edit", input: { file_path: "old.ts" }, timestamp: 1000 }),
+      ev({ phase: "post", tool: "Edit", timestamp: 1100 }),
+      ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 1200 }),
+      ev({ phase: "post", tool: "Bash", timestamp: 1300 }),
+    ];
+    const v = buildNowView(events, status({ promptAt: 29_000, doneAt: 1400 }), now, 29_000);
+    // The new turn has no steps yet, so the "just did" trail from the old prompt is gone.
+    expect(v.steps).toEqual([]);
+    // It is thinking through the fresh prompt, not anchored to the old turn's last action.
+    expect(v.thinking).toBe(true);
+    expect(v.action).toBeNull();
+    expect(v.since).toBe(29_000);
+  });
+
+  it("does not carry a dangling open call from a previous turn into the new one", () => {
+    const now = 30_000;
+    // An errored tool in the old turn left a "pre" with no "post"; the new prompt must not
+    // show it as the step running now.
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Read", input: { file_path: "old.ts" }, timestamp: 1000 }),
+    ];
+    const v = buildNowView(events, status({ promptAt: 29_000 }), now, 29_000);
+    expect(v.action).toBeNull();
+    expect(v.thinking).toBe(true);
+  });
 });

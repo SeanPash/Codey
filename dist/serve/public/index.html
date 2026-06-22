@@ -15,7 +15,7 @@
       --sky:#5fb0ff; --sky-dim:#3d7fc4; --violet:#9b8cff; --coral:#f0654f; --green:#6cc08a; --amber:#e6a24e;
       /* Live = right now. Reserved for the single thing happening this instant (NOW bar, the
          current step, the live group edge). Nothing else uses it, so live always stands out. */
-      --live:#36d77f; --live-dim:#1c7d4c;
+      --live:#f5a623; --live-dim:#8a5b16;
       --ink:#f1f4f9; --ink2:#cad1de; --body:#a9b1c0; --muted:#7a8392;
       --topbar:52px; --titlerow:50px; --head:102px;
     }
@@ -145,9 +145,9 @@
 
     /* per-prompt group: an outer card that visibly contains its task cards */
     .grp { background:#0f1219; border:1px solid var(--line); border-radius:14px; padding:14px 15px 11px; margin-bottom:18px; }
-    .grp.live { border-color:var(--live-dim); box-shadow:0 0 0 1px rgba(54,215,127,.12); }
-    /* a quiet green glow on the group being followed, so it is obvious where the live view is anchored */
-    .grp.live.following { border-color:var(--live); box-shadow:0 0 0 1px rgba(54,215,127,.26), 0 0 26px rgba(54,215,127,.10); }
+    .grp.live { border-color:var(--live-dim); box-shadow:0 0 0 1px rgba(245,166,35,.12); }
+    /* a quiet amber glow on the group being followed, so it is obvious where the live view is anchored */
+    .grp.live.following { border-color:var(--live); box-shadow:0 0 0 1px rgba(245,166,35,.26), 0 0 26px rgba(245,166,35,.10); }
     /* Hover stays a neutral grey everywhere, including inside the live group, so it can never be
        mistaken for the live element. Live uses the sky accent + pulse below; hover does not. */
     .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:#161b24; }
@@ -204,16 +204,16 @@
     .st { width:20px; text-align:right; font-size:11px; color:#5b6470; }
     .st.ok { color:var(--green); }
     .st.fail { color:var(--coral); font-weight:600; }
-    /* the step Claude is on right now: a solid GREEN accent bar, a clearly brighter background,
-       and a gentle pulse. Green is the live color and nothing else uses it, so the current step
+    /* the step Claude is on right now: a solid AMBER accent bar, a clearly brighter background,
+       and a gentle pulse. Amber is the live color and nothing else uses it, so the current step
        can never be mistaken for a hovered row (hover stays neutral grey). */
-    .rline.cur { background:rgba(54,215,127,.15); border-radius:6px; box-shadow:inset 3px 0 0 var(--live); animation:livepulse 2.6s ease-in-out infinite; }
-    .rline.cur .lbl { color:#d6ffe7; font-weight:700; }
-    .rline.cur .sw { background:var(--live); box-shadow:0 0 0 0 rgba(54,215,127,.35); animation:ppl 2s infinite; }
+    .rline.cur { background:rgba(245,166,35,.15); border-radius:6px; box-shadow:inset 3px 0 0 var(--live); animation:livepulse 2.6s ease-in-out infinite; }
+    .rline.cur .lbl { color:#ffe9c2; font-weight:700; }
+    .rline.cur .sw { background:var(--live); box-shadow:0 0 0 0 rgba(245,166,35,.35); animation:ppl 2s infinite; }
     .rline.cur .st { color:var(--live); }
-    @keyframes livepulse { 0%,100% { background:rgba(54,215,127,.15); } 50% { background:rgba(54,215,127,.115); } }
-    /* the green pulse ring, for any dot/pip that marks the live instant */
-    @keyframes ppl { 0%{box-shadow:0 0 0 0 rgba(54,215,127,.35)} 70%{box-shadow:0 0 0 3px rgba(54,215,127,0)} 100%{box-shadow:0 0 0 0 rgba(54,215,127,0)} }
+    @keyframes livepulse { 0%,100% { background:rgba(245,166,35,.15); } 50% { background:rgba(245,166,35,.115); } }
+    /* the amber pulse ring, for any dot/pip that marks the live instant */
+    @keyframes ppl { 0%{box-shadow:0 0 0 0 rgba(245,166,35,.35)} 70%{box-shadow:0 0 0 3px rgba(245,166,35,0)} 100%{box-shadow:0 0 0 0 rgba(245,166,35,0)} }
     @media (prefers-reduced-motion: reduce) { .rline.cur { animation:none; } }
     .curpip { width:6px; height:6px; border-radius:50%; background:var(--live); animation:ppl 1.4s infinite; flex:none; }
     /* plain-English failure note, shown inline under a failed line */
@@ -251,25 +251,25 @@
     .expl .t { color:var(--sky); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:8px; display:block; margin-bottom:5px; }
 
     /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
-       in the live green with a soft glow so it is unmistakably the live element on the page. */
+       in the live amber with a soft glow so it is unmistakably the live element on the page. */
     .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
-      background:linear-gradient(180deg,#0e1c16,#0c1512); border:1px solid var(--live-dim); border-radius:12px;
-      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(54,215,127,.08); }
+      background:linear-gradient(180deg,#1d1408,#15100a); border:1px solid var(--live-dim); border-radius:12px;
+      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(245,166,35,.08); }
     .nowstrip .nowtop { display:flex; align-items:center; gap:10px; }
-    .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#0a1410;
+    .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#1a1206;
       font-weight:800; display:inline-flex; align-items:center; gap:6px; flex:none;
       background:var(--live); border-radius:6px; padding:3px 8px; }
-    .nowstrip .ndot { width:7px; height:7px; border-radius:50%; background:#0a1410; animation:pp 1.6s infinite; }
+    .nowstrip .ndot { width:7px; height:7px; border-radius:50%; background:#1a1206; animation:pp 1.6s infinite; }
     /* the tool the current step is using: a tight mono tag, so the strip names what is running */
-    .nowstrip .ntool { flex:none; font-family:ui-monospace,monospace; font-size:11px; color:#9fe9c1;
-      background:rgba(54,215,127,.1); border:1px solid rgba(54,215,127,.28); border-radius:6px; padding:2px 8px; }
+    .nowstrip .ntool { flex:none; font-family:ui-monospace,monospace; font-size:11px; color:#f3d3a0;
+      background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.28); border-radius:6px; padding:2px 8px; }
     .nowstrip .nact { font-size:14.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .nowstrip .nact.think { color:#b3a8ff; }
-    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:#bdf0d4; font-size:13px; flex:none; }
+    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:#f0d9af; font-size:13px; flex:none; }
     .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
       background:#0c0f16; border:1px solid #283246; color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
-    .nowstrip .follow.on { background:rgba(54,215,127,.14); color:#bdf0d4; border-color:rgba(54,215,127,.42); }
+    .nowstrip .follow.on { background:rgba(245,166,35,.14); color:#f0d9af; border-color:rgba(245,166,35,.42); }
     .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
     .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
     .nowstrip .ntrail .lab { color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:9px; font-weight:600; }
@@ -354,7 +354,7 @@
     .phead .pproj { font-size:10px; color:var(--body); background:#11151d; border:1px solid #232c3c; border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--sky); }
     .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:#bfe0ff; background:rgba(95,176,255,.12); border:1px solid rgba(95,176,255,.32); }
-    /* live but no tool open yet: Claude is thinking. Framed in green like any live element. */
+    /* live but no tool open yet: Claude is thinking. Framed in amber like any live element. */
     .badge.think { color:#cbbfff; background:rgba(155,140,255,.14); border-color:rgba(155,140,255,.34); }
     /* a calm note for a terminal that answered with no tools, or has not acted yet: not an error,
        not dimmed-to-save-tokens (the live view costs nothing), just an honest state line. */
@@ -388,7 +388,7 @@
     .ptcr .pn span { display:block; font-size:9.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .pchip { display:inline-flex; align-items:baseline; gap:3px; padding:3px 7px; border-radius:7px; border:1px solid rgba(95,176,255,.25); background:rgba(95,176,255,.06); flex:none; }
     .pchip b { font-size:11px; font-weight:700; color:var(--sky); } .pchip small { font-size:8px; color:var(--muted); }
-    .prun { display:flex; align-items:center; gap:6px; font-size:9.5px; color:#9fe9c1; padding-top:4px; }
+    .prun { display:flex; align-items:center; gap:6px; font-size:9.5px; color:#f3d3a0; padding-top:4px; }
     .prun .pip { width:5px;height:5px;border-radius:50%;background:var(--live);animation:ppl 1.4s infinite; }
     .pager { display:flex; align-items:center; justify-content:center; gap:14px; padding:6px; flex:none; }
     .pager .nav { width:28px;height:28px;border-radius:7px;border:1px solid #283246;background:#10141d;color:var(--ink2);font:inherit;font-size:13px;cursor:pointer; }
@@ -1197,7 +1197,7 @@
     }
 
     function paneHtml(s, isFirst) {
-      // A pane is "live" (green frame) whenever the terminal is running: mid-tool OR thinking.
+      // A pane is "live" (amber frame) whenever the terminal is running: mid-tool OR thinking.
       const cls = "pane" + (s.running ? " run" : "");
       const pill = s.thinking ? `<span class="badge think">&#9670; Thinking</span>`
         : isFirst && s.running ? `<span class="badge">&#10022; Just prompted</span>` : "";
