@@ -11,8 +11,14 @@
     @font-face { font-family:'W95FA'; font-display:swap; src:url('/fonts/W95FA.woff') format('woff'); }
 
     :root {
-      --bg:#0c0e12; --card:#14171f; --line:#232a36; --inset:#0b0e15;
-      --sky:#5fb0ff; --sky-dim:#3d7fc4; --violet:#9b8cff; --coral:#f0654f; --green:#6cc08a; --amber:#e6a24e;
+      --bg:#0b0d11; --card:#14171f; --line:#222a37; --inset:#0a0d14;
+      /* Accent family. Each hue carries one meaning so the page reads in zones instead of one
+         flat blue: sky = structure/navigation, violet = tokens & spend, teal = time, green =
+         success, coral = failure. */
+      --sky:#5fb0ff; --sky-dim:#3d7fc4;
+      --violet:#9b8cff; --violet-dim:#5f52a8;
+      --teal:#3fc7b8; --teal-dim:#2c8278;
+      --coral:#f0654f; --green:#6cc08a; --amber:#e6a24e;
       /* Live = right now. Reserved for the single thing happening this instant (NOW bar, the
          current step, the live group edge). Nothing else uses it, so live always stands out. */
       --live:#f5a623; --live-dim:#8a5b16;
@@ -85,16 +91,23 @@
     .datefilter[open] > summary::before { content:"\25be"; }
     .datefilter > summary:hover { color:var(--ink2); }
     .datefilter .on { color:var(--sky); }
-    .daterow { display:flex; gap:7px; margin:8px 0 6px; }
-    .dlab { flex:1; font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600;
+    /* From and To stack so neither input is ever clipped or needs sideways scrolling. */
+    .daterow { display:flex; flex-direction:column; gap:8px; margin:8px 0 6px; }
+    .dlab { font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600;
       display:flex; flex-direction:column; gap:4px; }
-    .dinput { background:var(--inset); border:1px solid #283246; color:var(--ink); border-radius:7px; padding:5px 7px;
+    .dinput { width:100%; background:var(--inset); border:1px solid #283246; color:var(--ink); border-radius:7px; padding:6px 8px;
       font:inherit; font-size:11.5px; color-scheme:dark; }
     .dinput:focus { outline:none; border-color:var(--sky-dim); }
     .dclear { font:inherit; font-size:10.5px; color:var(--muted); background:transparent; border:none; cursor:pointer; padding:2px 3px; }
     .dclear:hover { color:var(--sky); }
-    .dayhd { font-size:8.5px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700;
-      margin:11px 0 5px 4px; }
+    /* Sticky day dividers so the date a run of sessions belongs to stays visible while you scroll
+       the list. A dot + count make each day legible at a glance instead of a faint label. */
+    .dayhd { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:8px;
+      font-size:9.5px; text-transform:uppercase; letter-spacing:.13em; color:var(--ink2); font-weight:700;
+      margin:14px 0 6px; padding:5px 4px 6px 6px; background:var(--bg); border-bottom:1px solid var(--line); }
+    .dayhd::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--sky-dim); flex:none; }
+    .dayhd .dcount { margin-left:auto; color:var(--muted); font-weight:600; font-size:9px;
+      background:#11141b; border:1px solid #222a37; border-radius:20px; padding:1px 7px; }
     .dayhd:first-of-type { margin-top:2px; }
     .sess { position:relative; padding:8px 10px; border-radius:8px; margin-bottom:4px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:none; background:transparent; color:var(--ink); font:inherit; }
     .sess:hover { background:#11141b; }
@@ -118,9 +131,9 @@
     .card.open { background:#151a23; }
     .card.warn { border-color:#3a3324; }
     .card::before { content:""; position:absolute; inset:0; border-radius:11px; padding:1px; opacity:0; transition:opacity .25s; pointer-events:none;
-      background:linear-gradient(110deg,transparent 20%,var(--sky) 50%,transparent 80%); background-size:200% 100%;
+      background:linear-gradient(110deg,transparent 20%,var(--violet) 50%,transparent 80%); background-size:200% 100%;
       -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; }
-    .card:hover::before, .card.open::before { opacity:.6; animation:beam 3s linear infinite; }
+    .card:hover::before, .card.open::before { opacity:.45; animation:beam 3s linear infinite; }
     @keyframes beam { to { background-position:-200% 0; } }
     .row { display:flex; align-items:center; gap:13px; cursor:pointer; position:relative; }
     .row:focus-visible { outline:2px solid var(--sky); outline-offset:3px; border-radius:6px; }
@@ -139,7 +152,9 @@
     .chip .tok { font-weight:700; font-size:16px; color:var(--ink); }
     .chip .u { color:var(--muted); font-size:10px; }
     .chip .bar { height:3px; background:#1b2230; border-radius:2px; margin-top:7px; }
-    .chip .bar > i { display:block; height:3px; background:linear-gradient(90deg,var(--sky-dim),var(--sky)); border-radius:2px; }
+    /* Token spend reads violet everywhere (matches the Tokens card), so the share bars on every
+       task card are not one more stripe of blue. */
+    .chip .bar > i { display:block; height:3px; background:linear-gradient(90deg,var(--violet-dim),var(--violet)); border-radius:2px; }
     .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
     .pill.amber { background:#2a2113; color:var(--amber); }
 
@@ -155,13 +170,16 @@
     .grp.following .card:hover { background:#161a22; }
     .grphd { display:flex; align-items:flex-start; gap:14px; padding:0 1px 12px; margin-bottom:13px; border-bottom:1px solid var(--line); }
     .grphd .gp { flex:1; min-width:0; }
-    .geyebrow { display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--sky); margin-bottom:5px; font-weight:600; }
-    .geyebrow.glive { color:var(--live); }
+    .geyebrow { position:relative; display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase;
+      color:var(--sky); margin-bottom:5px; padding-left:10px; font-weight:600; }
+    .geyebrow::before { content:""; position:absolute; left:0; top:1px; bottom:1px; width:2px; border-radius:2px; background:var(--sky); }
+    .geyebrow.glive { color:var(--live); } .geyebrow.glive::before { background:var(--live); }
+    .geyebrow.gcancel::before { background:var(--amber); }
     .geyebrow.glive .rdot { margin-right:5px; background:var(--live); animation:ppl 1.6s infinite; }
     .gtext { font-size:14.5px; font-weight:600; color:var(--ink); line-height:1.42;
       display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .grpmeta { flex:none; text-align:right; font-size:10px; color:var(--muted); line-height:1.7; white-space:nowrap; }
-    .grpmeta .gtok { color:var(--ink2); font-weight:600; }
+    .grpmeta .gtok { color:#b6abf0; font-weight:600; }
     .grpmeta .running { color:var(--sky); font-weight:600; }
     .grpmeta .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--sky);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
     .grpnote { color:var(--muted); font-size:11.5px; padding:8px 4px 2px; }
@@ -194,12 +212,14 @@
     .lchev { width:9px; flex:none; color:#5b6470; font-size:9px; }
     .rline.lo .lchev { color:var(--sky); }
     .lchev.sp { visibility:hidden; }
-    .sw { width:6px;height:6px;border-radius:2px;background:var(--sky);flex:none;box-shadow:0 0 7px rgba(95,176,255,.5); }
+    /* A plain tool step is a calm slate pip; the loud colors are saved for what carries meaning
+       (violet thinking, coral failure, amber the live step). */
+    .sw { width:6px;height:6px;border-radius:2px;background:#7e8aa0;flex:none;box-shadow:0 0 6px rgba(126,138,160,.4); }
     .sw.think { background:var(--violet); box-shadow:0 0 7px rgba(155,140,255,.5); }
     .sw.fail { background:var(--coral); box-shadow:0 0 7px rgba(240,101,79,.5); }
     .lbl { flex:1; font-size:12.5px; color:var(--ink2); }
     .tag { font-size:10px; font-family:ui-monospace,monospace; padding:2px 7px; border-radius:5px; flex:none; }
-    .tag.tool { background:rgba(95,176,255,.1); color:#8fc3ff; border:1px solid rgba(95,176,255,.18); }
+    .tag.tool { background:rgba(126,138,160,.1); color:#b3bdcd; border:1px solid rgba(126,138,160,.2); }
     .tag.think { background:rgba(155,140,255,.1); color:#b3a8ff; border:1px solid rgba(155,140,255,.2); }
     .num { width:64px; text-align:right; font-size:12.5px; color:var(--ink); font-weight:500; }
     .st { width:20px; text-align:right; font-size:11px; color:#5b6470; }
@@ -237,17 +257,34 @@
     .ctxsum .ctot { margin-left:auto; color:var(--muted); font-size:11px; }
     .ctx .note { padding:2px 14px 11px 32px; font-size:10.5px; color:var(--body); line-height:1.55; max-width:640px; }
 
-    /* summary panel */
-    .scard { background:#12151d; border:1px solid #1e2636; border-radius:10px; padding:12px 13px; margin-bottom:10px; }
-    .scard .k { font-size:8.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:600; margin-bottom:6px; }
-    .big { font-weight:700; font-size:21px; color:var(--sky); line-height:1; }
+    /* summary panel: each card carries one accent (a left rail + matching figure) so the panel
+       reads as distinct stats, not one block of blue. Tokens=violet, Time=teal, Overview=sky,
+       Status=its live/idle/stuck state. */
+    .scard { position:relative; background:#12151d; border:1px solid #1e2636; border-radius:11px;
+      padding:12px 13px 12px 15px; margin-bottom:10px; overflow:hidden; --accent:#2c3444; }
+    .scard::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); }
+    .scard.tokens { --accent:var(--violet); } .scard.time { --accent:var(--teal); }
+    .scard.over { --accent:var(--sky); } .scard.status { --accent:var(--green); }
+    .scard.status.live { --accent:var(--live); } .scard.status.stuck { --accent:var(--amber); }
+    .scard .k { font-size:8.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:700; margin-bottom:6px; }
+    .scard.tokens .k { color:#a99cf2; } .scard.time .k { color:#56bcae; } .scard.over .k { color:#7fb1e6; }
+    .big { font-weight:700; font-size:21px; color:var(--accent); line-height:1; font-variant-numeric:tabular-nums; }
     .big .u { font-size:9px; font-weight:400; color:var(--muted); margin-left:3px; }
     .subline { font-size:9.5px; color:var(--muted); margin-top:7px; }
-    .pair { display:flex; justify-content:space-between; align-items:baseline; padding:4px 0; gap:10px; }
+    .pair { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; gap:10px; }
     .pair span { font-size:11px; color:var(--body); }
-    .pair b { font-size:11px; color:var(--ink2); text-align:right; }
-    .status-ok { color:var(--green); font-weight:600; font-size:13px; }
-    .status-stuck { color:var(--amber); font-weight:600; font-size:12px; }
+    .pair b { font-size:12px; color:var(--ink2); text-align:right; font-weight:600; }
+    /* Priciest gets its own stacked block, divided off the counts, so a long task name has room
+       to wrap instead of being crushed against the value column. */
+    .ovdiv { height:1px; background:#1e2636; margin:8px 0; }
+    .ovwrap { padding-top:2px; }
+    .ovwrap .ovk { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
+    .ovwrap .ovv { font-size:12.5px; color:var(--ink2); font-weight:600; line-height:1.35; margin-top:3px; }
+    .status-line { font-weight:600; font-size:13px; display:flex; align-items:center; gap:8px; }
+    .status-done { color:var(--green); } .status-live { color:var(--live); } .status-stuck { color:var(--amber); font-size:12px; }
+    .status-line .sp { width:8px; height:8px; border-radius:50%; background:currentColor; flex:none; }
+    .status-line.live .sp { animation:ppl 1.6s infinite; }
+    .status-sub { font-size:9.5px; color:var(--muted); margin-top:6px; }
     .expl { font-size:9.5px; color:var(--body); line-height:1.55; }
     .expl .t { color:var(--sky); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:8px; display:block; margin-bottom:5px; }
 
@@ -881,19 +918,36 @@
 
     function renderSummary(snap) {
       const stuck = snap.activeWarning;
-      const status = stuck
-        ? `<div class="status-stuck">&#9888; ${esc(stuckPhrase(snap.activeWarning))}</div>`
-        : `<div class="status-ok">&#10003; On track</div>`;
+      // An honest state, not a verdict: stuck warns, live says it is working, otherwise we report
+      // when it was last active. Nothing here pretends to grade Claude against a goal.
+      let statusCls, statusHtml;
+      if (stuck) {
+        statusCls = " stuck";
+        statusHtml = `<div class="status-line stuck"><span>&#9888;</span>${esc(stuckPhrase(snap.activeWarning))}</div>`;
+      } else if (snap.live) {
+        statusCls = " live";
+        statusHtml = `<div class="status-line live"><span class="sp"></span>Working now</div>`
+          + `<div class="status-sub">Claude is actively running</div>`;
+      } else {
+        statusCls = "";
+        const last = snap.lastActivityAt ? ago(snap.lastActivityAt) : "";
+        statusHtml = `<div class="status-line done"><span class="sp"></span>Idle</div>`
+          + `<div class="status-sub">${last ? "last active " + esc(last) : "not running"}</div>`;
+      }
       const sessDur = snap.live
         ? `<span class="running"><span class="rdot"></span>${liveTimer(snap.startedAt)}</span>`
         : fmtDur((snap.lastActivityAt || snap.startedAt) - snap.startedAt);
+      const prompts = (snap.groups || []).length;
       document.getElementById("summary").innerHTML =
         `<p class="rh">This session</p>`
-        + `<div class="scard"><div class="k">Work done</div><div class="big">${fmt(snap.workTotal)} <span class="u">tokens</span></div><div class="subline">what Claude actually generated</div></div>`
-        + `<div class="scard"><div class="k">Time</div><div class="big" style="font-size:18px">${sessDur}</div><div class="subline">${snap.live ? "running now" : "total session time"}</div></div>`
-        + `<div class="scard"><div class="k">Overview</div><div class="pair"><span>Tasks</span><b>${snap.taskCount}</b></div>`
-        + `<div class="pair"><span>Priciest</span><b>${esc(snap.priciestTaskName || "none")}</b></div></div>`
-        + `<div class="scard"><div class="k">Status</div>${status}</div>`;
+        + `<div class="scard tokens"><div class="k">Tokens used</div><div class="big">${fmt(snap.workTotal)} <span class="u">tokens</span></div><div class="subline">what Claude generated this session</div></div>`
+        + `<div class="scard time"><div class="k">Time</div><div class="big" style="font-size:18px">${sessDur}</div><div class="subline">${snap.live ? "running now" : "total session time"}</div></div>`
+        + `<div class="scard over"><div class="k">Overview</div>`
+        + `<div class="pair"><span>Tasks</span><b>${snap.taskCount}</b></div>`
+        + `<div class="pair"><span>Prompts</span><b>${prompts}</b></div>`
+        + `<div class="ovdiv"></div>`
+        + `<div class="ovwrap"><div class="ovk">Priciest task</div><div class="ovv">${esc(snap.priciestTaskName || "none yet")}</div></div></div>`
+        + `<div class="scard status${statusCls}"><div class="k">Status</div>${statusHtml}</div>`;
     }
 
     function renderHeader(snap) {
@@ -985,8 +1039,11 @@
         if (!byDay.has(d)) { byDay.set(d, []); days.push(d); }
         byDay.get(d).push(s);
       }
-      const groups = days.map((d) =>
-        `<div class="dayhd">${esc(d)}</div>` + byDay.get(d).map(sessRowHtml).join("")).join("");
+      const groups = days.map((d) => {
+        const rows = byDay.get(d);
+        return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
+          + rows.map(sessRowHtml).join("");
+      }).join("");
       const empty = (q || dateFrom || dateTo) ? "No terminals match." : "No terminals yet.";
       list.innerHTML = shown.length ? groups : `<p class="smeta" style="padding-left:3px">${empty}</p>`;
 
