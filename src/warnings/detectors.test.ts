@@ -69,4 +69,20 @@ describe("detectHang", () => {
     expect(detectHang(slowRead, now, hangThreshold)?.tool).toBe("Read"); // 100s past the 45s read leash
     expect(detectHang(slowBash, now, hangThreshold)).toBeNull();         // 100s still under the 180s shell leash
   });
+
+  it("does not warn while activity is still flowing, even if an old call stayed open", () => {
+    // An early Read pre never got its post, but the session kept producing events since: this is
+    // a busy big request, not a hang. Idle is measured from the last activity, so it stays quiet.
+    const open = [ev({ id: "r", phase: "pre", tool: "Read", timestamp: 1000 })];
+    const now = 200_000;
+    const lastActivity = 199_000; // something happened 1s ago
+    expect(detectHang(open, now, hangThreshold, lastActivity)).toBeNull();
+  });
+
+  it("warns once the session has truly gone quiet past the threshold", () => {
+    const open = [ev({ id: "r", phase: "pre", tool: "Read", timestamp: 1000 })];
+    const now = 200_000;
+    const lastActivity = 100_000; // last activity 100s ago, past the 45s read leash
+    expect(detectHang(open, now, hangThreshold, lastActivity)?.tool).toBe("Read");
+  });
 });

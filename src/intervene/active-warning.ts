@@ -9,9 +9,10 @@ const REPEAT_ERROR_THRESHOLD = 3;
 // The single "what is Claude stuck on right now" resolver, shared by the snapshot (UI trigger) and
 // the writer (file contents). Same precedence and thresholds as the terminal watcher.
 export function resolveActiveWarning(events: ToolEvent[], now: number): Warning | null {
+  const lastActivityTs = events.reduce((m, e) => Math.max(m, e.timestamp), 0) || undefined;
   return (
     detectLoop(events, LOOP_THRESHOLD) ??
     detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ??
-    detectHang(computeOpenCalls(events), now, hangThreshold)
+    detectHang(computeOpenCalls(events), now, hangThreshold, lastActivityTs)
   );
 }

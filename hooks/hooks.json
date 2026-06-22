@@ -12,6 +12,9 @@
     ],
     "Stop": [
       { "matcher": "*", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/capture/stop-mark.js\"" } ] }
+    ],
+    "SessionEnd": [
+      { "matcher": "*", "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/dist/capture/session-end.js\"" } ] }
     ]
   }
 }

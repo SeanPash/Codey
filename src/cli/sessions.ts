@@ -108,7 +108,11 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         && status.promptAt > (status.doneAt ?? 0)
         && now - status.promptAt < THINKING_WINDOW_MS;
       const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-      const running = evMtime != null && (thinking || recentActivity);
+      // A SessionEnd stamp newer than the last activity means the terminal closed; drop it from
+      // the live/open tiers at once instead of waiting out the window. A resume bumps activity
+      // back above the stamp, so the session can light up again.
+      const closed = status?.closedAt != null && status.closedAt >= lastActivity;
+      const running = evMtime != null && !closed && (thinking || recentActivity);
       return {
         id,
         mtime,
@@ -118,7 +122,7 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         taskCount: cache?.chunks?.length ?? 0,
         lastPromptTs,
         running,
-        open: lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
+        open: !closed && lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
         live: running,
         day: dayBucket(mtime, now),
         // carried only for the filter below; not part of the public shape

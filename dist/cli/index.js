@@ -3304,14 +3304,16 @@ function detectRepeatError(events, threshold) {
     timestamp: last.timestamp
   };
 }
-function detectHang(openCalls, now, thresholdFor) {
+function detectHang(openCalls, now, thresholdFor, lastActivityTs) {
+  if (openCalls.length === 0) return null;
+  const since = lastActivityTs ?? Math.max(...openCalls.map((c) => c.timestamp));
+  const idle = now - since;
   for (const call of openCalls) {
-    const elapsed = now - call.timestamp;
-    if (elapsed >= thresholdFor(call.tool)) {
+    if (idle >= thresholdFor(call.tool)) {
       return {
         kind: "hang",
         tool: call.tool,
-        count: Math.floor(elapsed / 1e3),
+        count: Math.floor((now - call.timestamp) / 1e3),
         message: `This step (${call.tool}) is taking unusually long.`,
         timestamp: call.timestamp
       };
@@ -3650,7 +3652,8 @@ function createWatchState(mode, narrate) {
   return { engine: new NarrationEngine(mode, narrate), lastWarningKey: null, lastActionKey: null };
 }
 function activeWarning(events, now) {
-  return detectLoop(events, LOOP_THRESHOLD) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ?? detectHang(computeOpenCalls(events), now, hangThreshold);
+  const lastActivityTs = events.reduce((m, e) => Math.max(m, e.timestamp), 0) || void 0;
+  return detectLoop(events, LOOP_THRESHOLD) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ?? detectHang(computeOpenCalls(events), now, hangThreshold, lastActivityTs);
 }
 function warningKey(w) {
   return `${w.kind}|${w.tool}|${w.count}`;
@@ -4429,7 +4432,8 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
     const status = readStatus(dir);
     const thinking = evMtime != null && status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
     const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-    const running = evMtime != null && (thinking || recentActivity);
+    const closed = status?.closedAt != null && status.closedAt >= lastActivity;
+    const running = evMtime != null && !closed && (thinking || recentActivity);
     return {
       id,
       mtime,
@@ -4439,7 +4443,7 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
       taskCount: cache?.chunks?.length ?? 0,
       lastPromptTs,
       running,
-      open: lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
+      open: !closed && lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
       live: running,
       day: dayBucket(mtime, now),
       // carried only for the filter below; not part of the public shape
@@ -4957,7 +4961,8 @@ function buildSnapshot(input) {
 var LOOP_THRESHOLD3 = 5;
 var REPEAT_ERROR_THRESHOLD3 = 3;
 function resolveActiveWarning(events, now) {
-  return detectLoop(events, LOOP_THRESHOLD3) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD3) ?? detectHang(computeOpenCalls(events), now, hangThreshold);
+  const lastActivityTs = events.reduce((m, e) => Math.max(m, e.timestamp), 0) || void 0;
+  return detectLoop(events, LOOP_THRESHOLD3) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD3) ?? detectHang(computeOpenCalls(events), now, hangThreshold, lastActivityTs);
 }
 
 // src/serve/active.ts
@@ -5177,6 +5182,7 @@ function isRunning(dir, now) {
   const lastActivity = Math.max(evMtime, lastPrompt);
   const withinWindow = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
   const status = readStatus(dir);
+  if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
   const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
   return withinWindow || isThinking;
 }

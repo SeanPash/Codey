@@ -49,10 +49,14 @@
     body.split .titlerow { display:none; }
     .titlerow .stitle { font-size:20px; font-weight:400; color:var(--ink); margin:0; line-height:1.2;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .titlerow .renamebtn { flex:none; background:transparent; border:1px solid transparent; color:var(--muted);
-      border-radius:7px; padding:3px 8px; font-size:13px; cursor:pointer; opacity:0; transition:opacity .15s, border-color .15s, color .15s; }
-    .titlerow:hover .renamebtn { opacity:1; }
-    .titlerow .renamebtn:hover { color:var(--sky); border-color:rgba(95,176,255,.3); }
+    /* current-terminal actions: always visible (so the affordance is obvious), brighten on hover */
+    .titleacts { display:flex; gap:6px; flex:none; }
+    .tact { font:inherit; font-size:12px; display:inline-flex; align-items:center; gap:5px; background:#0c0f16;
+      border:1px solid #283246; color:var(--body); border-radius:7px; padding:4px 10px; cursor:pointer;
+      transition:color .15s, border-color .15s, background .15s; }
+    .tact:hover { color:var(--sky); border-color:rgba(95,176,255,.4); background:#0e1320; }
+    .tact.del:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
+    .tact .tg { font-size:13px; line-height:1; }
     .titlerow .stitle-input { font:inherit; font-size:20px; background:var(--inset); border:1px solid var(--sky-dim);
       color:var(--ink); border-radius:7px; padding:3px 9px; min-width:280px; }
     .toggle { margin-left:auto; display:flex; background:#0c0f16; border:1px solid #283246; border-radius:8px; padding:2px; }
@@ -74,13 +78,6 @@
     .dayhd:first-of-type { margin-top:2px; }
     .sess { position:relative; padding:8px 10px; border-radius:8px; margin-bottom:4px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:none; background:transparent; color:var(--ink); font:inherit; }
     .sess:hover { background:#11141b; }
-    /* row action buttons, revealed on hover */
-    .sessacts { position:absolute; top:6px; right:6px; display:none; gap:3px; }
-    .sess:hover .sessacts { display:flex; }
-    .sessacts button { background:#10141d; border:1px solid #283246; color:var(--muted); border-radius:6px;
-      width:22px; height:22px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
-    .sessacts button:hover { color:var(--sky); border-color:rgba(95,176,255,.4); }
-    .sessacts button.del:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
     .sessrename { width:100%; display:flex; gap:5px; align-items:center; padding:5px 6px; }
     .sessrename input { flex:1; min-width:0; background:var(--inset); border:1px solid var(--sky-dim); color:var(--ink);
       border-radius:6px; padding:5px 7px; font:inherit; font-size:12px; }
@@ -333,7 +330,10 @@
   <div class="titlerow" id="titlerow">
     <span class="sproj" id="sproj"></span>
     <h1 class="stitle disp" id="sname">Codey</h1>
-    <button class="renamebtn" id="rename-current" type="button" title="Rename this terminal" aria-label="Rename this terminal">&#9998;</button>
+    <span class="titleacts">
+      <button class="tact" id="rename-current" type="button" title="Rename this terminal" aria-label="Rename this terminal"><span class="tg">&#9998;</span> Rename</button>
+      <button class="tact del" id="delete-current" type="button" title="Delete this terminal" aria-label="Delete this terminal"><span class="tg">&#128465;</span> Delete</button>
+    </span>
     <div class="tlctl" id="tlctl"></div>
   </div>
 
@@ -655,10 +655,7 @@
       return `<button class="sess${active}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
         + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span>`
-        + `<span class="sessacts">`
-        + `<button class="ren" type="button" title="Rename" aria-label="Rename">&#9998;</button>`
-        + `<button class="del" type="button" title="Delete" aria-label="Delete">&#128465;</button>`
-        + `</span></button>`;
+        + `</button>`;
     }
 
     function renderRail(sessions) {
@@ -686,16 +683,11 @@
       if (search) search.addEventListener("input", (e) => { railFilter = e.target.value; renderRail(lastSessions); });
 
       document.querySelectorAll("#rail .sess").forEach((el) => {
-        el.addEventListener("click", (e) => {
-          if (e.target.closest(".sessacts")) return; // a row-action click is not a select
+        el.addEventListener("click", () => {
           currentId = el.dataset.id; pinned = true;
           open.clear(); tickSingle();
         });
       });
-      document.querySelectorAll("#rail .sessacts .ren").forEach((b) =>
-        b.addEventListener("click", (e) => { e.stopPropagation(); startRename(b.closest(".sess").dataset.id); }));
-      document.querySelectorAll("#rail .sessacts .del").forEach((b) =>
-        b.addEventListener("click", (e) => { e.stopPropagation(); deleteSession(b.closest(".sess").dataset.id); }));
 
       const input = document.querySelector("#rail .rename-in");
       if (input) {
@@ -844,6 +836,9 @@
     document.getElementById("tb-split").addEventListener("click", () => setView("split"));
     document.getElementById("rename-current").addEventListener("click", () => {
       if (currentId) startRename(currentId);
+    });
+    document.getElementById("delete-current").addEventListener("click", () => {
+      if (currentId) deleteSession(currentId);
     });
     function setView(v) {
       view = v;

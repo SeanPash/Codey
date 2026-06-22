@@ -34,12 +34,23 @@ export function detectRepeatError(events: ToolEvent[], threshold: number): Warni
     timestamp: last.timestamp };
 }
 
-// Any open call older than its per-tool threshold (oldest first) becomes a hang warning.
-export function detectHang(openCalls: ToolEvent[], now: number, thresholdFor: (tool: string) => number): Warning | null {
+// A hang means the session has gone quiet, not just that one step is slow. We measure idle
+// time from the last activity (the newest event), not from when a call opened, so a big
+// request that keeps producing events never looks hung. Only real silence past a tool's
+// per-tool threshold does. lastActivityTs defaults to the newest open call, so callers that
+// don't track activity keep the old "elapsed since the call" behavior.
+export function detectHang(
+  openCalls: ToolEvent[],
+  now: number,
+  thresholdFor: (tool: string) => number,
+  lastActivityTs?: number,
+): Warning | null {
+  if (openCalls.length === 0) return null;
+  const since = lastActivityTs ?? Math.max(...openCalls.map((c) => c.timestamp));
+  const idle = now - since;
   for (const call of openCalls) {
-    const elapsed = now - call.timestamp;
-    if (elapsed >= thresholdFor(call.tool)) {
-      return { kind: "hang", tool: call.tool, count: Math.floor(elapsed / 1000),
+    if (idle >= thresholdFor(call.tool)) {
+      return { kind: "hang", tool: call.tool, count: Math.floor((now - call.timestamp) / 1000),
         message: `This step (${call.tool}) is taking unusually long.`,
         timestamp: call.timestamp };
     }

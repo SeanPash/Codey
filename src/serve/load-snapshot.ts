@@ -35,6 +35,8 @@ export function isRunning(dir: string, now: number): boolean {
   // but only count it for a bounded window so a terminal closed mid-turn (which never fired
   // Stop) does not stay live forever.
   const status = readStatus(dir);
+  // A SessionEnd stamp newer than any activity means the terminal closed; it is not live.
+  if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
   const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0)
     && now - status.promptAt < THINKING_WINDOW_MS;
   return withinWindow || isThinking;

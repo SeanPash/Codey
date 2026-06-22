@@ -15,6 +15,7 @@ const entryPoints = [
   "src/capture/intervene-check.ts",
   "src/capture/prompt-mark.ts",
   "src/capture/stop-mark.ts",
+  "src/capture/session-end.ts",
 ];
 
 await build({
