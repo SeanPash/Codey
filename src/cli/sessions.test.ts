@@ -165,6 +165,24 @@ describe("listSessions", () => {
     expect(itemDone.running).toBe(false);
   });
 
+  it("does not count a terminal closed mid-turn (stale prompt, no stop) as running", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const stale = join(dir, "stale");
+    mkdirSync(stale);
+    writeFileSync(join(stale, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(stale, "events.jsonl"), base - 3600); // last event an hour ago
+    // Prompt far in the past, Stop never fired: the terminal was closed mid-turn.
+    writeFileSync(join(stale, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 3600_000,
+      doneAt: null,
+      updatedAt: now - 3600_000,
+    }));
+    const item = listSessions(dir, now).find((x) => x.id === "stale")!;
+    expect(item.running).toBe(false);
+  });
+
   it("enriches each session with name, taskCount, lastPromptTs and live flag", () => {
     const base = Math.floor(Date.now() / 1000);
     const s = join(dir, "sess1");

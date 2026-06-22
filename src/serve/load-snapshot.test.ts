@@ -24,7 +24,7 @@ const mockReadPrompts = readPrompts as ReturnType<typeof vi.fn>;
 const mockReadStatus = readStatus as ReturnType<typeof vi.fn>;
 
 // Import RUNNING_WINDOW_MS to avoid hardcoding the threshold.
-import { RUNNING_WINDOW_MS } from "../cli/sessions.js";
+import { RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
 
 describe("isRunning", () => {
   const DIR = "/fake/session";
@@ -52,19 +52,24 @@ describe("isRunning", () => {
     expect(isRunning(DIR, NOW)).toBe(false);
   });
 
-  it("returns true when promptAt > doneAt even with no recent events", () => {
-    // No events file, no prompts -- session looks completely idle by activity check.
-    mockReadStatus.mockReturnValue({ promptAt: 500, doneAt: 400, updatedAt: NOW });
+  it("returns true when a recent prompt is newer than doneAt, even with no recent events", () => {
+    // No events file, no prompts -- session looks idle by activity, but it is mid-response.
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 2000, doneAt: NOW - 5000, updatedAt: NOW });
     expect(isRunning(DIR, NOW)).toBe(true);
   });
 
   it("returns false when doneAt >= promptAt (Claude finished responding)", () => {
-    mockReadStatus.mockReturnValue({ promptAt: 400, doneAt: 500, updatedAt: NOW });
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 5000, doneAt: NOW - 2000, updatedAt: NOW });
     expect(isRunning(DIR, NOW)).toBe(false);
   });
 
-  it("returns true when promptAt is set and doneAt is null (never finished)", () => {
-    mockReadStatus.mockReturnValue({ promptAt: 900, doneAt: null, updatedAt: NOW });
+  it("returns true when a recent prompt has no doneAt (never finished yet)", () => {
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 2000, doneAt: null, updatedAt: NOW });
     expect(isRunning(DIR, NOW)).toBe(true);
+  });
+
+  it("returns false for a stale prompt past the thinking window (terminal closed mid-turn)", () => {
+    mockReadStatus.mockReturnValue({ promptAt: NOW - THINKING_WINDOW_MS - 1, doneAt: null, updatedAt: NOW });
+    expect(isRunning(DIR, NOW)).toBe(false);
   });
 });

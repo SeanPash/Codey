@@ -58,6 +58,10 @@ export interface SessionListItem {
 // the user may be composing their next prompt.
 export const RUNNING_WINDOW_MS = 15_000;
 export const OPEN_WINDOW_MS = 30 * 60_000;
+// A pure thinking gap (prompt submitted, no tool call yet, no Stop) is short in practice.
+// Bounding it keeps a terminal that was closed mid-turn, which never fired Stop, from
+// counting as running forever and inflating the live count.
+export const THINKING_WINDOW_MS = 3 * 60_000;
 
 // Returns "Today", "Yesterday", or the locale date string for older sessions.
 // Based on calendar day boundaries, not a rolling 24h window.
@@ -100,7 +104,9 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
       // "thinking" covers the gap when Claude is working but hasn't emitted a tool call for
       // more than RUNNING_WINDOW_MS: a prompt newer than the last stop means it is still live.
       const status = readStatus(dir);
-      const thinking = evMtime != null && status?.promptAt != null && status.promptAt > (status.doneAt ?? 0);
+      const thinking = evMtime != null && status?.promptAt != null
+        && status.promptAt > (status.doneAt ?? 0)
+        && now - status.promptAt < THINKING_WINDOW_MS;
       const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
       const running = evMtime != null && (thinking || recentActivity);
       return {

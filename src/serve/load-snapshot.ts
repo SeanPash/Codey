@@ -10,7 +10,7 @@ import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import { resolveActiveWarning } from "../intervene/active-warning.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
-import { listSessions, RUNNING_WINDOW_MS } from "../cli/sessions.js";
+import { listSessions, RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
 import { selectActive } from "./active.js";
 import { readStatus } from "../statusline/state.js";
 import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
@@ -25,9 +25,12 @@ export function isRunning(dir: string, now: number): boolean {
   const lastPrompt = prompts.length ? prompts[prompts.length - 1] : 0;
   const lastActivity = Math.max(evMtime, lastPrompt);
   const withinWindow = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  // A prompt newer than the last stop means Claude is mid-response (thinking or tool calls).
+  // A prompt newer than the last stop means Claude is mid-response (thinking or tool calls),
+  // but only count it for a bounded window so a terminal closed mid-turn (which never fired
+  // Stop) does not stay live forever.
   const status = readStatus(dir);
-  const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0);
+  const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0)
+    && now - status.promptAt < THINKING_WINDOW_MS;
   return withinWindow || isThinking;
 }
 
