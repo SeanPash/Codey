@@ -63,6 +63,19 @@ describe("buildNowView", () => {
     expect(v.action).toBeNull();
   });
 
+  it("goes quiet a short time after the last activity, not 30 minutes later", () => {
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Read", timestamp: 1000 }),
+      ev({ phase: "post", tool: "Read", timestamp: 1500 }),
+    ];
+    // 60s after the last activity, with no open call and no fresh prompt: the strip is done.
+    const v = buildNowView(events, status({ doneAt: 1600 }), 61_500);
+    expect(v.live).toBe(false);
+    // But it still bridges the brief gap between two back-to-back tools.
+    const bridge = buildNowView(events, status({ doneAt: 1600 }), 6500);
+    expect(bridge.live).toBe(true);
+  });
+
   it("is not live when the terminal was closed, even mid-tool", () => {
     const now = 5000;
     const events: ToolEvent[] = [ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 4000 })];

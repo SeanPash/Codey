@@ -48,9 +48,15 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
-  const rawChunks = chunksFor(sessionId, events, root);
   const now = Date.now();
   const live = isRunning(store.dir, now);
+  // Freeze completed prompts: segmentation may only rework the current (live) turn. The turn
+  // begins at the first event on or after the last prompt mark; everything before stays locked.
+  const promptMarks = readPrompts(store.dir);
+  const lastPrompt = promptMarks.length ? promptMarks[promptMarks.length - 1] : 0;
+  const foundTurn = lastPrompt > 0 ? events.findIndex((e) => e.timestamp >= lastPrompt) : 0;
+  const turnStartIndex = foundTurn >= 0 ? foundTurn : events.length;
+  const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex });
   let mtimeMs = 0;
   try { mtimeMs = statSync(store.path).mtimeMs; } catch { mtimeMs = 0; }
   const name = sessionDisplayName({
@@ -63,7 +69,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   // Prompt boundaries come from the transcript (it has the text). Fall back to the prompt-log
   // timestamps, labeled generically, when no transcript is available.
   let prompts: UserPrompt[] = readUserPrompts(meta?.transcriptPath ?? null);
-  if (prompts.length === 0) prompts = readPrompts(store.dir).map((ts) => ({ ts, text: "" }));
+  if (prompts.length === 0) prompts = promptMarks.map((ts) => ({ ts, text: "" }));
   const { seedDepth, genAuto } = timelineDefaults(readSessionMode(store.dir));
   const snap = buildSnapshot({
     sessionId,

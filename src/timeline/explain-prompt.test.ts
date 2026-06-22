@@ -49,6 +49,17 @@ describe("buildTaskExplainPrompt", () => {
     const p = buildTaskExplainPrompt("X", [line({ status: "fail", failSummary: "This command failed (exit code 1)." })], "deep");
     expect(p).toContain("This command failed (exit code 1).");
   });
+
+  it("forbids asking the user for more context", () => {
+    const p = buildTaskExplainPrompt("X", [line()], "deep").toLowerCase();
+    expect(p).toContain("never ask the user");
+  });
+
+  it("frames the task name as Codey's guess, not the agent's goal", () => {
+    const p = buildTaskExplainPrompt("Checking git history", [line()], "deep").toLowerCase();
+    expect(p).toContain("rough guess");
+    expect(p).toContain("do not claim the agent did the wrong thing");
+  });
 });
 
 describe("buildActionExplainPrompt", () => {
@@ -64,5 +75,14 @@ describe("buildActionExplainPrompt", () => {
       expect(p).not.toContain("—");
     }
     expect(buildActionExplainPrompt(line(), "teach").toLowerCase()).toContain("teach");
+  });
+
+  it("forbids asking the user for more context", () => {
+    expect(buildActionExplainPrompt(line(), "deep").toLowerCase()).toContain("never ask the user");
+  });
+
+  it("frames a thinking step as reasoning, not a command, so it never asks what ran", () => {
+    const p = buildActionExplainPrompt(line({ tool: "thinking", label: "Thought it through, then ran a command", raw: null }), "deep");
+    expect(p.toLowerCase()).toContain("paused to reason");
   });
 });

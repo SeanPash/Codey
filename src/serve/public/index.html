@@ -145,6 +145,11 @@
     .grp.live { border-color:#2f4f74; box-shadow:0 0 0 1px rgba(95,176,255,.10); }
     /* a quiet glow on the group being followed, so it is obvious where the live view is anchored */
     .grp.live.following { border-color:#3a6498; box-shadow:0 0 0 1px rgba(95,176,255,.22), 0 0 26px rgba(95,176,255,.09); }
+    /* while following live, hovers inside the live group take a sky tint so it reads as "live mode"
+       instead of the same flat grey used everywhere else */
+    .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:rgba(95,176,255,.10); }
+    .grp.following .rcpt .rhead:hover { background:rgba(95,176,255,.07); }
+    .grp.following .card:hover { background:#141c2b; }
     .grphd { display:flex; align-items:flex-start; gap:14px; padding:0 1px 12px; margin-bottom:13px; border-bottom:1px solid var(--line); }
     .grphd .gp { flex:1; min-width:0; }
     .geyebrow { display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--sky); margin-bottom:5px; font-weight:600; }
@@ -174,8 +179,13 @@
     .rhead .colh { margin-left:auto; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
     .rhead .tot { color:var(--ink2); font-weight:600; font-size:12px; margin-left:14px; }
     .rline { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid #141b27; transition:background .15s; }
-    .rline.can { cursor:pointer; }
-    .rline.can:hover, .rline.lo { background:#0e131d; }
+    .rline.can, .rline.brow { cursor:pointer; }
+    .rline.can:hover, .rline.brow:hover, .rline.lo { background:#0e131d; }
+    /* a burst: one row standing in for a run of same-kind steps, expanding to the real rows */
+    .tag.steps { background:rgba(155,140,255,.1); color:#b3a8ff; border:1px solid rgba(155,140,255,.2); }
+    .bchildren { margin-left:18px; border-left:2px solid #1c2433; }
+    .bchildren .rline { padding-left:14px; }
+    .bchildren .ldetail, .bchildren .failnote { padding-left:47px; }
     .lchev { width:9px; flex:none; color:#5b6470; font-size:9px; }
     .rline.lo .lchev { color:var(--sky); }
     .lchev.sp { visibility:hidden; }
@@ -328,7 +338,13 @@
     .phead .pproj { font-size:10px; color:var(--body); background:#11151d; border:1px solid #232c3c; border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--sky); }
     .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:#bfe0ff; background:rgba(95,176,255,.12); border:1px solid rgba(95,176,255,.32); }
-    .pbody { padding:9px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; min-height:0; }
+    /* Each pane scrolls on its own, so one busy terminal never crushes the others. min-height:0
+       lets the flex child actually shrink and hand its overflow to this scroller. */
+    .pbody { padding:9px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1 1 0; min-height:0;
+      scrollbar-width:thin; scrollbar-color:#2a3344 transparent; }
+    .pbody::-webkit-scrollbar { width:9px; }
+    .pbody::-webkit-scrollbar-thumb { background:#2a3344; border-radius:5px; border:2px solid #0f131b; }
+    .pbody::-webkit-scrollbar-thumb:hover { background:#3a4658; }
     .pbody .card { margin-bottom:0; }
     .ptc { background:#141925; border:1px solid #232c3c; border-radius:8px; padding:8px 10px; }
     .ptc.cur { background:#141b27; border-color:#2f4f74; }
@@ -426,6 +442,7 @@
     const closedByUser = new Set();// live chunk ids the user manually collapsed (overrides auto-open)
     let liveOpenId = null;         // the running task, auto-opened so its current step shows
     const lineOpen = new Set();    // expanded work lines, key "chunkId:idx"
+    const burstOpen = new Set();   // expanded bursts (runs of same-activity steps), key "chunkId|bStart"
     const workCollapsed = new Set();// folded work lists, by chunk id (default expanded)
     const confirmed = new Map();   // chunk id -> intervention action (survives the live re-render)
     let view = "single";           // "single" | "split"
@@ -687,12 +704,68 @@
         + fail + (lo ? lineDetail(c, l, idx) : "");
     }
 
+    // The shared activity behind a work line, used to spot a run of the same kind of step. A
+    // thinking row is phrased "Thought it through, then searched the code"; we key it on the
+    // action it leads into ("searched the code") so it groups with the searches that follow. A
+    // lone "Thought about what to do next." keys to null and never merges.
+    function activityKey(l) {
+      if (l.tool === "thinking") {
+        const m = /^thought it through, then (.+)$/i.exec(l.label || "");
+        return m ? m[1].toLowerCase().trim() : null;
+      }
+      return (l.label || "").toLowerCase().trim();
+    }
+
+    // Fold consecutive lines that share an activity key into a burst, but only when there are
+    // enough of them to be worth hiding (3+). Shorter runs stay as plain rows. Indices are kept
+    // so each child still maps to its real work line for "explain this step".
+    function groupBursts(lines) {
+      const out = [];
+      let i = 0;
+      while (i < lines.length) {
+        const key = activityKey(lines[i]);
+        let j = i;
+        if (key !== null) while (j + 1 < lines.length && activityKey(lines[j + 1]) === key) j++;
+        if (key !== null && j - i + 1 >= 3) {
+          const items = [];
+          for (let k = i; k <= j; k++) items.push({ l: lines[k], idx: k });
+          out.push({ burst: true, start: i, items });
+        } else {
+          for (let k = i; k <= j; k++) out.push({ burst: false, l: lines[k], idx: k });
+        }
+        i = j + 1;
+      }
+      return out;
+    }
+
+    // One collapsed burst: a parent row that summarizes the run, expanding to the real child rows.
+    function burstHtml(c, g, curIdx) {
+      const key = c.id + "|b" + g.start;
+      const hasCur = g.items.some((it) => it.idx === curIdx);
+      const childOpen = g.items.some((it) => lineOpen.has(c.id + ":" + it.idx));
+      const isOpen = burstOpen.has(key) || hasCur || childOpen;
+      const head = g.items[0].l;
+      const think = head.tool === "thinking";
+      const anyFail = g.items.some((it) => it.l.status === "fail");
+      const tokens = g.items.reduce((s, it) => s + (it.l.tokens || 0), 0);
+      const sw = anyFail ? "sw fail" : think ? "sw think" : "sw";
+      const chev = `<span class="lchev">${isOpen ? "&#9662;" : "&#9656;"}</span>`;
+      const st = anyFail ? '<span class="st fail">fail</span>' : '<span class="st ok">&#10003;</span>';
+      const children = isOpen
+        ? `<div class="bchildren">${g.items.map((it) => workLineHtml(c, it.l, it.idx, it.idx === curIdx)).join("")}</div>` : "";
+      return `<div class="rline brow${isOpen ? " lo" : ""}" data-burst="${esc(key)}">`
+        + `${chev}<span class="${sw}"></span><span class="lbl">${esc(head.label)}</span>`
+        + `<span class="tag steps">${g.items.length} steps</span><span class="num">${fmt(tokens)}</span>${st}</div>`
+        + children;
+    }
+
     function receiptHtml(c, liveTask) {
       const r = c.receipt;
       const collapsed = workCollapsed.has(c.id);
       const wchev = collapsed ? "&#9656;" : "&#9662;";
       const curIdx = liveTask ? currentLineIndex(r.workLines) : -1;
-      const work = collapsed ? "" : r.workLines.map((l, idx) => workLineHtml(c, l, idx, idx === curIdx)).join("");
+      const work = collapsed ? "" : groupBursts(r.workLines)
+        .map((g) => g.burst ? burstHtml(c, g, curIdx) : workLineHtml(c, g.l, g.idx, g.idx === curIdx)).join("");
       return `<div class="rcpt">`
         + `<div class="rhead js-work" role="button" tabindex="0" aria-expanded="${!collapsed}" data-id="${c.id}">`
         + `<span class="x">${wchev}</span><span class="ttl">Work Claude did</span><span class="colh">tokens</span><span class="tot">${fmt(c.workTotal)}</span></div>`
@@ -967,6 +1040,7 @@
       });
       wire(".js-work", (el) => { const id = el.dataset.id; workCollapsed.has(id) ? workCollapsed.delete(id) : workCollapsed.add(id); });
       wire(".rline.can", (el) => { const k = el.dataset.line; lineOpen.has(k) ? lineOpen.delete(k) : lineOpen.add(k); });
+      wire(".rline.brow", (el) => { const k = el.dataset.burst; burstOpen.has(k) ? burstOpen.delete(k) : burstOpen.add(k); });
     }
 
     function wireIntervention(scope) {

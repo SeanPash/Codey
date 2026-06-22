@@ -37,27 +37,68 @@ export function isStale(cache: TimelineCache | null, eventCount: number): boolea
   return eventCount - cache.eventCount > STALE_SLACK;
 }
 
+// Where the next segmentation pass is allowed to start. Completed prompts are frozen: once a
+// turn ends, its tasks (names, boundaries, narration) never change again, so a finished prompt
+// you have already read does not silently rewrite itself, and any explanation generated for it
+// stays attached. Only the live turn keeps re-segmenting as Claude works.
+//  - No cache yet: segment the whole session once (lock 0), even when idle.
+//  - Live: re-segment only from the current turn's first event; everything before is frozen.
+//  - Idle with a cache: do not re-segment at all (the timeline is locked as it stands).
+export interface SegmentPlan { refresh: boolean; lockBefore: number; }
+export function segmentPlan(
+  cache: TimelineCache | null, eventCount: number, live: boolean, turnStartIndex: number,
+): SegmentPlan {
+  if (eventCount === 0) return { refresh: false, lockBefore: 0 };
+  if (!cache) return { refresh: true, lockBefore: 0 };
+  const lockBefore = Math.max(0, Math.min(turnStartIndex, eventCount));
+  const refresh = live && isStale(cache, eventCount) && lockBefore < eventCount;
+  return { refresh, lockBefore };
+}
+
+// Combine the frozen chunks (those before the live turn) with a fresh segmentation of the live
+// turn's events. The tail is segmented in isolation, so its indices are slice-relative; we shift
+// them back onto the full event list. The seam falls exactly on the turn boundary, which is where
+// a fresh task should begin anyway.
+export function mergeSegmentation(prev: RawChunk[], tail: RawChunk[], lockBefore: number): RawChunk[] {
+  const frozen = prev.filter((c) => c.startIndex < lockBefore);
+  const shifted = tail.map((c) => ({ ...c, startIndex: c.startIndex + lockBefore }));
+  const merged = [...frozen, ...shifted].sort((a, b) => a.startIndex - b.startIndex);
+  if (merged.length === 0) return [];
+  merged[0] = { ...merged[0], startIndex: 0 };
+  const seen = new Set<number>();
+  return merged.filter((c) => (seen.has(c.startIndex) ? false : (seen.add(c.startIndex), true)));
+}
+
 // Track in-flight refreshes so polling never starts two passes for one session.
 const refreshing = new Set<string>();
 
-// Fire-and-forget: run the headless pass and update the cache if it produces usable chunks.
-function refresh(sessionId: string, events: ToolEvent[], root: string): void {
+// Fire-and-forget: segment only the unfrozen tail, merge it onto the frozen head, and write the
+// cache if the pass produced usable chunks.
+function refresh(sessionId: string, events: ToolEvent[], lockBefore: number, prev: RawChunk[], root: string): void {
   if (refreshing.has(sessionId)) return;
   refreshing.add(sessionId);
-  runSegmentation(buildSegmentationPrompt(events))
+  const slice = events.slice(lockBefore);
+  runSegmentation(buildSegmentationPrompt(slice))
     .then((text) => {
-      const chunks = text ? parseSegmentation(text, events.length) : [];
+      const tail = text ? parseSegmentation(text, slice.length) : [];
+      if (tail.length === 0) return;
+      const chunks = mergeSegmentation(prev, tail, lockBefore);
       if (chunks.length > 0) writeCache(sessionId, { eventCount: events.length, chunks }, root);
     })
     .catch(() => { /* leave the existing cache in place */ })
     .finally(() => { refreshing.delete(sessionId); });
 }
 
+export interface ChunksOpts { live: boolean; turnStartIndex: number; }
+
 // Synchronous chunk source for a snapshot read: return cached chunks (or naive), and kick off a
-// background refresh when stale. Live and replay use the same path; replay simply never goes stale
-// after its first pass.
-export function chunksFor(sessionId: string, events: ToolEvent[], root: string = defaultRoot()): RawChunk[] {
+// background refresh of the live turn when it is stale. Completed prompts stay frozen.
+export function chunksFor(
+  sessionId: string, events: ToolEvent[], root: string = defaultRoot(),
+  opts: ChunksOpts = { live: true, turnStartIndex: 0 },
+): RawChunk[] {
   const cache = readCache(sessionId, root);
-  if (isStale(cache, events.length)) refresh(sessionId, events, root);
+  const plan = segmentPlan(cache, events.length, opts.live, opts.turnStartIndex);
+  if (plan.refresh) refresh(sessionId, events, plan.lockBefore, cache?.chunks ?? [], root);
   return cache && cache.chunks.length > 0 ? cache.chunks : naiveSegment(events);
 }
