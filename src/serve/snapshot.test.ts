@@ -82,6 +82,23 @@ describe("buildSnapshot", () => {
     expect(snap.chunks).toHaveLength(2);
   });
 
+  it("does not smear the task sentence onto rows that have no reasoning of their own", () => {
+    const e: ToolEvent[] = [ev({ id: "0", timestamp: 100, tool: "Read", inputHash: "r" })];
+    const t: AssistantTurn[] = [turn({ ts: 100, outputTokens: 50, tool: "Read", input: { file_path: "a.ts" }, assistantText: null })];
+    const rc: RawChunk[] = [{ startIndex: 0, name: "Look", narration: "Read a file to understand it." }];
+    const snap = buildSnapshot({ sessionId: "s", sessionName: "s", project: null, color: "c", live: false, events: e, rawChunks: rc, turns: t, prompts: [], now: 9000 });
+    // The row keeps its own (absent) reasoning instead of inheriting the task narration.
+    expect(snap.chunks[0].receipt.workLines[0].why).toBeNull();
+    expect(snap.chunks[0].explanation).toBeNull();
+  });
+
+  it("carries the seed depth, auto flag, and a null summary per group", () => {
+    const snap = buildSnapshot({ sessionId: "s", sessionName: "s", project: null, color: "c", live: false, events, rawChunks, turns, prompts: [{ ts: 50, text: "go" }], now: 10000, seedDepth: "teach", genAuto: true });
+    expect(snap.seedDepth).toBe("teach");
+    expect(snap.genAuto).toBe(true);
+    expect(snap.groups.every((g) => g.summary === null)).toBe(true);
+  });
+
   it("attaches a repeat-error warning to the chunk where it happened", () => {
     const errEvents = [
       ev({ id: "0", phase: "post", tool: "Bash", isError: true, errorText: "boom", timestamp: 100 }),

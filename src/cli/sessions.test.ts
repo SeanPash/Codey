@@ -183,6 +183,37 @@ describe("listSessions", () => {
     expect(item.running).toBe(false);
   });
 
+  it("drops a closed session (SessionEnd stamp newer than activity) from running and open", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const closed = join(dir, "closed");
+    mkdirSync(closed);
+    writeFileSync(join(closed, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(closed, "events.jsonl"), base - 5); // very recent activity (would be running)
+    writeFileSync(join(closed, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 5_000, doneAt: now - 4_000, closedAt: now - 1_000, updatedAt: now - 1_000,
+    }));
+    const item = listSessions(dir, now).find((x) => x.id === "closed")!;
+    expect(item.running).toBe(false);
+    expect(item.open).toBe(false);
+  });
+
+  it("lights a closed session back up when it is resumed (activity newer than the stamp)", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const resumed = join(dir, "resumed");
+    mkdirSync(resumed);
+    writeFileSync(join(resumed, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(resumed, "events.jsonl"), base - 2); // activity after the close stamp
+    writeFileSync(join(resumed, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 3_000, doneAt: null, closedAt: now - 10_000, updatedAt: now - 3_000,
+    }));
+    const item = listSessions(dir, now).find((x) => x.id === "resumed")!;
+    expect(item.running).toBe(true);
+  });
+
   it("enriches each session with name, taskCount, lastPromptTs and live flag", () => {
     const base = Math.floor(Date.now() / 1000);
     const s = join(dir, "sess1");

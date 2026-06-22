@@ -9,8 +9,10 @@ export type RouteResult =
   | { type: "health" }
   | { type: "sessions" }
   | { type: "session"; id: string }
+  | { type: "now"; id: string }
   | { type: "intervene"; id: string }
   | { type: "rename"; id: string }
+  | { type: "explain"; id: string }
   | { type: "delete"; id: string }
   | { type: "live" }
   | { type: "font"; file: string }
@@ -27,6 +29,8 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (path === "/api/live") return { type: "live" };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
+    const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
+    if (mnow) return { type: "now", id: decodeURIComponent(mnow[1]) };
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
     if (m) return { type: "session", id: decodeURIComponent(m[1]) };
   }
@@ -35,6 +39,8 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (mi) return { type: "intervene", id: decodeURIComponent(mi[1]) };
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
     if (mn) return { type: "rename", id: decodeURIComponent(mn[1]) };
+    const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
+    if (me) return { type: "explain", id: decodeURIComponent(me[1]) };
   }
   if (method === "DELETE") {
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
@@ -54,10 +60,12 @@ export interface ServerDeps {
   buildId: string;          // identity the launcher checks to detect a stale server
   listSessions: () => SessionListItem[];
   getSnapshot: (id: string) => SessionSnapshot;
+  getNow: (id: string) => unknown;
   getLive: () => LiveSnapshot;
   intervene: (id: string, action: string) => boolean;
   rename: (id: string, name: string) => boolean;
   remove: (id: string) => boolean;
+  explain: (id: string, body: unknown) => Promise<{ text: string | null; cached: boolean; paused: boolean }>;
 }
 
 function readBody(req: import("node:http").IncomingMessage): Promise<string> {
@@ -82,6 +90,8 @@ export function createServer(deps: ServerDeps): Server {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
         sendJson(res, 200, deps.getSnapshot(route.id));
+      } else if (route.type === "now") {
+        sendJson(res, 200, deps.getNow(route.id));
       } else if (route.type === "live") {
         sendJson(res, 200, deps.getLive());
       } else if (route.type === "font") {
@@ -101,6 +111,17 @@ export function createServer(deps: ServerDeps): Server {
           try { name = String((JSON.parse(body || "{}") as { name?: unknown }).name ?? ""); } catch { name = ""; }
           const ok = deps.rename(route.id, name);
           sendJson(res, ok ? 200 : 400, { ok });
+        });
+      } else if (route.type === "explain") {
+        void readBody(req).then(async (body) => {
+          let parsed: unknown = {};
+          try { parsed = JSON.parse(body || "{}"); } catch { parsed = {}; }
+          try {
+            const result = await deps.explain(route.id, parsed);
+            sendJson(res, 200, result);
+          } catch (err) {
+            sendJson(res, 500, { error: String(err) });
+          }
         });
       } else if (route.type === "delete") {
         const ok = deps.remove(route.id);

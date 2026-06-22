@@ -10,6 +10,7 @@ export interface StatusSnapshot {
   warning: string | null;      // a formatted warning line, or null
   promptAt?: number | null;    // when the user last submitted a prompt, for the thinking state
   doneAt?: number | null;      // when Claude last finished a turn, for the summary state
+  closedAt?: number | null;    // when the session ended (terminal closed), so it drops from "live"
   updatedAt: number;
 }
 

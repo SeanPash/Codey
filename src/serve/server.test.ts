@@ -15,6 +15,10 @@ describe("resolveRoute", () => {
     expect(resolveRoute("GET", "/api/session/abc?t=1")).toEqual({ type: "session", id: "abc" });
   });
 
+  it("routes GET /api/session/:id/now to now, not snapshot", () => {
+    expect(resolveRoute("GET", "/api/session/abc/now")).toEqual({ type: "now", id: "abc" });
+  });
+
   it("rejects non-GET and unknown paths", () => {
     expect(resolveRoute("POST", "/")).toEqual({ type: "notfound" });
     expect(resolveRoute("GET", "/nope")).toEqual({ type: "notfound" });
@@ -44,6 +48,14 @@ describe("resolveRoute", () => {
 
   it("routes POST /api/session/:id/name to rename", () => {
     expect(resolveRoute("POST", "/api/session/abc/name")).toEqual({ type: "rename", id: "abc" });
+  });
+
+  it("routes POST /api/session/:id/explain to explain", () => {
+    expect(resolveRoute("POST", "/api/session/abc/explain")).toEqual({ type: "explain", id: "abc" });
+  });
+
+  it("does not treat a GET on the explain path as a snapshot", () => {
+    expect(resolveRoute("GET", "/api/session/abc/explain")).toEqual({ type: "notfound" });
   });
 
   it("routes DELETE /api/session/:id to delete", () => {

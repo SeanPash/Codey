@@ -49,10 +49,14 @@
     body.split .titlerow { display:none; }
     .titlerow .stitle { font-size:20px; font-weight:400; color:var(--ink); margin:0; line-height:1.2;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .titlerow .renamebtn { flex:none; background:transparent; border:1px solid transparent; color:var(--muted);
-      border-radius:7px; padding:3px 8px; font-size:13px; cursor:pointer; opacity:0; transition:opacity .15s, border-color .15s, color .15s; }
-    .titlerow:hover .renamebtn { opacity:1; }
-    .titlerow .renamebtn:hover { color:var(--sky); border-color:rgba(95,176,255,.3); }
+    /* current-terminal actions: always visible (so the affordance is obvious), brighten on hover */
+    .titleacts { display:flex; gap:6px; flex:none; }
+    .tact { font:inherit; font-size:12px; display:inline-flex; align-items:center; gap:5px; background:#0c0f16;
+      border:1px solid #283246; color:var(--body); border-radius:7px; padding:4px 10px; cursor:pointer;
+      transition:color .15s, border-color .15s, background .15s; }
+    .tact:hover { color:var(--sky); border-color:rgba(95,176,255,.4); background:#0e1320; }
+    .tact.del:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
+    .tact .tg { font-size:13px; line-height:1; }
     .titlerow .stitle-input { font:inherit; font-size:20px; background:var(--inset); border:1px solid var(--sky-dim);
       color:var(--ink); border-radius:7px; padding:3px 9px; min-width:280px; }
     .toggle { margin-left:auto; display:flex; background:#0c0f16; border:1px solid #283246; border-radius:8px; padding:2px; }
@@ -74,13 +78,6 @@
     .dayhd:first-of-type { margin-top:2px; }
     .sess { position:relative; padding:8px 10px; border-radius:8px; margin-bottom:4px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:none; background:transparent; color:var(--ink); font:inherit; }
     .sess:hover { background:#11141b; }
-    /* row action buttons, revealed on hover */
-    .sessacts { position:absolute; top:6px; right:6px; display:none; gap:3px; }
-    .sess:hover .sessacts { display:flex; }
-    .sessacts button { background:#10141d; border:1px solid #283246; color:var(--muted); border-radius:6px;
-      width:22px; height:22px; font-size:11px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
-    .sessacts button:hover { color:var(--sky); border-color:rgba(95,176,255,.4); }
-    .sessacts button.del:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
     .sessrename { width:100%; display:flex; gap:5px; align-items:center; padding:5px 6px; }
     .sessrename input { flex:1; min-width:0; background:var(--inset); border:1px solid var(--sky-dim); color:var(--ink);
       border-radius:6px; padding:5px 7px; font:inherit; font-size:12px; }
@@ -208,6 +205,67 @@
     .expl { font-size:9.5px; color:var(--body); line-height:1.55; }
     .expl .t { color:var(--sky); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:8px; display:block; margin-bottom:5px; }
 
+    /* live NOW strip: what Claude is on right now, sticky at the top of the single view */
+    .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
+      background:linear-gradient(180deg,#0f1726,#0d1320); border:1px solid #2f4f74; border-radius:12px;
+      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38); }
+    .nowstrip .nowtop { display:flex; align-items:center; gap:12px; }
+    .nowstrip .neye { font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--sky);
+      font-weight:700; display:inline-flex; align-items:center; gap:7px; flex:none; }
+    .nowstrip .ndot { width:8px; height:8px; border-radius:50%; background:var(--sky); animation:pp 1.6s infinite; }
+    .nowstrip .nact { font-size:14.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .nowstrip .nact.think { color:#b3a8ff; }
+    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:var(--ink2); font-size:13px; flex:none; }
+    .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
+      background:#0c0f16; border:1px solid #283246; color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
+    .nowstrip .follow.on { background:rgba(95,176,255,.14); color:#bfe0ff; border-color:rgba(95,176,255,.4); }
+    .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
+    .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
+    .nowstrip .ntrail .lab { color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:9px; font-weight:600; }
+    .nowstrip .ntrail .k { color:var(--green); } .nowstrip .ntrail .k.f { color:var(--coral); }
+    @media (prefers-reduced-motion: reduce) { .nowstrip .ndot { animation:none; } }
+
+    /* depth + summaries controls in the title row */
+    .tlctl { margin-left:auto; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    .ctlgrp { display:flex; align-items:center; gap:7px; }
+    .ctlgrp .cl { font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+    .seg { display:flex; background:#0c0f16; border:1px solid #283246; border-radius:8px; padding:2px; }
+    .seg button { font:inherit; font-size:11.5px; padding:4px 11px; border:none; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; }
+    .seg button.on { background:rgba(95,176,255,.14); color:#bfe0ff; box-shadow:inset 0 0 0 1px rgba(95,176,255,.3); }
+    .budgetcue { font-size:10.5px; color:var(--muted); }
+    .budgetcue.low { color:var(--amber); }
+
+    /* generated why/how panel inside an open task card */
+    .expla { margin-top:13px; border:1px solid #243150; background:linear-gradient(180deg,#121a2a,#0f1420); border-radius:10px; padding:12px 14px; }
+    .expla .et { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--sky); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .expla .etext { font-size:13px; color:var(--ink2); line-height:1.62; white-space:pre-wrap; }
+    .expla .edepth { color:var(--muted); font-weight:600; letter-spacing:.08em; }
+    .genwrap { margin-top:13px; }
+    .genbtn { font:inherit; font-size:12.5px; font-weight:600; color:#bfe0ff; background:rgba(95,176,255,.1); border:1px solid rgba(95,176,255,.32); border-radius:9px; padding:9px 14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .genbtn:hover { background:rgba(95,176,255,.18); }
+    .genbtn .ic { font-size:12px; }
+    .genhint { font-size:10.5px; color:var(--muted); margin-top:8px; }
+    .gening { font-size:12.5px; color:var(--body); display:inline-flex; align-items:center; gap:9px; }
+    .expla .gening, .genwrap .gening, .recap .gening { margin-top:0; }
+    .spin { width:12px; height:12px; border:2px solid #2a3344; border-top-color:var(--sky); border-radius:50%; animation:spin .7s linear infinite; flex:none; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .gpaused { margin-top:13px; font-size:12px; color:#e8d9b8; background:#191510; border:1px solid #3a3324; border-radius:9px; padding:10px 12px; line-height:1.55; }
+    .gpaused b { color:var(--amber); }
+
+    /* per-action explain control, inside the expanded line detail */
+    .whybtn { font:inherit; font-size:11px; font-weight:600; color:#9fc7ff; background:rgba(95,176,255,.08); border:1px solid rgba(95,176,255,.26); border-radius:7px; padding:4px 11px; cursor:pointer; }
+    .whybtn:hover { background:rgba(95,176,255,.16); }
+    .ld .lv.gen { color:var(--ink2); }
+
+    /* heading echo + closing recap on a prompt group */
+    .gecho { font-size:12px; color:var(--body); line-height:1.5; margin-top:9px; padding:1px 0 1px 10px; border-left:2px solid rgba(95,176,255,.4); }
+    .recap { margin-top:9px; background:#101725; border:1px solid #243150; border-radius:11px; padding:13px 15px; }
+    .recap .rt { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--sky); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .recap .rx { font-size:13px; color:var(--ink2); line-height:1.62; white-space:pre-wrap; }
+    .recap .pend { font-size:12px; color:var(--muted); }
+    .recap .pend.warn { color:var(--amber); }
+
     /* intervention bar (Plan 3, preserved) */
     .intervene { margin:12px 0 2px; border:1px solid #3a3324; background:#191510; border-radius:10px; padding:12px 14px; }
     .intervene-head { display:flex; align-items:center; gap:8px; font-size:13px; color:#e8d9b8; margin-bottom:10px; }
@@ -293,12 +351,19 @@
   <div class="titlerow" id="titlerow">
     <span class="sproj" id="sproj"></span>
     <h1 class="stitle disp" id="sname">Codey</h1>
-    <button class="renamebtn" id="rename-current" type="button" title="Rename this terminal" aria-label="Rename this terminal">&#9998;</button>
+    <span class="titleacts">
+      <button class="tact" id="rename-current" type="button" title="Rename this terminal" aria-label="Rename this terminal"><span class="tg">&#9998;</span> Rename</button>
+      <button class="tact del" id="delete-current" type="button" title="Delete this terminal" aria-label="Delete this terminal"><span class="tg">&#128465;</span> Delete</button>
+    </span>
+    <div class="tlctl" id="tlctl"></div>
   </div>
 
   <div class="cols">
     <aside class="rail" id="rail" aria-label="Sessions"></aside>
-    <main class="center" id="main"></main>
+    <main class="center">
+      <div id="nowstrip" class="nowstrip" hidden></div>
+      <div id="main"></div>
+    </main>
     <aside class="summary" id="summary"></aside>
   </div>
 
@@ -345,6 +410,148 @@
     let railFilter = "";           // sidebar search text
     let renamingId = null;         // session id being renamed inline (pauses rail refresh)
 
+    // ---- Explanations: generated why/how and per-prompt summaries ----
+    const explCache = new Map();   // "scope|id|depth" -> generated text (survives the live refresh)
+    const explLoading = new Set(); // keys currently generating
+    const autoFired = new Set();   // summary keys Auto has already requested, so it fires once per depth
+    let budgetPaused = false;      // a generation hit the budget cap
+    let depth = localStorage.getItem("codey-depth");   // null until seeded from the snapshot mode
+    let genMode = localStorage.getItem("codey-gen");   // "auto" | "saver", null until seeded
+    let lastSnap = null;           // last single-view snapshot, for re-render after a generation
+    const curDepth = () => depth || "deep";
+    const ekey = (scope, id) => scope + "|" + id + "|" + curDepth();
+    const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
+
+    async function generate(scope, id) {
+      if (!currentId) return;
+      const key = ekey(scope, id);
+      if (explCache.has(key) || explLoading.has(key)) return;
+      explLoading.add(key);
+      if (lastSnap) renderSingle(lastSnap);
+      try {
+        const res = await fetch("/api/session/" + encodeURIComponent(currentId) + "/explain", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ scope, id, depth: curDepth() }),
+        });
+        const data = await res.json();
+        if (data && data.paused) budgetPaused = true;
+        else if (data && data.text) { explCache.set(key, data.text); budgetPaused = false; }
+      } catch { /* leave the button so the user can retry */ }
+      explLoading.delete(key);
+      if (lastSnap) renderSingle(lastSnap);
+    }
+
+    // Pre-load any explanations the snapshot already carries (cached at the seed depth), so a
+    // reopened timeline shows them without a round-trip. Never clobber a fresher client value.
+    function seedEmbedded(snap) {
+      const sd = snap.seedDepth || "deep";
+      for (const c of snap.chunks || []) {
+        if (c.explanation) { const k = "task|" + c.id + "|" + sd; if (!explCache.has(k)) explCache.set(k, c.explanation); }
+      }
+      for (const g of snap.groups || []) {
+        if (g.summary) { const k = "summary|" + g.id + "|" + sd; if (!explCache.has(k)) explCache.set(k, g.summary); }
+      }
+    }
+
+    function renderControls(snap) {
+      const el = document.getElementById("tlctl");
+      if (!el) return;
+      const seg = (val, cur, label) => `<button data-val="${val}" class="${val === cur ? "on" : ""}" type="button">${label}</button>`;
+      const cue = snap.budgetLeft
+        ? `<span class="budgetcue${/reach/.test(snap.budgetLeft) ? " low" : ""}">${esc(snap.budgetLeft)}</span>` : "";
+      el.innerHTML =
+        `<div class="ctlgrp"><span class="cl">Depth</span><div class="seg" id="seg-depth">`
+        + seg("simple", curDepth(), "Simple") + seg("deep", curDepth(), "Deep") + seg("teach", curDepth(), "Teach") + `</div></div>`
+        + `<div class="ctlgrp"><span class="cl">Summaries</span><div class="seg" id="seg-gen">`
+        + seg("auto", genMode, "Auto") + seg("saver", genMode, "Saver") + `</div></div>`
+        + cue;
+      el.querySelectorAll("#seg-depth button").forEach((b) => b.addEventListener("click", () => {
+        depth = b.dataset.val; localStorage.setItem("codey-depth", depth); autoFired.clear();
+        if (lastSnap) renderSingle(lastSnap);
+      }));
+      el.querySelectorAll("#seg-gen button").forEach((b) => b.addEventListener("click", () => {
+        genMode = b.dataset.val; localStorage.setItem("codey-gen", genMode);
+        if (lastSnap) renderSingle(lastSnap);
+      }));
+    }
+
+    // The generated why/how panel for an open task. Only in single view, where currentId is the
+    // session these ids belong to.
+    function explainBlock(scope, id) {
+      if (view !== "single") return "";
+      const key = ekey(scope, id);
+      const cached = explCache.get(key);
+      if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(curDepth())}</span></div><div class="etext">${esc(cached)}</div></div>`;
+      if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(curDepth())} depth…</span></div>`;
+      if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining. Raise it with <b>/codey:budget &lt;n&gt;</b> in your terminal, then try again.</div>`;
+      return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}"><span class="ic">&#9670;</span> Explain why &amp; how</button>`
+        + `<div class="genhint">Generates a ${esc(curDepth())} explanation. Uses your Codey tokens.</div></div>`;
+    }
+
+    // The closing recap card for a prompt group.
+    function summaryBlock(g) {
+      if (view !== "single") return "";
+      const key = ekey("summary", g.id);
+      const cached = explCache.get(key);
+      if (cached) return `<div class="recap"><div class="rt">&#10022; What Claude got done</div><div class="rx">${esc(cached)}</div></div>`;
+      if (explLoading.has(key)) return `<div class="recap"><span class="gening"><span class="spin"></span>Summarizing this prompt…</span></div>`;
+      if (g.live) return `<div class="recap"><span class="pend">A recap appears here once Claude finishes this prompt.</span></div>`;
+      if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached. Raise it with /codey:budget, then summarize.</span></div>`;
+      return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
+        + `<div class="genhint">Generates a ${esc(curDepth())} recap. Uses your Codey tokens.</div></div>`;
+    }
+
+    // ---- Live NOW strip + Follow Live ----
+    let followLive = true;   // when live, keep the newest activity in view
+    let nowState = null;     // last /now payload, for re-rendering the strip on toggle
+
+    function renderNow(n) {
+      const strip = document.getElementById("nowstrip");
+      if (!strip) return;
+      if (!n || !n.live || view !== "single") { strip.hidden = true; return; }
+      strip.hidden = false;
+      const act = n.action
+        ? `<span class="nact">${esc(n.action.label)}</span>`
+        : n.thinking ? `<span class="nact think">Thinking it through</span>` : `<span class="nact">Working</span>`;
+      const timer = n.since ? `<span class="ntime timer" data-since="${n.since}">${fmtDur(Date.now() - n.since)}</span>` : "";
+      const follow = `<button class="follow${followLive ? " on" : ""}" id="follow-toggle" type="button">`
+        + `<span class="fd"></span>${followLive ? "Following" : "Follow live"}</button>`;
+      const trail = (n.steps && n.steps.length)
+        ? `<div class="ntrail"><span class="lab">just did</span>`
+          + n.steps.map((s) => `<span class="stp"><span class="k${s.status === "fail" ? " f" : ""}">`
+            + `${s.status === "fail" ? "&#10007;" : "&#10003;"}</span> ${esc(s.label)}</span>`).join("")
+          + `</div>`
+        : "";
+      strip.innerHTML = `<div class="nowtop"><span class="neye"><span class="ndot"></span>Now</span>${act}${timer}${follow}</div>${trail}`;
+      document.getElementById("follow-toggle").addEventListener("click", () => setFollow(!followLive));
+    }
+
+    function setFollow(on) {
+      followLive = on;
+      renderNow(nowState);
+      if (on) scrollToLive();
+    }
+
+    // Keep the newest activity in view, but only nudge when new content has pushed it off the
+    // bottom, so a user reading at the end is not yanked every second.
+    function scrollToLive() {
+      if (!followLive) return;
+      const fromBottom = document.body.scrollHeight - (window.scrollY + window.innerHeight);
+      if (fromBottom > 40) window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    }
+
+    // A deliberate scroll up means "let me read"; pause following until the user opts back in.
+    window.addEventListener("wheel", (e) => { if (e.deltaY < 0 && followLive) setFollow(false); }, { passive: true });
+
+    async function tickNow() {
+      if (view !== "single" || !currentId) { renderNow(null); return; }
+      try {
+        nowState = await (await fetch("/api/session/" + encodeURIComponent(currentId) + "/now")).json();
+        renderNow(nowState);
+        if (nowState.live && followLive) scrollToLive();
+      } catch { /* keep the last strip on a transient error */ }
+    }
+
     // ---- Intervention (Plan 3), preserved ----
     const FALLBACK = {
       nudge: { label: "Nudge it to move on", do: "If Claude keeps repeating it, press Esc to interrupt, then paste this so it skips the stuck step:",
@@ -390,13 +597,25 @@
     // ---- Receipt ----
     function actionCount(receipt) { return receipt.workLines.filter((l) => l.status !== "none").length; }
 
-    function lineDetail(l) {
+    // The per-action why/how line: cached text, a spinner, a budget notice, or the button.
+    function actionWhy(c, idx) {
+      if (view !== "single") return "";
+      const id = c.id + "#" + idx;
+      const key = ekey("action", id);
+      const cached = explCache.get(key);
+      if (cached) return `<div class="ld"><span class="lk">why &amp; how</span><span class="lv gen">${esc(cached)}</span></div>`;
+      if (explLoading.has(key)) return `<div class="ld"><span class="lk">why &amp; how</span><span class="lv"><span class="gening"><span class="spin"></span>Explaining…</span></span></div>`;
+      if (budgetPaused) return `<div class="ld"><span class="lk">why &amp; how</span><span class="lv" style="color:var(--amber)">Budget reached. Raise it with /codey:budget.</span></div>`;
+      return `<div class="ld"><span class="lk"></span><span class="lv"><button class="whybtn" type="button" data-gen-scope="action" data-gen-id="${esc(id)}">Explain this step</button></span></div>`;
+    }
+
+    function lineDetail(c, l, idx) {
       const parts = [];
       if (l.ts) parts.push(`<div class="ld"><span class="lk">at</span><span class="lv">${fmtClockSec(l.ts)}</span></div>`);
       if (l.raw) parts.push(`<div class="ld"><span class="lk">ran</span><code>${esc(l.raw)}</code></div>`);
-      if (l.why) parts.push(`<div class="ld"><span class="lk">explanation</span><span class="lv">${esc(l.why)}</span></div>`);
+      if (l.why) parts.push(`<div class="ld"><span class="lk">Claude's note</span><span class="lv">${esc(l.why)}</span></div>`);
       if (l.status === "fail" && l.errorText) parts.push(`<div class="ld err"><span class="lk">error</span><code>${esc(l.errorText)}</code></div>`);
-      if (!parts.length) parts.push(`<div class="ld"><span class="lv">No extra detail for this step.</span></div>`);
+      parts.push(actionWhy(c, idx));
       return `<div class="ldetail">${parts.join("")}</div>`;
     }
 
@@ -408,13 +627,14 @@
         : l.status === "ok" ? '<span class="st ok">&#10003;</span>' : '<span class="st">&middot;</span>';
       const key = c.id + ":" + idx;
       const lo = lineOpen.has(key);
-      const canExpand = !!(l.raw || l.why || l.ts || (l.status === "fail" && l.errorText));
+      // In single view every line expands, since even a bare step offers an "explain this step" button.
+      const canExpand = view === "single" || !!(l.raw || l.why || l.ts || (l.status === "fail" && l.errorText));
       const chev = canExpand ? `<span class="lchev">${lo ? "&#9662;" : "&#9656;"}</span>` : `<span class="lchev sp"></span>`;
       const fail = l.status === "fail" && l.failSummary
         ? `<div class="failnote">${esc(l.failSummary)}${l.resolved ? ' <span class="note">&middot; recovered on the next try</span>' : ""}</div>` : "";
       return `<div class="rline${canExpand ? " can" : ""}${lo ? " lo" : ""}" data-line="${esc(key)}">`
         + `${chev}<span class="${sw}"></span><span class="lbl">${esc(l.label)}</span>${tag}<span class="num">${fmt(l.tokens)}</span>${st}</div>`
-        + fail + (lo ? lineDetail(l) : "");
+        + fail + (lo ? lineDetail(c, l, idx) : "");
     }
 
     function receiptHtml(c) {
@@ -452,7 +672,7 @@
         + `<div class="right"><div class="meta"><div class="mtime">${fmtClock(c.startTs)}</div><div class="mdur">${durLabel(c, snap)}</div><div>${acts} action${acts === 1 ? "" : "s"} ${done}</div></div>`
         + `<div class="chip"><div class="top"><span class="tok">${fmt(c.workTotal)}</span><span class="u">tokens</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`
         + `</div></div>`
-        + (isOpen ? receiptHtml(c) : "")
+        + (isOpen ? explainBlock("task", c.id) + receiptHtml(c) : "")
         + (barWarning ? interventionBar(barWarning, c.id) : "")
         + `</div>`;
     }
@@ -466,10 +686,14 @@
       const eyebrow = g.live
         ? `<span class="geyebrow glive"><span class="rdot"></span>You asked &middot; working now</span>`
         : `<span class="geyebrow">You asked</span>`;
+      // Heading echo: the first sentence of the recap, for skimming a completed prompt.
+      const sumKey = ekey("summary", g.id);
+      const sum = explCache.get(sumKey);
+      const echo = (!g.live && sum && view === "single") ? `<div class="gecho">${esc(firstSentence(sum))}</div>` : "";
       return `<section class="grp${g.live ? " live" : ""}">`
-        + `<div class="grphd"><div class="gp">${eyebrow}<span class="gtext">${esc(g.prompt)}</span></div>`
+        + `<div class="grphd"><div class="gp">${eyebrow}<span class="gtext">${esc(g.prompt)}</span>${echo}</div>`
         + `<div class="grpmeta">${fmtClock(g.startTs)} &middot; ${dur} &middot; <span class="gtok">${fmt(g.workTotal)} tokens</span> &middot; ${g.taskCount} task${g.taskCount === 1 ? "" : "s"}</div>`
-        + `</div>${cards}</section>`;
+        + `</div>${cards}${summaryBlock(g)}</section>`;
     }
 
     function renderSummary(snap) {
@@ -506,10 +730,7 @@
       return `<button class="sess${active}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
         + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span>`
-        + `<span class="sessacts">`
-        + `<button class="ren" type="button" title="Rename" aria-label="Rename">&#9998;</button>`
-        + `<button class="del" type="button" title="Delete" aria-label="Delete">&#128465;</button>`
-        + `</span></button>`;
+        + `</button>`;
     }
 
     function renderRail(sessions) {
@@ -537,16 +758,11 @@
       if (search) search.addEventListener("input", (e) => { railFilter = e.target.value; renderRail(lastSessions); });
 
       document.querySelectorAll("#rail .sess").forEach((el) => {
-        el.addEventListener("click", (e) => {
-          if (e.target.closest(".sessacts")) return; // a row-action click is not a select
-          currentId = el.dataset.id; pinned = true;
-          open.clear(); tickSingle();
+        el.addEventListener("click", () => {
+          currentId = el.dataset.id; pinned = true; followLive = true;
+          open.clear(); tickSingle(); tickNow();
         });
       });
-      document.querySelectorAll("#rail .sessacts .ren").forEach((b) =>
-        b.addEventListener("click", (e) => { e.stopPropagation(); startRename(b.closest(".sess").dataset.id); }));
-      document.querySelectorAll("#rail .sessacts .del").forEach((b) =>
-        b.addEventListener("click", (e) => { e.stopPropagation(); deleteSession(b.closest(".sess").dataset.id); }));
 
       const input = document.querySelector("#rail .rename-in");
       if (input) {
@@ -583,7 +799,12 @@
     }
 
     function renderSingle(snap) {
+      lastSnap = snap;
+      if (depth === null) depth = snap.seedDepth || "deep";
+      if (genMode === null) genMode = snap.genAuto ? "auto" : "saver";
+      seedEmbedded(snap);
       renderHeader(snap);
+      renderControls(snap);
       renderSummary(snap);
       const chunks = snap.chunks || [];
       const groups = snap.groups || [];
@@ -601,6 +822,29 @@
 
       wireCards(main, () => renderSingle(snap));
       wireIntervention(main);
+      wireGenerate(main);
+      maybeAutoSummary(snap);
+    }
+
+    // Wire every "Explain"/"Why"/"Summarize" button to its generation request.
+    function wireGenerate(scope) {
+      scope.querySelectorAll("[data-gen-scope]").forEach((b) => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        generate(b.dataset.genScope, b.dataset.genId);
+      }));
+    }
+
+    // In Auto, generate the recap for the single most-recently-finished prompt, once per depth.
+    // Everything else (older summaries, all task and action explanations) stays click-to-generate.
+    function maybeAutoSummary(snap) {
+      if (genMode !== "auto" || budgetPaused) return;
+      const completed = (snap.groups || []).filter((g) => !g.live);
+      const target = completed[completed.length - 1];
+      if (!target) return;
+      const key = ekey("summary", target.id);
+      if (explCache.has(key) || explLoading.has(key) || autoFired.has(key)) return;
+      autoFired.add(key);
+      setTimeout(() => generate("summary", target.id), 0);
     }
 
     // Shared expand/collapse wiring for task cards, used by both Single and Active Terminals.
@@ -668,6 +912,9 @@
     document.getElementById("rename-current").addEventListener("click", () => {
       if (currentId) startRename(currentId);
     });
+    document.getElementById("delete-current").addEventListener("click", () => {
+      if (currentId) deleteSession(currentId);
+    });
     function setView(v) {
       view = v;
       document.body.classList.toggle("split", v === "split");
@@ -676,6 +923,7 @@
       document.getElementById("rail").style.display = v === "split" ? "none" : "";
       document.getElementById("summary").style.display = v === "split" ? "none" : "";
       document.getElementById("jumplive").hidden = true;
+      renderNow(view === "single" ? nowState : null);
       tick();
     }
 
@@ -765,6 +1013,10 @@
 
     tick();
     setInterval(tick, 2000);
+    // The NOW strip polls a cheap endpoint about once a second so the current step feels live,
+    // without fetching the full snapshot that often.
+    tickNow();
+    setInterval(tickNow, 1000);
   </script>
 </body>
 </html>

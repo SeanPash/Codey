@@ -8,7 +8,7 @@ function chunk(over: Partial<TimelineChunk>): TimelineChunk {
   return {
     id: "c", name: "Task", narration: "", startTs: 0, endTs: 0,
     tokenTotal: 0, workTotal: 0, contextTotal: 0, warnings: [],
-    receipt: { workTotal: 0, workLines: [], contextTotal: 0 }, ...over,
+    receipt: { workTotal: 0, workLines: [], contextTotal: 0 }, explanation: null, ...over,
   };
 }
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
