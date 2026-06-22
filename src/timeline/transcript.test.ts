@@ -56,6 +56,44 @@ describe("parseTranscript", () => {
     }));
     expect(t[0].tool).toBe("thinking");
   });
+
+  it("captures the first text block as assistantText", () => {
+    const t = parseTranscript(JSON.stringify({
+      type: "assistant", timestamp: "2026-06-20T10:00:06.000Z",
+      message: {
+        usage: { output_tokens: 10 },
+        content: [
+          { type: "text", text: "Let me check the config." },
+          { type: "tool_use", name: "Read", id: "t1", input: { file_path: "/a/b.ts" } },
+        ],
+      },
+    }));
+    expect(t[0].assistantText).toBe("Let me check the config.");
+  });
+
+  it("returns null for assistantText when there is no text block", () => {
+    const t = parseTranscript(JSON.stringify({
+      type: "assistant", timestamp: "2026-06-20T10:00:07.000Z",
+      message: {
+        usage: { output_tokens: 5 },
+        content: [{ type: "tool_use", name: "Bash", id: "t2", input: { command: "ls" } }],
+      },
+    }));
+    expect(t[0].assistantText).toBeNull();
+  });
+
+  it("clamps assistantText to ~200 chars and collapses whitespace", () => {
+    const longText = "word ".repeat(60).trim(); // 299 chars
+    const t = parseTranscript(JSON.stringify({
+      type: "assistant", timestamp: "2026-06-20T10:00:08.000Z",
+      message: {
+        usage: { output_tokens: 20 },
+        content: [{ type: "text", text: longText }],
+      },
+    }));
+    expect(t[0].assistantText).not.toBeNull();
+    expect(t[0].assistantText!.length).toBeLessThanOrEqual(200);
+  });
 });
 
 describe("firstUserPrompt", () => {
