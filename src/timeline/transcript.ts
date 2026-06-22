@@ -87,25 +87,6 @@ export function parseTranscript(text: string): AssistantTurn[] {
   return turns;
 }
 
-// The first human prompt, used as a fallback session name. Content may be a plain string
-// or an array of blocks; we take the first text we find.
-export function firstUserPrompt(text: string): string | null {
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    if (!line) continue;
-    let r: Record<string, any>;
-    try { r = JSON.parse(line); } catch { continue; }
-    if (r.type !== "user") continue;
-    const c = r.message?.content;
-    if (typeof c === "string" && c.trim()) return c.trim();
-    if (Array.isArray(c)) {
-      const t = c.find((b) => b && typeof b === "object" && b.type === "text");
-      if (t && typeof t.text === "string" && t.text.trim()) return t.text.trim();
-    }
-  }
-  return null;
-}
-
 export interface UserPrompt { ts: number; text: string; }
 
 // Turn a raw user message into a clean prompt heading, or "" if it is not a real human
@@ -116,7 +97,7 @@ export function cleanPromptText(s: string): string {
   const cmd = /<command-name>([^<]+)<\/command-name>/.exec(s);
   if (cmd) return "/" + cmd[1].trim().replace(/^\//, "");
   const head = s.trim();
-  if (/^<(command-message|command-args|local-command-stdout|bash-input|bash-stdout)/.test(head)) return "";
+  if (/^<(command-message|command-args|local-command-stdout|local-command-caveat|bash-input|bash-stdout)/.test(head)) return "";
   if (/^<system-reminder>/.test(head) || head.startsWith("Caveat:")) return "";
   // An interrupt is not a prompt. Claude Code writes "[Request interrupted by user]" (sometimes
   // "...for tool use") as a user turn when you cancel; left in, it becomes a phantom live group.
@@ -170,12 +151,22 @@ export function readUserPrompts(path: string | null): UserPrompt[] {
   }
 }
 
-// Glue: read the first prompt off disk; tolerate a missing/unreadable path.
+// Session-control commands carry no intent, so they make poor titles. We skip them when
+// naming a session (a /clear then "hi" is named "hi"), but still fall back to one if it is
+// the only prompt there is.
+const CONTROL_COMMANDS = new Set(["/clear", "/compact"]);
+
+// Glue: the first human prompt off disk, used as a session name. Routed through the same
+// cleaning the timeline body uses, so a session that opens with a command, a skill, or an
+// injected reminder is named off real words instead of raw markup. Skips a leading /clear or
+// /compact so the name reflects the actual work. Null on a missing path.
 export function readFirstPrompt(path: string | null): string | null {
   if (!path) return null;
   try {
     if (!existsSync(path)) return null;
-    return firstUserPrompt(readFileSync(path, "utf8"));
+    const ps = userPrompts(readFileSync(path, "utf8"));
+    const named = ps.find((p) => !CONTROL_COMMANDS.has(p.text)) ?? ps[0];
+    return named?.text ?? null;
   } catch {
     return null;
   }
