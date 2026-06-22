@@ -57,7 +57,11 @@ export interface SessionListItem {
 // just did something); "open" is a generous window where the terminal is likely still up and
 // the user may be composing their next prompt.
 export const RUNNING_WINDOW_MS = 15_000;
-export const OPEN_WINDOW_MS = 30 * 60_000;
+// "Open" drives the Active Terminals grid ("terminals open right now"). A clean close fires
+// SessionEnd and drops the tile at once; this window is only the backstop for a terminal that
+// was force-closed or crashed without firing it. Keep it short so a dead terminal does not
+// linger in the grid: long enough to cover composing the next prompt, not half an hour.
+export const OPEN_WINDOW_MS = 10 * 60_000;
 // A pure thinking gap (prompt submitted, no tool call yet, no Stop) is short in practice.
 // Bounding it keeps a terminal that was closed mid-turn, which never fired Stop, from
 // counting as running forever and inflating the live count.

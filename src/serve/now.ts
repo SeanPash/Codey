@@ -2,7 +2,7 @@ import type { ToolEvent } from "../types.js";
 import type { StatusSnapshot } from "../statusline/state.js";
 import { actionLabel, pastTense, shortTarget } from "../statusline/labels.js";
 import { computeOpenCalls } from "../warnings/open-calls.js";
-import { OPEN_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
+import { RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
 
 export interface NowStep {
   label: string;
@@ -70,7 +70,10 @@ export function buildNowView(events: ToolEvent[], status: StatusSnapshot | null,
     && status.promptAt > (status.doneAt ?? 0)
     && now - status.promptAt < THINKING_WINDOW_MS;
 
-  const recent = lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS;
+  // The NOW strip means "right now", so the trailing window is short: it only bridges the
+  // brief gap between two back-to-back tools. It must not be the generous 30-minute "open"
+  // window, or the strip and its Follow-live timer keep ticking long after Claude has stopped.
+  const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
   const live = !!current || thinking || recent;
 
   const steps = completedSteps(events).slice(-TRAIL).reverse();

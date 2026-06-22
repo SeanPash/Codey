@@ -4295,21 +4295,41 @@ function isStale(cache, eventCount) {
   if (!cache) return true;
   return eventCount - cache.eventCount > STALE_SLACK;
 }
+function segmentPlan(cache, eventCount, live, turnStartIndex) {
+  if (eventCount === 0) return { refresh: false, lockBefore: 0 };
+  if (!cache) return { refresh: true, lockBefore: 0 };
+  const lockBefore = Math.max(0, Math.min(turnStartIndex, eventCount));
+  const refresh2 = live && isStale(cache, eventCount) && lockBefore < eventCount;
+  return { refresh: refresh2, lockBefore };
+}
+function mergeSegmentation(prev, tail, lockBefore) {
+  const frozen = prev.filter((c) => c.startIndex < lockBefore);
+  const shifted = tail.map((c) => ({ ...c, startIndex: c.startIndex + lockBefore }));
+  const merged = [...frozen, ...shifted].sort((a, b) => a.startIndex - b.startIndex);
+  if (merged.length === 0) return [];
+  merged[0] = { ...merged[0], startIndex: 0 };
+  const seen = /* @__PURE__ */ new Set();
+  return merged.filter((c) => seen.has(c.startIndex) ? false : (seen.add(c.startIndex), true));
+}
 var refreshing = /* @__PURE__ */ new Set();
-function refresh(sessionId, events, root) {
+function refresh(sessionId, events, lockBefore, prev, root) {
   if (refreshing.has(sessionId)) return;
   refreshing.add(sessionId);
-  runSegmentation(buildSegmentationPrompt(events)).then((text) => {
-    const chunks = text ? parseSegmentation(text, events.length) : [];
+  const slice = events.slice(lockBefore);
+  runSegmentation(buildSegmentationPrompt(slice)).then((text) => {
+    const tail = text ? parseSegmentation(text, slice.length) : [];
+    if (tail.length === 0) return;
+    const chunks = mergeSegmentation(prev, tail, lockBefore);
     if (chunks.length > 0) writeCache(sessionId, { eventCount: events.length, chunks }, root);
   }).catch(() => {
   }).finally(() => {
     refreshing.delete(sessionId);
   });
 }
-function chunksFor(sessionId, events, root = defaultRoot()) {
+function chunksFor(sessionId, events, root = defaultRoot(), opts = { live: true, turnStartIndex: 0 }) {
   const cache = readCache(sessionId, root);
-  if (isStale(cache, events.length)) refresh(sessionId, events, root);
+  const plan = segmentPlan(cache, events.length, opts.live, opts.turnStartIndex);
+  if (plan.refresh) refresh(sessionId, events, plan.lockBefore, cache?.chunks ?? [], root);
   return cache && cache.chunks.length > 0 ? cache.chunks : naiveSegment(events);
 }
 
@@ -4404,7 +4424,7 @@ function latestSessionId(root = defaultRoot()) {
   return names.map((name) => ({ name, mtime: statSync(join9(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
 }
 var RUNNING_WINDOW_MS = 15e3;
-var OPEN_WINDOW_MS = 30 * 6e4;
+var OPEN_WINDOW_MS = 10 * 6e4;
 var THINKING_WINDOW_MS = 3 * 6e4;
 function dayBucket(mtime, now) {
   const d = new Date(mtime);
@@ -5008,22 +5028,24 @@ function actionInstruction(depth) {
       return "In a few plain English sentences for a non-technical person, explain what Claude did in this single step, why it matters, and how it works.";
   }
 }
+var SELF_CONTAINED = "Explain only the steps shown above. The steps are all the context that exists, so never ask the user for more information, never say you lack context, and never ask them to describe what happened. If the detail is sparse, give your best plain high-level explanation from what is shown.";
 var TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation, no preamble.";
 function buildTaskExplainPrompt(taskName, lines, depth) {
   const body = lines.map(actionContext).join("\n");
   return [
-    `An AI coding agent worked on a task called "${taskName}". These are the steps it took, with its own reasoning:`,
+    `Codey automatically grouped these steps from an AI coding agent and labeled the group "${taskName}". That label is a rough guess, not the agent's stated goal, so explain what the steps below actually accomplish and do not claim the agent did the wrong thing just because the steps differ from the label. These are the steps, with the agent's own reasoning:`,
     body,
     "",
-    `${taskInstruction(depth)} ${TAIL}`
+    `${taskInstruction(depth)} ${SELF_CONTAINED} ${TAIL}`
   ].join("\n");
 }
 function buildActionExplainPrompt(line, depth) {
+  const intro = line.tool === "thinking" ? "An AI coding agent paused to reason before its next action. This is that thinking step, with the agent's own words:" : "An AI coding agent took this single step, with its own reasoning:";
   return [
-    "An AI coding agent took this single step, with its own reasoning:",
+    intro,
     actionContext(line),
     "",
-    `${actionInstruction(depth)} ${TAIL}`
+    `${actionInstruction(depth)} ${SELF_CONTAINED} ${TAIL}`
   ].join("\n");
 }
 
@@ -5218,7 +5240,7 @@ function buildNowView(events, status, now) {
   const openCalls = computeOpenCalls(events);
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
   const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
-  const recent = lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS;
+  const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
   const live = !!current || thinking || recent;
   const steps = completedSteps(events).slice(-TRAIL).reverse();
   if (current) {
@@ -5252,9 +5274,13 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
-  const rawChunks = chunksFor(sessionId, events, root);
   const now = Date.now();
   const live = isRunning(store.dir, now);
+  const promptMarks = readPrompts(store.dir);
+  const lastPrompt = promptMarks.length ? promptMarks[promptMarks.length - 1] : 0;
+  const foundTurn = lastPrompt > 0 ? events.findIndex((e) => e.timestamp >= lastPrompt) : 0;
+  const turnStartIndex = foundTurn >= 0 ? foundTurn : events.length;
+  const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex });
   let mtimeMs = 0;
   try {
     mtimeMs = statSync2(store.path).mtimeMs;
@@ -5269,7 +5295,7 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     customName: readCustomName(store.dir)
   });
   let prompts = readUserPrompts(meta?.transcriptPath ?? null);
-  if (prompts.length === 0) prompts = readPrompts(store.dir).map((ts) => ({ ts, text: "" }));
+  if (prompts.length === 0) prompts = promptMarks.map((ts) => ({ ts, text: "" }));
   const { seedDepth, genAuto } = timelineDefaults(readSessionMode(store.dir));
   const snap = buildSnapshot({
     sessionId,
