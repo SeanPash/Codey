@@ -245,7 +245,8 @@
     .phead .pproj { font-size:10px; color:var(--body); background:#11151d; border:1px solid #232c3c; border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--sky); }
     .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:#bfe0ff; background:rgba(95,176,255,.12); border:1px solid rgba(95,176,255,.32); }
-    .pbody { padding:9px; display:flex; flex-direction:column; gap:7px; overflow-y:auto; flex:1; min-height:0; }
+    .pbody { padding:9px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1; min-height:0; }
+    .pbody .card { margin-bottom:0; }
     .ptc { background:#141925; border:1px solid #232c3c; border-radius:8px; padding:8px 10px; }
     .ptc.cur { background:#141b27; border-color:#2f4f74; }
     .ptcr { display:flex; align-items:flex-start; gap:8px; }
@@ -598,17 +599,20 @@
           ? chunks.map((c) => cardHtml(c, maxWork, barFor(c), snap)).join("")
           : '<div class="empty">No activity recorded for this session yet.</div>');
 
-      const rerender = () => renderSingle(snap);
-      const wire = (sel, fn) => main.querySelectorAll(sel).forEach((el) => {
+      wireCards(main, () => renderSingle(snap));
+      wireIntervention(main);
+    }
+
+    // Shared expand/collapse wiring for task cards, used by both Single and Active Terminals.
+    function wireCards(scope, rerender) {
+      const wire = (sel, fn) => scope.querySelectorAll(sel).forEach((el) => {
         const run = () => { fn(el); rerender(); };
         el.addEventListener("click", (e) => { e.stopPropagation(); run(); });
         el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); } });
       });
-
       wire(".js-toggle", (el) => { const id = el.closest(".card").dataset.id; open.has(id) ? open.delete(id) : open.add(id); });
       wire(".js-work", (el) => { const id = el.dataset.id; workCollapsed.has(id) ? workCollapsed.delete(id) : workCollapsed.add(id); });
       wire(".rline.can", (el) => { const k = el.dataset.line; lineOpen.has(k) ? lineOpen.delete(k) : lineOpen.add(k); });
-      wireIntervention(main);
     }
 
     function wireIntervention(scope) {
@@ -684,23 +688,30 @@
     }
 
     // ---- Active Terminals (multi-session) ----
-    const SPLIT_PER_PAGE = 3;
+    const SPLIT_PER_PAGE = 2;
     let lastLive = null; // keep the last payload so pager clicks re-render without a refetch
 
     function paneHtml(s, isFirst) {
       const cls = "pane" + (s.runningTool ? " run" : "");
       const pill = isFirst && s.running ? `<span class="badge">&#10022; Just prompted</span>` : "";
       const proj = s.project ? `<span class="pproj">${esc(s.project)}</span>` : "";
-      const lastIdx = s.chunks.length - 1;
-      const cards = s.chunks.map((c, i) => {
-        const cur = i === lastIdx ? " cur" : "";
-        const run = i === lastIdx && s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
-        return `<div class="ptc${cur}"><div class="ptcr"><div class="pn"><b>${esc(c.name)}</b><span>${esc(c.narration || "")}</span></div>`
-          + `<div class="pchip"><b>${fmt(c.workTotal)}</b><small>tok</small></div></div>${run}</div>`;
-      }).join("") || '<div class="prun" style="padding:4px">just started</div>';
+      // Namespace each chunk id with the session so the same card index in two panes does not
+      // share expand state. Render the full Single-view card so panes get the same receipts.
+      const chunks = s.chunks.map((c) => ({ ...c, id: s.sessionId + "~" + c.id }));
+      const lastFinite = chunks.reduce((m, c) => {
+        const e = c.endTs < 1e15 ? c.endTs : c.startTs;
+        return e > m ? e : m;
+      }, 0) || Date.now();
+      const pseudo = { live: s.running, lastActivityAt: lastFinite };
+      const maxWork = Math.max(1, ...chunks.map((c) => c.workTotal));
+      const cards = chunks.length
+        ? chunks.map((c) => cardHtml(c, maxWork, null, pseudo)).join("")
+        : '<div class="prun" style="padding:4px">just started</div>';
+      const runl = s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
       return `<div class="${cls}"><div class="phead"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
         + `<span class="pname">${esc(s.name)}</span>${proj}${pill}`
-        + `<span class="pwork">work <b>${fmt(s.workTotal)}</b></span></div><div class="pbody">${cards}</div></div>`;
+        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span></div>`
+        + `<div class="pbody">${cards}${runl}</div></div>`;
     }
 
     function renderSplit(live) {
@@ -732,6 +743,7 @@
       const next = document.getElementById("pg-next");
       if (prev) prev.addEventListener("click", () => { splitPinned = true; splitPage--; renderSplit(lastLive); });
       if (next) next.addEventListener("click", () => { splitPinned = true; splitPage++; renderSplit(lastLive); });
+      wireCards(main, () => renderSplit(lastLive));
     }
 
     function tick() { if (view === "single") return tickSingle(); return tickSplit(); }
