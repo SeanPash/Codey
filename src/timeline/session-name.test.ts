@@ -22,6 +22,40 @@ describe("sessionDisplayName", () => {
     expect(sessionDisplayName({ firstChunkName: null, firstPrompt: null, sessionId: "8535319b-3132-404f", mtimeMs: 0 }))
       .toBe("Session 8535319b");
   });
+
+  it("customName wins over AI chunk name and first prompt", () => {
+    expect(sessionDisplayName({
+      firstChunkName: "Reinstall the plugin",
+      firstPrompt: "delete and reinstall codey",
+      sessionId: "abc",
+      mtimeMs: 0,
+      customName: "My project sprint",
+    })).toBe("My project sprint");
+  });
+
+  it("customName is clamped to MAX_TITLE (38 chars)", () => {
+    const long = "A very long custom name that exceeds the maximum title length for display";
+    const result = sessionDisplayName({ firstChunkName: null, firstPrompt: null, sessionId: "abc", mtimeMs: 0, customName: long });
+    expect(result.length).toBeLessThanOrEqual(38);
+    expect(result.endsWith("…")).toBe(true);
+  });
+
+  it("null or whitespace customName falls through to normal logic", () => {
+    expect(sessionDisplayName({
+      firstChunkName: "Reinstall the plugin",
+      firstPrompt: "do something",
+      sessionId: "abc",
+      mtimeMs: 0,
+      customName: null,
+    })).toBe("Reinstall the plugin");
+    expect(sessionDisplayName({
+      firstChunkName: "Reinstall the plugin",
+      firstPrompt: "do something",
+      sessionId: "abc",
+      mtimeMs: 0,
+      customName: "   ",
+    })).toBe("Reinstall the plugin");
+  });
 });
 
 describe("projectFrom", () => {

@@ -6,6 +6,7 @@ import { readPrompts } from "../capture/prompts.js";
 import { readMeta } from "../store/session-meta.js";
 import { readFirstPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
+import { readCustomName } from "../store/session-name-store.js";
 import { readStatus } from "../statusline/state.js";
 
 // The mtime of a session's events.jsonl, or null if it has none. This is the real
@@ -94,6 +95,7 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         firstPrompt: readFirstPrompt(meta?.transcriptPath ?? null),
         sessionId: id,
         mtimeMs: mtime,
+        customName: readCustomName(dir),
       });
       // "thinking" covers the gap when Claude is working but hasn't emitted a tool call for
       // more than RUNNING_WINDOW_MS: a prompt newer than the last stop means it is still live.

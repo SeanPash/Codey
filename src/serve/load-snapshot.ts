@@ -5,6 +5,7 @@ import { readMeta } from "../store/session-meta.js";
 import { readPrompts } from "../capture/prompts.js";
 import { readTranscriptTurns, readFirstPrompt, readUserPrompts, type UserPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
+import { readCustomName } from "../store/session-name-store.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import { resolveActiveWarning } from "../intervene/active-warning.js";
@@ -45,6 +46,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     firstPrompt: readFirstPrompt(meta?.transcriptPath ?? null),
     sessionId,
     mtimeMs,
+    customName: readCustomName(store.dir),
   });
   // Prompt boundaries come from the transcript (it has the text). Fall back to the prompt-log
   // timestamps, labeled generically, when no transcript is available.
