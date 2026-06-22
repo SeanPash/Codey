@@ -107,7 +107,7 @@
     .sess .smeta { color:var(--muted); font-size:9.5px; margin-top:3px; padding-left:16px; }
     .sess .rproj { color:var(--body); }
     .sdot { width:6px;height:6px;border-radius:50%;background:var(--sky);flex:none;animation:pp 1.8s infinite; }
-    @keyframes pp { 0%{box-shadow:0 0 0 0 rgba(95,176,255,.5)} 70%{box-shadow:0 0 0 5px rgba(95,176,255,0)} 100%{box-shadow:0 0 0 0 rgba(95,176,255,0)} }
+    @keyframes pp { 0%{box-shadow:0 0 0 0 rgba(95,176,255,.35)} 70%{box-shadow:0 0 0 3px rgba(95,176,255,0)} 100%{box-shadow:0 0 0 0 rgba(95,176,255,0)} }
 
     .center { flex:1; min-width:0; padding:16px 20px; }
     .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:var(--head); align-self:stretch; }
@@ -207,13 +207,13 @@
     /* the step Claude is on right now: a solid GREEN accent bar, a clearly brighter background,
        and a gentle pulse. Green is the live color and nothing else uses it, so the current step
        can never be mistaken for a hovered row (hover stays neutral grey). */
-    .rline.cur { background:rgba(54,215,127,.16); border-radius:6px; box-shadow:inset 3px 0 0 var(--live); animation:livepulse 1.8s ease-in-out infinite; }
+    .rline.cur { background:rgba(54,215,127,.15); border-radius:6px; box-shadow:inset 3px 0 0 var(--live); animation:livepulse 2.6s ease-in-out infinite; }
     .rline.cur .lbl { color:#d6ffe7; font-weight:700; }
-    .rline.cur .sw { background:var(--live); box-shadow:0 0 0 0 rgba(54,215,127,.5); animation:ppl 1.5s infinite; }
+    .rline.cur .sw { background:var(--live); box-shadow:0 0 0 0 rgba(54,215,127,.35); animation:ppl 2s infinite; }
     .rline.cur .st { color:var(--live); }
-    @keyframes livepulse { 0%,100% { background:rgba(54,215,127,.16); } 50% { background:rgba(54,215,127,.09); } }
+    @keyframes livepulse { 0%,100% { background:rgba(54,215,127,.15); } 50% { background:rgba(54,215,127,.115); } }
     /* the green pulse ring, for any dot/pip that marks the live instant */
-    @keyframes ppl { 0%{box-shadow:0 0 0 0 rgba(54,215,127,.5)} 70%{box-shadow:0 0 0 5px rgba(54,215,127,0)} 100%{box-shadow:0 0 0 0 rgba(54,215,127,0)} }
+    @keyframes ppl { 0%{box-shadow:0 0 0 0 rgba(54,215,127,.35)} 70%{box-shadow:0 0 0 3px rgba(54,215,127,0)} 100%{box-shadow:0 0 0 0 rgba(54,215,127,0)} }
     @media (prefers-reduced-motion: reduce) { .rline.cur { animation:none; } }
     .curpip { width:6px; height:6px; border-radius:50%; background:var(--live); animation:ppl 1.4s infinite; flex:none; }
     /* plain-English failure note, shown inline under a failed line */

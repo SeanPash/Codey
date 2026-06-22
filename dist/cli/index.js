@@ -5270,14 +5270,15 @@ function buildNowView(events, status, now) {
   const lastActivity = events.reduce((m, e) => Math.max(m, e.timestamp), 0);
   const closed = status?.closedAt != null && status.closedAt >= Math.max(lastActivity, status.promptAt ?? 0);
   if (closed) return { ...empty, steps: completedSteps(events).slice(-TRAIL).reverse() };
-  const openCalls = computeOpenCalls(events);
-  const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
-  const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
+  const steps = completedSteps(events).slice(-TRAIL).reverse();
   const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
   const finished = status?.doneAt != null && status.doneAt >= lastSignal;
+  if (finished) return { ...empty, steps };
+  const openCalls = computeOpenCalls(events);
+  const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
+  const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && now - status.promptAt < THINKING_WINDOW_MS;
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  const live = !!current || thinking || recent && !finished;
-  const steps = completedSteps(events).slice(-TRAIL).reverse();
+  const live = !!current || thinking || recent;
   if (current) {
     const action = {
       label: currentLabel(current.tool, current.input),

@@ -100,6 +100,22 @@ describe("buildNowView", () => {
     expect(v.steps.length).toBe(1);
   });
 
+  it("goes quiet after the turn ends even with a dangling open call from an errored tool", () => {
+    // A tool that errors fires no PostToolUse, so its "pre" never gets a "post" and looks
+    // open forever. Once the Stop hook stamps doneAt past every signal the turn is over, so
+    // the strip must not treat that stale pre as a running step.
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Read", input: { file_path: "a.txt" }, timestamp: 1000 }),
+      ev({ phase: "pre", tool: "Bash", input: { command: "ls" }, timestamp: 1100 }),
+      ev({ phase: "post", tool: "Bash", timestamp: 1200 }),
+    ];
+    const v = buildNowView(events, status({ doneAt: 2000 }), 3000);
+    expect(v.live).toBe(false);
+    expect(v.action).toBeNull();
+    // The trail still shows what did complete, so the strip is not blank.
+    expect(v.steps.map((s) => s.label)).toEqual(["Listed the files here"]);
+  });
+
   it("is not live when the terminal was closed, even mid-tool", () => {
     const now = 5000;
     const events: ToolEvent[] = [ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 4000 })];

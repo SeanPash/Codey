@@ -83,27 +83,29 @@ export function buildNowView(events: ToolEvent[], status: StatusSnapshot | null,
   const closed = status?.closedAt != null && status.closedAt >= Math.max(lastActivity, status.promptAt ?? 0);
   if (closed) return { ...empty, steps: completedSteps(events).slice(-TRAIL).reverse() };
 
+  const steps = completedSteps(events).slice(-TRAIL).reverse();
+
+  // When Claude finishes a turn the Stop hook stamps doneAt. If that stamp is newer than every
+  // other signal (the last tool event and the last prompt), the turn is genuinely over, so the
+  // strip goes quiet at once with just the completed trail. No tool can still be running after a
+  // Stop, so any leftover open "pre" is stale (an errored tool fires no PostToolUse, so its pre
+  // never closes) and must not keep the strip live. A new prompt or tool call pushes a signal
+  // past doneAt and relights it.
+  const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
+  const finished = status?.doneAt != null && status.doneAt >= lastSignal;
+  if (finished) return { ...empty, steps };
+
   const openCalls = computeOpenCalls(events);
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
   const thinking = !current && status?.promptAt != null
     && status.promptAt > lastActivity
-    && status.promptAt > (status.doneAt ?? 0)
     && now - status.promptAt < THINKING_WINDOW_MS;
-
-  // When Claude finishes a turn the Stop hook stamps doneAt. If that stamp is newer than every
-  // other signal (the last tool event and the last prompt), the turn is genuinely over, so the
-  // strip goes quiet at once instead of lingering out the recent-activity window. A new prompt
-  // or tool call pushes a signal past doneAt and relights it.
-  const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
-  const finished = status?.doneAt != null && status.doneAt >= lastSignal;
 
   // The NOW strip means "right now", so the trailing window is short: it only bridges the brief
   // gap between two back-to-back tools (where Stop has not fired). It is not the generous
   // 30-minute "open" window, or the strip and its Follow-live timer would tick on after a stop.
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  const live = !!current || thinking || (recent && !finished);
-
-  const steps = completedSteps(events).slice(-TRAIL).reverse();
+  const live = !!current || thinking || recent;
 
   if (current) {
     const action = {
