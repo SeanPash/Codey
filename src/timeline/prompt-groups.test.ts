@@ -13,7 +13,7 @@ function chunk(over: Partial<TimelineChunk>): TimelineChunk {
 }
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
   return { ts: 0, outputTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
-    tool: null, input: null, isError: false, errorText: null, toolUseId: null, ...over };
+    tool: null, input: null, isError: false, errorText: null, toolUseId: null, assistantText: null, ...over };
 }
 
 describe("groupByPrompt", () => {
@@ -45,7 +45,7 @@ describe("groupByPrompt", () => {
     const g = groupByPrompt(prompts, chunks, turns, 9000, false);
     expect(g[0].workTotal).toBe(300);           // 100 + 200
     expect(g[0].contextTotal).toBe(100);        // 50 + 50
-    expect(g[0].tokenTotal).toBe(400);
+    expect(g[0].tokenTotal).toBe(300);          // work only (not work + context)
     expect(g[0].durationMs).toBe(4000);         // 5000 - 1000
     expect(g[1].workTotal).toBe(300);
     expect(g[1].durationMs).toBe(4000);         // sessionEnd 9000 - prompt start 5000
@@ -81,5 +81,18 @@ describe("groupByPrompt", () => {
     expect(g[0].prompt).toBe("Earlier in this session");
     expect(g[0].chunks.map((c) => c.id)).toEqual(["e0"]);
     expect(g[1].prompt).toBe("hello");
+  });
+
+  it("tokenTotal equals work tokens only, not work + context", () => {
+    const mixedTurns = [
+      turn({ ts: 1100, outputTokens: 100, inputTokens: 500, cacheReadTokens: 2000 }),
+      turn({ ts: 1200, outputTokens: 200, inputTokens: 600, cacheReadTokens: 3000 }),
+    ];
+    const g = groupByPrompt([{ ts: 1000, text: "do it" }], [], mixedTurns, 9000, false);
+    // work = 100 + 200 = 300, context = (500+2000) + (600+3000) = 6100; tokenTotal should be just 300
+    expect(g[0].workTotal).toBe(300);
+    expect(g[0].contextTotal).toBe(6100);
+    expect(g[0].tokenTotal).toBe(300);
+    expect(g[0].tokenTotal).not.toBe(g[0].workTotal + g[0].contextTotal);
   });
 });

@@ -121,7 +121,7 @@ function wrapWhy(text: string, width: number, maxLines: number): string[] {
 
 // Format the task number, widening to a range when the card stands for a burst.
 function tasknum(c: { seq: number; endSeq?: number }): string {
-  return c.endSeq && c.endSeq !== c.seq ? `#${c.seq}–${c.endSeq}` : `#${c.seq}`;
+  return c.endSeq && c.endSeq !== c.seq ? `#${c.seq}-${c.endSeq}` : `#${c.seq}`;
 }
 
 export function renderStatus(view: StatusView, width = WRAP): string {
@@ -176,9 +176,11 @@ export function renderStatus(view: StatusView, width = WRAP): string {
   }
 
   out.push(f.divider("Current task"));
+  // Read as a sentence ("Claude is writing the file foo.ts"), not a bare verb, so a glance
+  // tells you what is happening. The tight past-tense form is kept for the done rows above.
   out.push(
     f.listItem(
-      `${BOLD}${accent}▸${RESET} ${NUM}${tasknum(view.current)}${RESET} ${GRAY}${view.current.tag}${RESET} ${TEXT}${shortTarget(view.current.target)}${RESET}`,
+      `${BOLD}${accent}▸${RESET} ${NUM}${tasknum(view.current)}${RESET} ${GRAY}Claude is ${view.current.tag}${RESET} ${TEXT}${view.current.target}${RESET}`,
     ),
   );
   if (view.current.raw) {

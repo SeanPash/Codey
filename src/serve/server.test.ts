@@ -41,4 +41,25 @@ describe("resolveRoute", () => {
     expect(resolveRoute("GET", "/fonts/W95FA.woff")).toEqual({ type: "font", file: "W95FA.woff" });
     expect(resolveRoute("GET", "/fonts/../secret")).toEqual({ type: "notfound" });
   });
+
+  it("routes POST /api/session/:id/name to rename", () => {
+    expect(resolveRoute("POST", "/api/session/abc/name")).toEqual({ type: "rename", id: "abc" });
+  });
+
+  it("routes DELETE /api/session/:id to delete", () => {
+    expect(resolveRoute("DELETE", "/api/session/abc")).toEqual({ type: "delete", id: "abc" });
+  });
+
+  it("GET /api/session/:id still resolves to session (not delete)", () => {
+    expect(resolveRoute("GET", "/api/session/abc")).toEqual({ type: "session", id: "abc" });
+  });
+
+  it("POST /api/session/:id/intervene still resolves to intervene", () => {
+    expect(resolveRoute("POST", "/api/session/abc/intervene")).toEqual({ type: "intervene", id: "abc" });
+  });
+
+  it("decodes percent-encoded ids in rename and delete routes", () => {
+    expect(resolveRoute("POST", "/api/session/my%20session/name")).toEqual({ type: "rename", id: "my session" });
+    expect(resolveRoute("DELETE", "/api/session/my%20session")).toEqual({ type: "delete", id: "my session" });
+  });
 });

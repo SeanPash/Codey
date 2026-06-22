@@ -28,8 +28,8 @@ describe("renderStatus", () => {
   it("shows the current task with its raw command as an indented sub-line", () => {
     const out = plain(renderStatus(base));
     expect(out).toContain("Current task");
-    expect(out).toContain("#15 removing temp-demo.txt");
-    const taskIdx = out.indexOf("#15 removing temp-demo.txt");
+    expect(out).toContain("#15 Claude is removing the file temp-demo.txt");
+    const taskIdx = out.indexOf("#15 Claude is removing the file temp-demo.txt");
     const rawIdx = out.indexOf("running  C:\\proj\\temp-demo.txt");
     expect(rawIdx).toBeGreaterThan(taskIdx); // raw sits UNDER the task now
   });
@@ -53,7 +53,7 @@ describe("renderStatus", () => {
       prev: [{ seq: 14, tag: "reading", target: "the file rules.md", raw: "rules.md" }],
     }));
     expect(out).toContain("✓ #14 read rules.md");
-    expect(out).toContain("▸ #15 removing temp-demo.txt");
+    expect(out).toContain("▸ #15 Claude is removing the file temp-demo.txt");
   });
 
   it("shows the why under an Explanation section when present", () => {
@@ -92,7 +92,7 @@ describe("renderStatus", () => {
       ...base,
       current: { seq: 3, endSeq: 7, tag: "reading", target: "5 files (a.ts, b.ts, +3)", raw: null },
     }));
-    expect(out).toContain("#3–7 reading 5 files (a.ts, b.ts, +3)");
+    expect(out).toContain("#3-7 Claude is reading 5 files (a.ts, b.ts, +3)");
   });
 
   it("clamps a very long raw command to a single line with an ellipsis", () => {
@@ -106,7 +106,7 @@ describe("renderStatus", () => {
 
   it("omits the raw sub-line when the current card has no raw", () => {
     const out = plain(renderStatus({ ...base, current: { ...base.current!, raw: null } }));
-    expect(out).toContain("#15 removing temp-demo.txt");
+    expect(out).toContain("#15 Claude is removing the file temp-demo.txt");
     expect(out).not.toContain("↳ running");
   });
 

@@ -14,5 +14,5 @@ export function buildNarrationPrompt(events: ToolEvent[], mode: Mode): string {
       : mode === "deep"
       ? "In 2-3 plain-English sentences for a non-technical person, explain what Claude is doing, why it matters, and how this change actually addresses the problem. Do not list the tools; describe the goal."
       : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Do not list the tools; describe the goal.";
-  return `These are the most recent actions an AI coding agent took:\n${lines}\n\n${instruction}\nUse plain hyphens, not em dashes. Reply with only the explanation, no preamble.`;
+  return `These are the most recent actions an AI coding agent took:\n${lines}\n\n${instruction}\nWrite plain English. Never use em dashes; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }

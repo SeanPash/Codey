@@ -70,9 +70,9 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     const endTs = next ? (events[next.startIndex]?.timestamp ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
     const slice = events.slice(rc.startIndex, endIndex);
     const raw = attributeChunk(turns, startTs, endTs);
-    // The "why" behind each action is the task's own narration. Reusing it costs no tokens.
+    // Fill narration only where the line has no real per-action explanation.
     const why = rc.narration || null;
-    const workLines = groupThinking(raw.workLines).map((l) => ({ ...l, why }));
+    const workLines = groupThinking(raw.workLines).map((l) => ({ ...l, why: l.why ?? why }));
     const receipt = { ...raw, workLines };
     return {
       id: `c${idx}`,

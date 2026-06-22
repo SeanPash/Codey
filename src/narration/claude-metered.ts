@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { headlessEnv } from "./claude-spawn.js";
 
 export interface MeteredResult {
   text: string;
@@ -38,7 +39,7 @@ export function parseMetered(stdout: string, prompt: string): MeteredResult | nu
 // Runs the user's own Claude Code headless and reports both the text and the token spend.
 export function runClaudeMetered(prompt: string, timeoutMs = 15000): Promise<MeteredResult | null> {
   return new Promise((resolve) => {
-    execFile("claude", buildMeteredArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true }, (err, stdout) => {
+    execFile("claude", buildMeteredArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env: headlessEnv() }, (err, stdout) => {
       if (err) return resolve(null);
       resolve(parseMetered(stdout, prompt));
     });

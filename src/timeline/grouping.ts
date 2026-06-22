@@ -1,10 +1,16 @@
 import type { ReceiptLine } from "../types.js";
 
-function thinkingRow(tokens: number, ts: number, nextLabel: string | null): ReceiptLine {
-  const label = nextLabel
-    ? `Planned before ${nextLabel.charAt(0).toLowerCase()}${nextLabel.slice(1)}`
-    : "Planned the next steps";
-  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false, raw: null, why: null, failSummary: null, ts };
+// Lower-case the first character so the merged sentence flows naturally.
+function lc(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+function thinkingRow(tokens: number, ts: number, nextLine: ReceiptLine | null): ReceiptLine {
+  const label = nextLine
+    ? `Thought it through, then ${lc(nextLine.label)}`
+    : "Thought about what to do next.";
+  const why = nextLine?.why ?? null;
+  return { label, tool: "thinking", tokens, status: "none", errorText: null, resolved: false, raw: null, why, failSummary: null, ts };
 }
 
 // Collapse each run of consecutive thinking lines (status "none") into a single row.
@@ -18,7 +24,7 @@ export function groupThinking(lines: ReceiptLine[]): ReceiptLine[] {
   let inRun = false;
   for (const l of lines) {
     if (l.status === "none") { if (!inRun) runTs = l.ts; runTokens += l.tokens; inRun = true; continue; }
-    if (inRun) { out.push(thinkingRow(runTokens, runTs, l.label)); runTokens = 0; inRun = false; }
+    if (inRun) { out.push(thinkingRow(runTokens, runTs, l)); runTokens = 0; inRun = false; }
     out.push(l);
   }
   if (inRun) out.push(thinkingRow(runTokens, runTs, null));

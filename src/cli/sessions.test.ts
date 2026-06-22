@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { latestSessionId, listSessions } from "./sessions.js";
+import { latestSessionId, listSessions, dayBucket } from "./sessions.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -12,6 +12,32 @@ afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 function setMtime(p: string, epochSec: number): void {
   utimesSync(p, epochSec, epochSec);
 }
+
+describe("dayBucket", () => {
+  it("returns 'Today' when mtime is on the same calendar day as now", () => {
+    const now = new Date("2025-06-15T14:00:00").getTime();
+    expect(dayBucket(now, now)).toBe("Today");
+    // earlier the same day is still Today
+    const morningTs = new Date("2025-06-15T08:00:00").getTime();
+    expect(dayBucket(morningTs, now)).toBe("Today");
+  });
+
+  it("returns 'Yesterday' when mtime is on the previous calendar day", () => {
+    const now = new Date("2025-06-15T14:00:00").getTime();
+    const yesterdayNoon = new Date("2025-06-14T12:00:00").getTime();
+    expect(dayBucket(yesterdayNoon, now)).toBe("Yesterday");
+  });
+
+  it("returns a locale date string for older sessions", () => {
+    const now = new Date("2025-06-15T14:00:00").getTime();
+    const weekAgo = new Date("2025-06-08T10:00:00").getTime();
+    const result = dayBucket(weekAgo, now);
+    expect(result).not.toBe("Today");
+    expect(result).not.toBe("Yesterday");
+    // The string must be non-empty
+    expect(result.length).toBeGreaterThan(0);
+  });
+});
 
 describe("latestSessionId", () => {
   it("returns null when there are no sessions", () => {
@@ -72,15 +98,31 @@ describe("listSessions", () => {
     expect(listSessions(dir).map((s) => s.id)).not.toContain("phantom");
   });
 
-  it("keeps a freshly prompted session even before its first tool call, marked running", () => {
+  it("only lists sessions that have captured at least one tool event (real terminals)", () => {
+    const now = Date.now();
+    // real: has events.jsonl
+    const real = join(dir, "real");
+    mkdirSync(real);
+    writeFileSync(join(real, "events.jsonl"), '{"phase":"pre"}\n');
+    // phantom: has a prompt but no events.jsonl
+    const phantom = join(dir, "phantom");
+    mkdirSync(phantom);
+    writeFileSync(join(phantom, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
+    const ids = listSessions(dir, now).map((s) => s.id);
+    expect(ids).toContain("real");
+    expect(ids).not.toContain("phantom");
+  });
+
+  // This test previously relied on a phantom (no events) being kept when recently prompted.
+  // Task 1.2 removes that allowance. The "fresh" scenario now only applies to real terminals
+  // (those with events.jsonl). The "thinking" state is covered by Task 2.1.
+  it("hides a freshly prompted session that has no events (phantom)", () => {
     const now = Date.now();
     const fresh = join(dir, "fresh");
     mkdirSync(fresh);
     writeFileSync(join(fresh, "prompts.jsonl"), JSON.stringify({ ts: now - 2000 }) + "\n");
     const item = listSessions(dir, now).find((x) => x.id === "fresh");
-    expect(item).toBeDefined();
-    expect(item!.running).toBe(true);
-    expect(item!.open).toBe(true);
+    expect(item).toBeUndefined();
   });
 
   it("marks a recent-but-idle session open but not running", () => {
@@ -93,6 +135,52 @@ describe("listSessions", () => {
     const item = listSessions(dir, now).find((x) => x.id === "idle")!;
     expect(item.running).toBe(false);
     expect(item.open).toBe(true);
+  });
+
+  it("counts as running when prompted but not yet stopped, even outside the activity window", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const thinking = join(dir, "thinking");
+    mkdirSync(thinking);
+    writeFileSync(join(thinking, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(thinking, "events.jsonl"), base - 60); // last event 60s ago, outside 15s window
+    // Status: prompt at 30s ago, no doneAt -- Claude is still thinking
+    writeFileSync(join(thinking, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 30_000,
+      doneAt: null,
+      updatedAt: now - 30_000,
+    }));
+    const itemThinking = listSessions(dir, now).find((x) => x.id === "thinking")!;
+    expect(itemThinking.running).toBe(true);
+
+    // Now mark it done: doneAt newer than promptAt
+    writeFileSync(join(thinking, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 30_000,
+      doneAt: now - 5_000,
+      updatedAt: now - 5_000,
+    }));
+    const itemDone = listSessions(dir, now).find((x) => x.id === "thinking")!;
+    expect(itemDone.running).toBe(false);
+  });
+
+  it("does not count a terminal closed mid-turn (stale prompt, no stop) as running", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const stale = join(dir, "stale");
+    mkdirSync(stale);
+    writeFileSync(join(stale, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(stale, "events.jsonl"), base - 3600); // last event an hour ago
+    // Prompt far in the past, Stop never fired: the terminal was closed mid-turn.
+    writeFileSync(join(stale, "statusline.json"), JSON.stringify({
+      mode: "simple", action: null, why: null, warning: null,
+      promptAt: now - 3600_000,
+      doneAt: null,
+      updatedAt: now - 3600_000,
+    }));
+    const item = listSessions(dir, now).find((x) => x.id === "stale")!;
+    expect(item.running).toBe(false);
   });
 
   it("enriches each session with name, taskCount, lastPromptTs and live flag", () => {
@@ -109,5 +197,17 @@ describe("listSessions", () => {
     expect(item.taskCount).toBe(1);
     expect(item.lastPromptTs).toBe(1782070000000);
     expect(item.live).toBe(true);
+  });
+
+  it("sets a day field on each returned session item", () => {
+    const base = Math.floor(Date.now() / 1000);
+    const now = base * 1000;
+    const s = join(dir, "daySess");
+    mkdirSync(s);
+    writeFileSync(join(s, "events.jsonl"), '{"phase":"pre"}\n');
+    setMtime(join(s, "events.jsonl"), base);
+    const item = listSessions(dir, now).find((x) => x.id === "daySess")!;
+    expect(typeof item.day).toBe("string");
+    expect(item.day.length).toBeGreaterThan(0);
   });
 });

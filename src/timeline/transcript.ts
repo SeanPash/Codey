@@ -11,6 +11,7 @@ export interface AssistantTurn {
   isError: boolean;              // from the matching tool_result
   errorText: string | null;
   toolUseId: string | null;      // the tool_use block id, for pairing with hook events
+  assistantText: string | null;  // first text block the model wrote, clamped to ~200 chars
 }
 
 interface ToolResult { isError: boolean; text: string | null; }
@@ -20,6 +21,22 @@ function resultText(content: unknown): string | null {
   if (Array.isArray(content)) {
     const t = content.find((b) => b && typeof b === "object" && (b as any).type === "text");
     return t ? String((t as any).text ?? "") : null;
+  }
+  return null;
+}
+
+// Pull the first text block from an assistant message, collapsed to one line and clamped.
+function firstAssistantText(blocks: any[]): string | null {
+  const tb = blocks.find((b) => b?.type === "text");
+  if (tb && typeof tb.text === "string" && tb.text.trim()) {
+    const one = tb.text.replace(/\s+/g, " ").trim();
+    return one.length > 200 ? one.slice(0, 200) : one;
+  }
+  // Secondary: if no text block, try the first thinking block (clamped shorter).
+  const th = blocks.find((b) => b?.type === "thinking");
+  if (th && typeof th.thinking === "string" && th.thinking.trim()) {
+    const one = th.thinking.replace(/\s+/g, " ").trim();
+    return one.length > 120 ? one.slice(0, 120) : one;
   }
   return null;
 }
@@ -64,6 +81,7 @@ export function parseTranscript(text: string): AssistantTurn[] {
       isError: res?.isError ?? false,
       errorText: res?.isError ? res.text : null,
       toolUseId: toolUse?.id ?? null,
+      assistantText: firstAssistantText(blocks),
     });
   }
   return turns;

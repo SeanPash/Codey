@@ -80,7 +80,7 @@ export function groupByPrompt(
       durationMs: liveGroup ? null : Math.max(0, endTs - b.startTs),
       workTotal: work,
       contextTotal: context,
-      tokenTotal: work + context,
+      tokenTotal: work,
       taskCount: groupChunks.length,
       chunks: groupChunks,
       live: liveGroup,

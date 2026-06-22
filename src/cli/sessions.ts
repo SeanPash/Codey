@@ -6,6 +6,8 @@ import { readPrompts } from "../capture/prompts.js";
 import { readMeta } from "../store/session-meta.js";
 import { readFirstPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
+import { readCustomName } from "../store/session-name-store.js";
+import { readStatus } from "../statusline/state.js";
 
 // The mtime of a session's events.jsonl, or null if it has none. This is the real
 // activity signal: the capture hook appends to it on every tool call. We can't use the
@@ -48,6 +50,7 @@ export interface SessionListItem {
   running: boolean;        // mid-tool or active within the running window (pulsing live)
   open: boolean;           // used recently, so the terminal is probably still open
   live: boolean;           // alias of running, kept for existing callers
+  day: string;             // "Today", "Yesterday", or a locale date string
 }
 
 // Two tiers of liveness. "running" is the pulsing indicator (Claude is actively working or
@@ -55,6 +58,26 @@ export interface SessionListItem {
 // the user may be composing their next prompt.
 export const RUNNING_WINDOW_MS = 15_000;
 export const OPEN_WINDOW_MS = 30 * 60_000;
+// A pure thinking gap (prompt submitted, no tool call yet, no Stop) is short in practice.
+// Bounding it keeps a terminal that was closed mid-turn, which never fired Stop, from
+// counting as running forever and inflating the live count.
+export const THINKING_WINDOW_MS = 3 * 60_000;
+
+// Returns "Today", "Yesterday", or the locale date string for older sessions.
+// Based on calendar day boundaries, not a rolling 24h window.
+export function dayBucket(mtime: number, now: number): string {
+  // Strip to midnight of each day in local time by comparing date strings.
+  const d = new Date(mtime);
+  const n = new Date(now);
+  const mtimeDay = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const nowDay   = `${n.getFullYear()}-${n.getMonth()}-${n.getDate()}`;
+  if (mtimeDay === nowDay) return "Today";
+  // Check yesterday: midnight of now minus one day
+  const yesterday = new Date(n.getFullYear(), n.getMonth(), n.getDate() - 1);
+  const yDay = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+  if (mtimeDay === yDay) return "Yesterday";
+  return d.toLocaleDateString();
+}
 
 export function listSessions(root: string = defaultRoot(), now: number = Date.now()): SessionListItem[] {
   if (!existsSync(root)) return [];
@@ -76,8 +99,16 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         firstPrompt: readFirstPrompt(meta?.transcriptPath ?? null),
         sessionId: id,
         mtimeMs: mtime,
+        customName: readCustomName(dir),
       });
-      const running = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
+      // "thinking" covers the gap when Claude is working but hasn't emitted a tool call for
+      // more than RUNNING_WINDOW_MS: a prompt newer than the last stop means it is still live.
+      const status = readStatus(dir);
+      const thinking = evMtime != null && status?.promptAt != null
+        && status.promptAt > (status.doneAt ?? 0)
+        && now - status.promptAt < THINKING_WINDOW_MS;
+      const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
+      const running = evMtime != null && (thinking || recentActivity);
       return {
         id,
         mtime,
@@ -89,15 +120,16 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         running,
         open: lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
         live: running,
+        day: dayBucket(mtime, now),
         // carried only for the filter below; not part of the public shape
         _hasEvents: evMtime != null,
         _lastActivity: lastActivity,
       } as SessionListItem & { _hasEvents: boolean; _lastActivity: number };
     })
-    // Real terminals only: a session must have captured a tool call at some point, or have a
-    // prompt recent enough that it is plausibly a live terminal still spinning up. This drops
-    // the empty phantom folders left by headless narration calls.
-    .filter((s) => s._hasEvents || (s._lastActivity > 0 && now - s._lastActivity < OPEN_WINDOW_MS))
+    // Real terminals only: a session must have captured at least one tool call (events.jsonl).
+    // This drops the phantom folders that headless narration or the global prompt hook creates
+    // without ever running a tool.
+    .filter((s) => s._hasEvents)
     .map(({ _hasEvents, _lastActivity, ...s }) => s)
     .sort((a, b) => b.mtime - a.mtime);
 }

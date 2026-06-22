@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { headlessEnv } from "./claude-spawn.js";
 
 export function buildClaudeArgs(prompt: string): string[] {
   return ["-p", prompt, "--model", "haiku"];
@@ -9,7 +10,7 @@ export function buildClaudeArgs(prompt: string): string[] {
 // narration pass would record itself as a phantom session.
 export function runClaude(prompt: string, timeoutMs = 15000): Promise<string | null> {
   return new Promise((resolve) => {
-    const env = { ...process.env, CODEY_HEADLESS: "1" };
+    const env = headlessEnv();
     execFile("claude", buildClaudeArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env }, (err, stdout) => {
       if (err) return resolve(null);
       const out = stdout.trim();

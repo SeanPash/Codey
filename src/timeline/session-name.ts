@@ -3,6 +3,7 @@ export interface NameInputs {
   firstPrompt: string | null;     // first user message
   sessionId: string;
   mtimeMs: number;
+  customName?: string | null;     // user-set name; wins over everything when present
 }
 
 const PLACEHOLDER = new Set(["Working", "Task 2", "Continued working."]);
@@ -21,7 +22,9 @@ function clamp(s: string, n: number): string {
 
 // Pick the most human name available. The AI task name is concise and titled; the first
 // prompt is the user's own words; the id is the last resort.
+// A user-set customName wins over all automatic names when present and non-empty.
 export function sessionDisplayName(i: NameInputs): string {
+  if (i.customName && i.customName.trim()) return clamp(i.customName.trim(), MAX_TITLE);
   if (i.firstChunkName && !PLACEHOLDER.has(i.firstChunkName)) return clamp(i.firstChunkName, MAX_TITLE);
   if (i.firstPrompt) return clamp(i.firstPrompt, MAX_TITLE);
   return `Session ${i.sessionId.slice(0, 8)}`;
