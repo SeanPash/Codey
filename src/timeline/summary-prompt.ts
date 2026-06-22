@@ -34,6 +34,6 @@ export function buildSummaryPrompt(promptText: string, tasks: SummaryTask[], dep
     "It worked through these tasks, with its own reasoning:",
     body,
     "",
-    `${instruction(depth)} Focus on the outcome, do not list the tools. Use plain hyphens, not em dashes. Reply with only the recap, no preamble.`,
+    `${instruction(depth)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`,
   ].join("\n");
 }

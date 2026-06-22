@@ -69,8 +69,8 @@ export function buildExplainPrompt(events: ToolEvent[], priorPasses: string[], d
   const lines = events.map(summarizeEvent).join("\n");
   const instruction = depthInstruction(depth);
   if (priorPasses.length === 0) {
-    return `These are the actions an AI coding agent took for the current task:\n${lines}\n\n${instruction} Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation.`;
+    return `These are the actions an AI coding agent took for the current task:\n${lines}\n\n${instruction} Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation.`;
   }
   const heard = priorPasses.map((p, i) => `${i + 1}. ${p}`).join("\n");
-  return `These are the actions an AI coding agent took for the current task:\n${lines}\n\nThe user has already been told:\n${heard}\n\nGo one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction} Use plain hyphens, not em dashes. Reply with only the explanation.`;
+  return `These are the actions an AI coding agent took for the current task:\n${lines}\n\nThe user has already been told:\n${heard}\n\nGo one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction} Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation.`;
 }

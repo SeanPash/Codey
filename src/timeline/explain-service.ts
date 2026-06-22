@@ -5,6 +5,7 @@ import { buildSummaryPrompt, type SummaryTask } from "./summary-prompt.js";
 import { readExplanation, writeExplanation, type ExplainScope } from "./explain-cache.js";
 import { hashContent } from "../util/hash.js";
 import { readBudget, addSpend, budgetAllows } from "../budget/budget.js";
+import { stripDashes } from "../util/text.js";
 
 export interface ExplainRequest {
   sessionId: string;
@@ -104,7 +105,7 @@ export async function explain(snap: SessionSnapshot, req: ExplainRequest, deps: 
   const res = await deps.narrate(loc.prompt);
   if (!res || !res.text.trim()) return { text: null, cached: false, paused: false };
   addSpend(deps.sessionDir, res.tokens);
-  const text = res.text.trim();
+  const text = stripDashes(res.text.trim());
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
   return { text, cached: false, paused: false };
 }

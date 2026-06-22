@@ -35,7 +35,7 @@ function actionInstruction(depth: ExplainDepth): string {
   }
 }
 
-const TAIL = "Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation, no preamble.";
+const TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation, no preamble.";
 
 // Explain a whole task: feed the model the named task plus the reasoning behind each action,
 // so it can give a real why and how rather than a description of tool calls.
