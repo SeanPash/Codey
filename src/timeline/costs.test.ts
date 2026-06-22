@@ -5,7 +5,7 @@ import type { AssistantTurn } from "./transcript.js";
 function turn(partial: Partial<AssistantTurn>): AssistantTurn {
   return {
     ts: 0, outputTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
-    tool: null, input: null, isError: false, errorText: null, toolUseId: null, ...partial,
+    tool: null, input: null, isError: false, errorText: null, toolUseId: null, assistantText: null, ...partial,
   };
 }
 

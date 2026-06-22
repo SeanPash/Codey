@@ -16,7 +16,7 @@ function pre(id: string, tool: string, hash: string, ts: number): ToolEvent {
 function turn(toolUseId: string | null, tool: string, isError: boolean, errorText: string | null): AssistantTurn {
   return {
     ts: 0, outputTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
-    tool, input: null, isError, errorText, toolUseId,
+    tool, input: null, isError, errorText, toolUseId, assistantText: null,
   };
 }
 

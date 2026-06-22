@@ -13,7 +13,7 @@ function chunk(over: Partial<TimelineChunk>): TimelineChunk {
 }
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
   return { ts: 0, outputTokens: 0, inputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
-    tool: null, input: null, isError: false, errorText: null, toolUseId: null, ...over };
+    tool: null, input: null, isError: false, errorText: null, toolUseId: null, assistantText: null, ...over };
 }
 
 describe("groupByPrompt", () => {
