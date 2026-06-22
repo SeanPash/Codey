@@ -41,6 +41,12 @@ export function isRunning(dir: string, now: number): boolean {
   if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
   const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0)
     && now - status.promptAt < THINKING_WINDOW_MS;
+  // The Stop hook stamps doneAt when Claude finishes a turn. If that stamp is newer than every
+  // other signal (last tool event and last prompt), the turn is over: drop live at once rather
+  // than waiting out the recent-activity window, so a finished session stops pulsing right away.
+  const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
+  const finished = status?.doneAt != null && status.doneAt >= lastSignal;
+  if (finished) return false;
   return withinWindow || isThinking;
 }
 
@@ -154,6 +160,8 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
       chunks: snap.chunks,
       runningTool,
       acted: s.acted,
+      // Live but no tool open: Claude is thinking (before the first tool) or between calls.
+      thinking: s.running && !runningTool,
     };
   });
   // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".

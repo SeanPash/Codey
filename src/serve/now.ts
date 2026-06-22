@@ -1,6 +1,6 @@
 import type { ToolEvent } from "../types.js";
 import type { StatusSnapshot } from "../statusline/state.js";
-import { actionLabel, pastTense, shortTarget } from "../statusline/labels.js";
+import { actionLabel, pastTense, shortTarget, rawTarget } from "../statusline/labels.js";
 import { computeOpenCalls } from "../warnings/open-calls.js";
 import { RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
 
@@ -13,7 +13,9 @@ export interface NowStep {
 // events tail and the statusline only, so it can be polled often without parsing transcripts.
 export interface NowView {
   live: boolean;                              // something is actively happening
-  action: { label: string; tool: string } | null; // the current step, or null between tools
+  // The current step: a friendly label, the tool name, and the literal target (the actual
+  // command/path/pattern) so the strip can name exactly what Claude is on, not a vague phrase.
+  action: { label: string; tool: string; detail: string | null } | null;
   since: number;                              // when the current step (or think) started
   thinking: boolean;                          // prompt in flight, no tool call yet
   steps: NowStep[];                           // last few completed steps, newest first
@@ -30,6 +32,22 @@ function cap(s: string): string {
 function currentLabel(tool: string, input: unknown): string {
   const a = actionLabel(tool, input);
   return cap(`${a.tag} ${shortTarget(a.target)}`).trim();
+}
+
+function baseName(p: string): string {
+  const parts = p.replace(/["']/g, "").split(/[\\/]/);
+  return parts[parts.length - 1] || p;
+}
+
+// The literal target behind the current step, kept short so the strip can show exactly what
+// Claude is on (the real command or filename), not just the friendly phrase. Paths collapse to
+// their basename; commands and patterns are clipped to one readable line.
+function currentDetail(tool: string, input: unknown): string | null {
+  const raw = rawTarget(tool, input);
+  if (!raw) return null;
+  if (tool === "Read" || tool === "Edit" || tool === "MultiEdit" || tool === "Write") return baseName(raw);
+  const line = raw.trim().split("\n")[0];
+  return line.length > 56 ? line.slice(0, 55) + "…" : line;
 }
 
 function pastLabel(tool: string, input: unknown): string {
@@ -72,16 +90,28 @@ export function buildNowView(events: ToolEvent[], status: StatusSnapshot | null,
     && status.promptAt > (status.doneAt ?? 0)
     && now - status.promptAt < THINKING_WINDOW_MS;
 
-  // The NOW strip means "right now", so the trailing window is short: it only bridges the
-  // brief gap between two back-to-back tools. It must not be the generous 30-minute "open"
-  // window, or the strip and its Follow-live timer keep ticking long after Claude has stopped.
+  // When Claude finishes a turn the Stop hook stamps doneAt. If that stamp is newer than every
+  // other signal (the last tool event and the last prompt), the turn is genuinely over, so the
+  // strip goes quiet at once instead of lingering out the recent-activity window. A new prompt
+  // or tool call pushes a signal past doneAt and relights it.
+  const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
+  const finished = status?.doneAt != null && status.doneAt >= lastSignal;
+
+  // The NOW strip means "right now", so the trailing window is short: it only bridges the brief
+  // gap between two back-to-back tools (where Stop has not fired). It is not the generous
+  // 30-minute "open" window, or the strip and its Follow-live timer would tick on after a stop.
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  const live = !!current || thinking || recent;
+  const live = !!current || thinking || (recent && !finished);
 
   const steps = completedSteps(events).slice(-TRAIL).reverse();
 
   if (current) {
-    return { live, action: { label: currentLabel(current.tool, current.input), tool: current.tool }, since: current.timestamp, thinking: false, steps };
+    const action = {
+      label: currentLabel(current.tool, current.input),
+      tool: current.tool,
+      detail: currentDetail(current.tool, current.input),
+    };
+    return { live, action, since: current.timestamp, thinking: false, steps };
   }
   if (thinking) {
     return { live, action: null, since: status!.promptAt!, thinking: true, steps };

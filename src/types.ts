@@ -118,7 +118,8 @@ export interface LiveSession {
   lastPromptTs: number;        // ordering key (only moves on a new prompt)
   chunks: TimelineChunk[];     // compact timeline, rendered small
   runningTool: string | null;  // tool of the open pre-event, or null when idle
-  acted: boolean;              // has run a tool (false = prompted but no work yet, shown dimmed)
+  acted: boolean;              // has run a tool (false = prompted but no work yet)
+  thinking: boolean;           // live but not mid-tool: prompt in flight or between tool calls
 }
 
 // A terminal the user hid from the grid, kept so it can be listed and restored.

@@ -52,6 +52,13 @@ describe("isRunning", () => {
     expect(isRunning(DIR, NOW)).toBe(false);
   });
 
+  it("returns false when the turn finished, even with a just-now event", () => {
+    // A tool ran a second ago, then Stop fired right after: the turn is over, so not live.
+    mockStatSync.mockReturnValue({ mtimeMs: NOW - 1000 });
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 8000, doneAt: NOW - 500, updatedAt: NOW });
+    expect(isRunning(DIR, NOW)).toBe(false);
+  });
+
   it("returns true when a recent prompt is newer than doneAt, even with no recent events", () => {
     // No events file, no prompts -- session looks idle by activity, but it is mid-response.
     mockReadStatus.mockReturnValue({ promptAt: NOW - 2000, doneAt: NOW - 5000, updatedAt: NOW });

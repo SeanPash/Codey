@@ -26,6 +26,19 @@ describe("buildNowView", () => {
     expect(v.since).toBe(9000);
   });
 
+  it("names the literal target of the current step, so the strip is specific", () => {
+    const bash: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Bash", input: { command: "mkdir -p out && cd out && echo hi" }, timestamp: 1000 }),
+    ];
+    expect(buildNowView(bash, null, 2000).action?.detail).toBe("mkdir -p out && cd out && echo hi");
+
+    const read: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Read", input: { file_path: "/a/b/sessions.ts" }, timestamp: 1000 }),
+    ];
+    // A path collapses to its basename so the headline stays tight.
+    expect(buildNowView(read, null, 2000).action?.detail).toBe("sessions.ts");
+  });
+
   it("lists the last completed steps newest first, with status", () => {
     const events: ToolEvent[] = [
       ev({ phase: "pre", tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 }),
@@ -63,17 +76,28 @@ describe("buildNowView", () => {
     expect(v.action).toBeNull();
   });
 
-  it("goes quiet a short time after the last activity, not 30 minutes later", () => {
+  it("bridges the brief gap between back-to-back tools, but only until the turn ends", () => {
     const events: ToolEvent[] = [
       ev({ phase: "pre", tool: "Read", timestamp: 1000 }),
       ev({ phase: "post", tool: "Read", timestamp: 1500 }),
     ];
-    // 60s after the last activity, with no open call and no fresh prompt: the strip is done.
-    const v = buildNowView(events, status({ doneAt: 1600 }), 61_500);
-    expect(v.live).toBe(false);
-    // But it still bridges the brief gap between two back-to-back tools.
-    const bridge = buildNowView(events, status({ doneAt: 1600 }), 6500);
+    // Mid-work between two tools (Stop has not fired): a few seconds later it is still live.
+    const bridge = buildNowView(events, status({}), 6500);
     expect(bridge.live).toBe(true);
+    // Long after the last activity, with nothing fresh: the strip is done.
+    expect(buildNowView(events, status({}), 61_500).live).toBe(false);
+  });
+
+  it("goes quiet the instant Claude finishes the turn, not after the window", () => {
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 1000 }),
+      ev({ phase: "post", tool: "Bash", timestamp: 1500 }),
+    ];
+    // Stop fired (doneAt newer than the last tool): live ends now, even within the 15s window.
+    const v = buildNowView(events, status({ doneAt: 2000 }), 3000);
+    expect(v.live).toBe(false);
+    // The finished steps still show so the trail is not blank.
+    expect(v.steps.length).toBe(1);
   });
 
   it("is not live when the terminal was closed, even mid-tool", () => {

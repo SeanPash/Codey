@@ -13,6 +13,9 @@
     :root {
       --bg:#0c0e12; --card:#14171f; --line:#232a36; --inset:#0b0e15;
       --sky:#5fb0ff; --sky-dim:#3d7fc4; --violet:#9b8cff; --coral:#f0654f; --green:#6cc08a; --amber:#e6a24e;
+      /* Live = right now. Reserved for the single thing happening this instant (NOW bar, the
+         current step, the live group edge). Nothing else uses it, so live always stands out. */
+      --live:#36d77f; --live-dim:#1c7d4c;
       --ink:#f1f4f9; --ink2:#cad1de; --body:#a9b1c0; --muted:#7a8392;
       --topbar:52px; --titlerow:50px; --head:102px;
     }
@@ -142,9 +145,9 @@
 
     /* per-prompt group: an outer card that visibly contains its task cards */
     .grp { background:#0f1219; border:1px solid var(--line); border-radius:14px; padding:14px 15px 11px; margin-bottom:18px; }
-    .grp.live { border-color:#2f4f74; box-shadow:0 0 0 1px rgba(95,176,255,.10); }
-    /* a quiet glow on the group being followed, so it is obvious where the live view is anchored */
-    .grp.live.following { border-color:#3a6498; box-shadow:0 0 0 1px rgba(95,176,255,.22), 0 0 26px rgba(95,176,255,.09); }
+    .grp.live { border-color:var(--live-dim); box-shadow:0 0 0 1px rgba(54,215,127,.12); }
+    /* a quiet green glow on the group being followed, so it is obvious where the live view is anchored */
+    .grp.live.following { border-color:var(--live); box-shadow:0 0 0 1px rgba(54,215,127,.26), 0 0 26px rgba(54,215,127,.10); }
     /* Hover stays a neutral grey everywhere, including inside the live group, so it can never be
        mistaken for the live element. Live uses the sky accent + pulse below; hover does not. */
     .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:#161b24; }
@@ -153,7 +156,8 @@
     .grphd { display:flex; align-items:flex-start; gap:14px; padding:0 1px 12px; margin-bottom:13px; border-bottom:1px solid var(--line); }
     .grphd .gp { flex:1; min-width:0; }
     .geyebrow { display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--sky); margin-bottom:5px; font-weight:600; }
-    .geyebrow.glive .rdot { margin-right:5px; }
+    .geyebrow.glive { color:var(--live); }
+    .geyebrow.glive .rdot { margin-right:5px; background:var(--live); animation:ppl 1.6s infinite; }
     .gtext { font-size:14.5px; font-weight:600; color:var(--ink); line-height:1.42;
       display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .grpmeta { flex:none; text-align:right; font-size:10px; color:var(--muted); line-height:1.7; white-space:nowrap; }
@@ -200,15 +204,18 @@
     .st { width:20px; text-align:right; font-size:11px; color:#5b6470; }
     .st.ok { color:var(--green); }
     .st.fail { color:var(--coral); font-weight:600; }
-    /* the step Claude is on right now: a solid sky accent bar, a clearly brighter background, and
-       a gentle pulse, so the live step stands out from any hovered row at a glance */
-    .rline.cur { background:rgba(95,176,255,.16); border-radius:6px; box-shadow:inset 3px 0 0 var(--sky); animation:livepulse 1.8s ease-in-out infinite; }
-    .rline.cur .lbl { color:#dcefff; font-weight:700; }
-    .rline.cur .sw { background:var(--sky); box-shadow:0 0 0 0 rgba(95,176,255,.5); animation:pp 1.5s infinite; }
-    .rline.cur .st { color:var(--sky); }
-    @keyframes livepulse { 0%,100% { background:rgba(95,176,255,.16); } 50% { background:rgba(95,176,255,.10); } }
+    /* the step Claude is on right now: a solid GREEN accent bar, a clearly brighter background,
+       and a gentle pulse. Green is the live color and nothing else uses it, so the current step
+       can never be mistaken for a hovered row (hover stays neutral grey). */
+    .rline.cur { background:rgba(54,215,127,.16); border-radius:6px; box-shadow:inset 3px 0 0 var(--live); animation:livepulse 1.8s ease-in-out infinite; }
+    .rline.cur .lbl { color:#d6ffe7; font-weight:700; }
+    .rline.cur .sw { background:var(--live); box-shadow:0 0 0 0 rgba(54,215,127,.5); animation:ppl 1.5s infinite; }
+    .rline.cur .st { color:var(--live); }
+    @keyframes livepulse { 0%,100% { background:rgba(54,215,127,.16); } 50% { background:rgba(54,215,127,.09); } }
+    /* the green pulse ring, for any dot/pip that marks the live instant */
+    @keyframes ppl { 0%{box-shadow:0 0 0 0 rgba(54,215,127,.5)} 70%{box-shadow:0 0 0 5px rgba(54,215,127,0)} 100%{box-shadow:0 0 0 0 rgba(54,215,127,0)} }
     @media (prefers-reduced-motion: reduce) { .rline.cur { animation:none; } }
-    .curpip { width:6px; height:6px; border-radius:50%; background:var(--sky); animation:pp 1.4s infinite; flex:none; }
+    .curpip { width:6px; height:6px; border-radius:50%; background:var(--live); animation:ppl 1.4s infinite; flex:none; }
     /* plain-English failure note, shown inline under a failed line */
     .failnote { padding:0 14px 9px 47px; margin-top:-4px; border-bottom:1px solid #141b27; font-size:11.5px; color:#e7b0a6; }
     .failnote .note { color:var(--muted); }
@@ -243,21 +250,26 @@
     .expl { font-size:9.5px; color:var(--body); line-height:1.55; }
     .expl .t { color:var(--sky); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:8px; display:block; margin-bottom:5px; }
 
-    /* live NOW strip: what Claude is on right now, sticky at the top of the single view */
+    /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
+       in the live green with a soft glow so it is unmistakably the live element on the page. */
     .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
-      background:linear-gradient(180deg,#0f1726,#0d1320); border:1px solid #2f4f74; border-radius:12px;
-      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38); }
-    .nowstrip .nowtop { display:flex; align-items:center; gap:12px; }
-    .nowstrip .neye { font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--sky);
-      font-weight:700; display:inline-flex; align-items:center; gap:7px; flex:none; }
-    .nowstrip .ndot { width:8px; height:8px; border-radius:50%; background:var(--sky); animation:pp 1.6s infinite; }
+      background:linear-gradient(180deg,#0e1c16,#0c1512); border:1px solid var(--live-dim); border-radius:12px;
+      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(54,215,127,.08); }
+    .nowstrip .nowtop { display:flex; align-items:center; gap:10px; }
+    .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#0a1410;
+      font-weight:800; display:inline-flex; align-items:center; gap:6px; flex:none;
+      background:var(--live); border-radius:6px; padding:3px 8px; }
+    .nowstrip .ndot { width:7px; height:7px; border-radius:50%; background:#0a1410; animation:pp 1.6s infinite; }
+    /* the tool the current step is using: a tight mono tag, so the strip names what is running */
+    .nowstrip .ntool { flex:none; font-family:ui-monospace,monospace; font-size:11px; color:#9fe9c1;
+      background:rgba(54,215,127,.1); border:1px solid rgba(54,215,127,.28); border-radius:6px; padding:2px 8px; }
     .nowstrip .nact { font-size:14.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .nowstrip .nact.think { color:#b3a8ff; }
-    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:var(--ink2); font-size:13px; flex:none; }
+    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:#bdf0d4; font-size:13px; flex:none; }
     .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
       background:#0c0f16; border:1px solid #283246; color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
-    .nowstrip .follow.on { background:rgba(95,176,255,.14); color:#bfe0ff; border-color:rgba(95,176,255,.4); }
+    .nowstrip .follow.on { background:rgba(54,215,127,.14); color:#bdf0d4; border-color:rgba(54,215,127,.42); }
     .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
     .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
     .nowstrip .ntrail .lab { color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:9px; font-weight:600; }
@@ -325,28 +337,31 @@
 
     .empty { color:var(--muted); padding:48px 0; text-align:center; }
 
-    /* Active Terminals: a vertical stack of full-size terminals. The stack scrolls as a whole,
-       and each terminal keeps a comfortable height and scrolls its own breakdowns, so a busy
-       terminal never squishes the others. The controls (pager, hidden tray) stay pinned above. */
+    /* Active Terminals: two full-size terminals side by side, paged. Each pane keeps the full
+       height of the row and scrolls its own breakdowns, so a busy terminal never squishes its
+       neighbour. The controls (pager, hidden tray) stay pinned above the row. */
     .splitwrap { display:flex; flex-direction:column; gap:10px; height:calc(100vh - var(--head) - 32px); }
-    .tstack { display:flex; flex-direction:column; gap:14px; flex:1; min-height:0; overflow-y:auto; padding-right:4px;
-      scrollbar-width:thin; scrollbar-color:#2a3344 transparent; }
-    .tstack::-webkit-scrollbar { width:10px; }
-    .tstack::-webkit-scrollbar-thumb { background:#28303f; border-radius:5px; }
-    .pane { position:relative; background:#0f131b; border:1px solid #232c3c; border-radius:11px; overflow:hidden; display:flex; flex-direction:column; min-height:0; flex:none; height:clamp(360px, 62vh, 560px); }
-    .pane.run { border-color:#2f4f74; }
+    .tstack { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; flex:1; min-height:0; }
+    /* A lone terminal on the last page stretches across both columns instead of leaving a gap. */
+    .tstack.solo { grid-template-columns:minmax(0,1fr); }
+    .pane { position:relative; background:#0f131b; border:1px solid #232c3c; border-radius:11px; overflow:hidden; display:flex; flex-direction:column; min-height:0; height:100%; }
+    .pane.run { border-color:var(--live-dim); }
     .pane.run::before { content:""; position:absolute; inset:0; border-radius:11px; padding:1px; pointer-events:none;
-      background:linear-gradient(110deg,transparent 25%,var(--sky) 50%,transparent 75%); background-size:200% 100%;
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; animation:beam 3s linear infinite; opacity:.55; }
+      background:linear-gradient(110deg,transparent 25%,var(--live) 50%,transparent 75%); background-size:200% 100%;
+      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; animation:beam 3s linear infinite; opacity:.5; }
     .phead { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid #1b2331; background:#0c1018; flex-wrap:wrap; }
     .phead .pname { font-weight:600; font-size:12.5px; color:var(--ink); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .phead .pproj { font-size:10px; color:var(--body); background:#11151d; border:1px solid #232c3c; border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--sky); }
     .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:#bfe0ff; background:rgba(95,176,255,.12); border:1px solid rgba(95,176,255,.32); }
-    /* a terminal that has been prompted but has not run a tool yet: present but visibly idle */
-    .pane.idle { opacity:.62; border-style:dashed; }
-    .pane.idle .phead { background:#0b0e14; }
-    .idlebadge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:var(--muted); background:#11151d; border:1px solid #232c3c; }
+    /* live but no tool open yet: Claude is thinking. Framed in green like any live element. */
+    .badge.think { color:#cbbfff; background:rgba(155,140,255,.14); border-color:rgba(155,140,255,.34); }
+    /* a calm note for a terminal that answered with no tools, or has not acted yet: not an error,
+       not dimmed-to-save-tokens (the live view costs nothing), just an honest state line. */
+    .pnote { margin:auto; padding:22px 14px; text-align:center; color:var(--muted); font-size:12px; line-height:1.5; }
+    .pnote .pn1 { color:var(--ink2); font-weight:600; display:block; margin-bottom:3px; }
+    .pthink { display:flex; align-items:center; gap:8px; font-size:12px; color:#cbbfff; padding:10px 11px; }
+    .pthink .pip { width:6px;height:6px;border-radius:50%;background:var(--violet);animation:pp 1.4s infinite; }
     /* dismiss (X) to hide a terminal from the grid; non-destructive, restorable below */
     .pdismiss { flex:none; width:20px; height:20px; line-height:1; display:inline-flex; align-items:center; justify-content:center;
       border:1px solid #232c3c; background:#0c1018; color:var(--muted); border-radius:6px; cursor:pointer; font-size:13px; }
@@ -373,8 +388,8 @@
     .ptcr .pn span { display:block; font-size:9.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .pchip { display:inline-flex; align-items:baseline; gap:3px; padding:3px 7px; border-radius:7px; border:1px solid rgba(95,176,255,.25); background:rgba(95,176,255,.06); flex:none; }
     .pchip b { font-size:11px; font-weight:700; color:var(--sky); } .pchip small { font-size:8px; color:var(--muted); }
-    .prun { display:flex; align-items:center; gap:6px; font-size:9.5px; color:#bfe0ff; padding-top:4px; }
-    .prun .pip { width:5px;height:5px;border-radius:50%;background:var(--sky);animation:pp 1.4s infinite; }
+    .prun { display:flex; align-items:center; gap:6px; font-size:9.5px; color:#9fe9c1; padding-top:4px; }
+    .prun .pip { width:5px;height:5px;border-radius:50%;background:var(--live);animation:ppl 1.4s infinite; }
     .pager { display:flex; align-items:center; justify-content:center; gap:14px; padding:6px; flex:none; }
     .pager .nav { width:28px;height:28px;border-radius:7px;border:1px solid #283246;background:#10141d;color:var(--ink2);font:inherit;font-size:13px;cursor:pointer; }
     .pager .nav:hover { border-color:var(--sky); color:var(--sky); }
@@ -483,6 +498,7 @@
     let depth = localStorage.getItem("codey-depth");   // null until seeded from the snapshot mode
     let genMode = localStorage.getItem("codey-gen");   // "auto" | "saver", null until seeded
     let lastSnap = null;           // last single-view snapshot, for re-render after a generation
+    let liveNow = false;           // a session is actively running, so poll faster
     const curDepth = () => depth || "deep";
     const ekey = (scope, id) => scope + "|" + id + "|" + curDepth();
     const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
@@ -575,9 +591,12 @@
       if (!strip) return;
       if (!n || !n.live || view !== "single") { strip.hidden = true; return; }
       strip.hidden = false;
+      // Name the exact step: the tool tag plus its literal target (the real command/file), so
+      // the strip says "Bash mkdir -p out && ..." not a vague "running a few shell commands".
+      const tool = n.action ? `<span class="ntool">${esc(n.action.tool)}</span>` : "";
       const act = n.action
-        ? `<span class="nact">${esc(n.action.label)}</span>`
-        : n.thinking ? `<span class="nact think">Thinking it through</span>` : `<span class="nact">Working</span>`;
+        ? `${tool}<span class="nact">${esc(n.action.detail || n.action.label)}</span>`
+        : n.thinking ? `<span class="nact think">Thinking through the prompt</span>` : `<span class="nact">Working</span>`;
       const timer = n.since ? `<span class="ntime timer" data-since="${n.since}">${fmtDur(Date.now() - n.since)}</span>` : "";
       const follow = `<button class="follow${followLive ? " on" : ""}" id="follow-toggle" type="button">`
         + `<span class="fd"></span>${followLive ? "Following" : "Follow live"}</button>`;
@@ -587,7 +606,7 @@
             + `${s.status === "fail" ? "&#10007;" : "&#10003;"}</span> ${esc(s.label)}</span>`).join("")
           + `</div>`
         : "";
-      strip.innerHTML = `<div class="nowtop"><span class="neye"><span class="ndot"></span>Now</span>${act}${timer}${follow}</div>${trail}`;
+      strip.innerHTML = `<div class="nowtop"><span class="neye"><span class="ndot"></span>Live</span>${act}${timer}${follow}</div>${trail}`;
       document.getElementById("follow-toggle").addEventListener("click", () => setFollow(!followLive));
     }
 
@@ -999,6 +1018,7 @@
 
     function renderSingle(snap) {
       lastSnap = snap;
+      liveNow = !!snap.live;
       if (depth === null) depth = snap.seedDepth || "deep";
       if (genMode === null) genMode = snap.genAuto ? "auto" : "saver";
       seedEmbedded(snap);
@@ -1153,9 +1173,9 @@
     }
 
     // ---- Active Terminals (multi-session) ----
-    // A page holds a few full-size terminals; the stack scrolls through them. Bounded so a
+    // Two full-size terminals side by side per page; the pager walks the rest. Bounded so a
     // machine with many open terminals does not re-render dozens of full receipts every tick.
-    const SPLIT_PER_PAGE = 4;
+    const SPLIT_PER_PAGE = 2;
     let lastLive = null; // keep the last payload so pager clicks re-render without a refetch
 
     async function dismissTerminal(id) {
@@ -1177,9 +1197,9 @@
     }
 
     function paneHtml(s, isFirst) {
-      const idle = !s.acted;
-      const cls = "pane" + (s.runningTool ? " run" : "") + (idle ? " idle" : "");
-      const pill = idle ? `<span class="idlebadge">no actions yet</span>`
+      // A pane is "live" (green frame) whenever the terminal is running: mid-tool OR thinking.
+      const cls = "pane" + (s.running ? " run" : "");
+      const pill = s.thinking ? `<span class="badge think">&#9670; Thinking</span>`
         : isFirst && s.running ? `<span class="badge">&#10022; Just prompted</span>` : "";
       const proj = s.project ? `<span class="pproj">${esc(s.project)}</span>` : "";
       const dismissBtn = `<button class="pdismiss" type="button" data-dismiss="${esc(s.sessionId)}" title="Hide this terminal" aria-label="Hide this terminal">&times;</button>`;
@@ -1192,18 +1212,24 @@
       }, 0) || Date.now();
       const pseudo = { live: s.running, lastActivityAt: lastFinite };
       const maxWork = Math.max(1, ...chunks.map((c) => c.workTotal));
-      const cards = chunks.length
-        ? chunks.map((c) => cardHtml(c, maxWork, null, pseudo)).join("")
-        : '<div class="prun" style="padding:4px">just started</div>';
+      const cards = chunks.map((c) => cardHtml(c, maxWork, null, pseudo)).join("");
+      // The body: thinking banner, the cards so far, and the live "running X now" line. When a
+      // terminal has done no tool work, say so plainly instead of dimming it like it is broken.
+      const think = s.thinking ? `<div class="pthink"><span class="pip"></span>Thinking through the prompt…</div>` : "";
       const runl = s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
+      let body;
+      if (chunks.length) body = `${think}${cards}${runl}`;
+      else if (s.thinking) body = think;
+      else body = `<div class="pnote"><span class="pn1">Answered directly</span>No tools used for this prompt.</div>`;
       return `<div class="${cls}"><div class="phead"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
         + `<span class="pname">${esc(s.name)}</span>${proj}${pill}`
         + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${dismissBtn}</div>`
-        + `<div class="pbody">${cards}${runl}</div></div>`;
+        + `<div class="pbody">${body}</div></div>`;
     }
 
     function renderSplit(live) {
       const sessions = live.sessions;
+      liveNow = live.liveCount > 0;
       updateLiveBadge(live.liveCount);
       document.getElementById("sname").textContent = "Active terminals";
       const main = document.getElementById("main");
@@ -1228,8 +1254,10 @@
           + `<button class="nav" id="pg-next" type="button"${splitPage === pages ? " disabled" : ""}>&#8250;</button>`
           + `<span class="prange">Page ${splitPage} of ${pages} &middot; most recent first &middot; scroll for the rest</span></div>`
         : "";
-      // Controls (pager + hidden tray) pinned above; the terminal stack scrolls on its own.
-      main.innerHTML = `<div class="splitwrap">${pager}${tray}<div class="tstack">${stack}</div></div>`;
+      // Controls (pager + hidden tray) pinned above; the two panes fill the row below. A lone
+      // pane on the last page spans the full width instead of leaving an empty column.
+      const solo = pageItems.length === 1 ? " solo" : "";
+      main.innerHTML = `<div class="splitwrap">${pager}${tray}<div class="tstack${solo}">${stack}</div></div>`;
 
       const prev = document.getElementById("pg-prev");
       const next = document.getElementById("pg-next");
@@ -1266,8 +1294,14 @@
       });
     }, 1000);
 
-    tick();
-    setInterval(tick, 2000);
+    // Self-scheduling poll: 1s while something is live so the current step and receipts keep
+    // pace with Claude, easing to 2.5s when idle to stay cheap. Re-scheduled after each tick so
+    // a slow fetch never stacks requests.
+    async function tickLoop() {
+      try { await tick(); } catch { /* keep the loop alive on a transient error */ }
+      setTimeout(tickLoop, liveNow ? 1000 : 2500);
+    }
+    tickLoop();
     // The NOW strip polls a cheap endpoint a bit under once a second so the current step and the
     // quick steps in its trail feel live, without fetching the full snapshot that often.
     tickNow();
