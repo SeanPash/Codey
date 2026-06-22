@@ -79,6 +79,7 @@ export function buildNowView(
   status: StatusSnapshot | null,
   now: number,
   turnStart: number = Number.NEGATIVE_INFINITY,
+  cancelledAt: number = 0,
 ): NowView {
   const empty: NowView = { live: false, action: null, since: 0, thinking: false, steps: [] };
   if (allEvents.length === 0 && !status) return empty;
@@ -103,7 +104,11 @@ export function buildNowView(
   // past doneAt and relights it.
   const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
   const finished = status?.doneAt != null && status.doneAt >= lastSignal;
-  if (finished) return { ...empty, steps };
+  // A user interrupt fires no Stop hook, so doneAt never lands and a dangling open "pre" keeps
+  // the strip lit. The transcript's cancel marker is the only record: when it is newer than every
+  // signal the turn is over, so the strip goes quiet with just the completed trail.
+  const cancelled = cancelledAt > 0 && cancelledAt >= lastSignal;
+  if (finished || cancelled) return { ...empty, steps };
 
   const openCalls = computeOpenCalls(events);
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;

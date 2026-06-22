@@ -3212,6 +3212,41 @@ function readUserPrompts(path) {
     return [];
   }
 }
+function lastInterruptTs(text) {
+  let last = 0;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    let r;
+    try {
+      r = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (r.type !== "user") continue;
+    const c = r.message?.content;
+    let t = null;
+    if (typeof c === "string") t = c;
+    else if (Array.isArray(c)) {
+      const tb = c.find((b) => b && typeof b === "object" && b.type === "text");
+      if (tb && typeof tb.text === "string") t = tb.text;
+    }
+    if (t && /^\[request interrupted by user/i.test(t.trim())) {
+      const ts = Date.parse(r.timestamp ?? "") || 0;
+      if (ts > last) last = ts;
+    }
+  }
+  return last;
+}
+function readLastInterrupt(path) {
+  if (!path) return 0;
+  try {
+    if (!existsSync3(path)) return 0;
+    return lastInterruptTs(readFileSync3(path, "utf8"));
+  } catch {
+    return 0;
+  }
+}
 var CONTROL_COMMANDS = /* @__PURE__ */ new Set(["/clear", "/compact"]);
 function readFirstPrompt(path) {
   if (!path) return null;
@@ -4852,7 +4887,7 @@ function windowTotals(turns, startTs, endTs) {
   }
   return { work, context };
 }
-function groupByPrompt(prompts, chunks, turns, sessionEndTs, live) {
+function groupByPrompt(prompts, chunks, turns, sessionEndTs, live, cancelledAt = 0) {
   const boundaries = [];
   const sorted = [...prompts].filter((p) => p.ts > 0).sort((a, b) => a.ts - b.ts);
   const firstActivity = Math.min(
@@ -4881,6 +4916,7 @@ function groupByPrompt(prompts, chunks, turns, sessionEndTs, live) {
     const groupChunks = chunks.filter((c) => c.startTs >= b.startTs && (next ? c.startTs < next.startTs : true));
     const { work, context } = windowTotals(turns, b.startTs, next ? next.startTs : Number.MAX_SAFE_INTEGER);
     const liveGroup = live && isLast;
+    const cancelled = cancelledAt > 0 && cancelledAt >= b.startTs && (next ? cancelledAt < next.startTs : true);
     return {
       id: b.id,
       prompt: b.label,
@@ -4893,6 +4929,7 @@ function groupByPrompt(prompts, chunks, turns, sessionEndTs, live) {
       taskCount: groupChunks.length,
       chunks: groupChunks,
       live: liveGroup,
+      cancelled,
       summary: null
     };
   });
@@ -4969,7 +5006,7 @@ function buildSnapshot(input) {
   const activity = [...events.map((e) => e.timestamp), ...turns.map((t) => t.ts)].filter((t) => t > 0);
   const lastActivityAt = activity.length ? Math.max(...activity) : startedAt;
   const sessionEndTs = input.live ? input.now : lastActivityAt || input.now;
-  const groups = groupByPrompt(input.prompts, chunks, turns, sessionEndTs, input.live);
+  const groups = groupByPrompt(input.prompts, chunks, turns, sessionEndTs, input.live, input.cancelledAt ?? 0);
   return {
     sessionId: input.sessionId,
     sessionName: input.sessionName,
@@ -5247,7 +5284,7 @@ function completedSteps(events) {
   }
   return done;
 }
-function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINITY) {
+function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINITY, cancelledAt = 0) {
   const empty = { live: false, action: null, since: 0, thinking: false, steps: [] };
   if (allEvents.length === 0 && !status) return empty;
   const events = allEvents.filter((e) => e.timestamp >= turnStart);
@@ -5257,7 +5294,8 @@ function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINI
   const steps = completedSteps(events).slice(-TRAIL).reverse();
   const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
   const finished = status?.doneAt != null && status.doneAt >= lastSignal;
-  if (finished) return { ...empty, steps };
+  const cancelled = cancelledAt > 0 && cancelledAt >= lastSignal;
+  if (finished || cancelled) return { ...empty, steps };
   const openCalls = computeOpenCalls(events);
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
   const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && now - status.promptAt < THINKING_WINDOW_MS;
@@ -5312,7 +5350,7 @@ function restore(root, id) {
 }
 
 // src/serve/load-snapshot.ts
-function isRunning(dir, now) {
+function isRunning(dir, now, cancelledAt = 0) {
   let evMtime = 0;
   try {
     evMtime = statSync3(join15(dir, "events.jsonl")).mtimeMs;
@@ -5329,6 +5367,7 @@ function isRunning(dir, now) {
   const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
   const finished = status?.doneAt != null && status.doneAt >= lastSignal;
   if (finished) return false;
+  if (cancelledAt > 0 && cancelledAt >= lastSignal) return false;
   return withinWindow || isThinking;
 }
 function loadSnapshot(sessionId, root = defaultRoot()) {
@@ -5336,8 +5375,9 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
+  const cancelledAt = readLastInterrupt(meta?.transcriptPath ?? null);
   const now = Date.now();
-  const live = isRunning(store.dir, now);
+  const live = isRunning(store.dir, now, cancelledAt);
   const promptMarks = readPrompts(store.dir);
   const lastPrompt = promptMarks.length ? promptMarks[promptMarks.length - 1] : 0;
   const foundTurn = lastPrompt > 0 ? events.findIndex((e) => e.timestamp >= lastPrompt) : 0;
@@ -5371,7 +5411,8 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     prompts,
     now,
     seedDepth,
-    genAuto
+    genAuto,
+    cancelledAt
   });
   const reconciled = reconcileErrors(events, turns);
   const withMeta = {
@@ -5385,7 +5426,8 @@ function loadNow(sessionId, root = defaultRoot()) {
   const store = new SessionStore(sessionId, root);
   const marks = readPrompts(store.dir);
   const turnStart = marks.length ? marks[marks.length - 1] : Number.NEGATIVE_INFINITY;
-  return buildNowView(store.readAll(), readStatus(store.dir), Date.now(), turnStart);
+  const cancelledAt = readLastInterrupt(readMeta(sessionId, root)?.transcriptPath ?? null);
+  return buildNowView(store.readAll(), readStatus(store.dir), Date.now(), turnStart, cancelledAt);
 }
 function isScope(s) {
   return s === "task" || s === "action" || s === "summary";
@@ -5418,21 +5460,22 @@ function loadLive(root = defaultRoot()) {
     const snap = loadSnapshot(s.id, root);
     const events = new SessionStore(s.id, root).readAll();
     const last = events[events.length - 1];
-    const runningTool = s.running && last && last.phase === "pre" ? last.tool : null;
+    const running = s.running && snap.live;
+    const runningTool = running && last && last.phase === "pre" ? last.tool : null;
     return {
       sessionId: s.id,
       name: s.name,
       project: s.project,
       color: s.color,
       workTotal: snap.workTotal,
-      running: s.running,
+      running,
       open: s.open,
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
       runningTool,
       acted: s.acted,
       // Live but no tool open: Claude is thinking (before the first tool) or between calls.
-      thinking: s.running && !runningTool
+      thinking: running && !runningTool
     };
   });
   return { sessions, liveCount: sessions.filter((s) => s.running).length, hidden };

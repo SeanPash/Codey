@@ -37,6 +37,7 @@ export function groupByPrompt(
   turns: AssistantTurn[],
   sessionEndTs: number,
   live: boolean,
+  cancelledAt: number = 0,
 ): PromptGroup[] {
   const boundaries: Boundary[] = [];
 
@@ -72,6 +73,8 @@ export function groupByPrompt(
     const groupChunks = chunks.filter((c) => c.startTs >= b.startTs && (next ? c.startTs < next.startTs : true));
     const { work, context } = windowTotals(turns, b.startTs, next ? next.startTs : Number.MAX_SAFE_INTEGER);
     const liveGroup = live && isLast;
+    // The interrupt belongs to the group whose [start, next) window contains it.
+    const cancelled = cancelledAt > 0 && cancelledAt >= b.startTs && (next ? cancelledAt < next.startTs : true);
     return {
       id: b.id,
       prompt: b.label,
@@ -84,6 +87,7 @@ export function groupByPrompt(
       taskCount: groupChunks.length,
       chunks: groupChunks,
       live: liveGroup,
+      cancelled,
       summary: null,
     };
   });

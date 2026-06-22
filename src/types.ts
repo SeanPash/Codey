@@ -81,6 +81,7 @@ export interface PromptGroup {
   taskCount: number;
   chunks: TimelineChunk[];
   live: boolean;                 // the active group of a live session
+  cancelled: boolean;            // the user interrupted Claude during this prompt (no Stop fired)
   summary: string | null;        // generated recap of what this prompt accomplished, or null
 }
 
