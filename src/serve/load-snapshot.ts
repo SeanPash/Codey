@@ -11,17 +11,23 @@ import { resolveActiveWarning } from "../intervene/active-warning.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
 import { listSessions, RUNNING_WINDOW_MS } from "../cli/sessions.js";
 import { selectActive } from "./active.js";
+import { readStatus } from "../statusline/state.js";
 import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
 
 // Running = the freshest of a captured tool call or a submitted prompt is within the window,
 // so a session lights up the instant it is prompted, before any tool has run.
-function isRunning(dir: string, now: number): boolean {
+// Also stays live while Claude is thinking: promptAt newer than doneAt means a response is in flight.
+export function isRunning(dir: string, now: number): boolean {
   let evMtime = 0;
   try { evMtime = statSync(join(dir, "events.jsonl")).mtimeMs; } catch { evMtime = 0; }
   const prompts = readPrompts(dir);
   const lastPrompt = prompts.length ? prompts[prompts.length - 1] : 0;
   const lastActivity = Math.max(evMtime, lastPrompt);
-  return lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
+  const withinWindow = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
+  // A prompt newer than the last stop means Claude is mid-response (thinking or tool calls).
+  const status = readStatus(dir);
+  const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0);
+  return withinWindow || isThinking;
 }
 
 export function loadSnapshot(sessionId: string, root: string = defaultRoot()): SessionSnapshot {
