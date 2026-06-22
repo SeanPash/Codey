@@ -117,7 +117,11 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
       // the live/open tiers at once instead of waiting out the window. A resume bumps activity
       // back above the stamp, so the session can light up again.
       const closed = status?.closedAt != null && status.closedAt >= lastActivity;
-      const running = evMtime != null && !closed && (thinking || recentActivity);
+      // doneAt (the Stop hook) newer than every signal means the turn finished: stop pulsing now
+      // rather than lingering through the recent-activity window. A fresh prompt/tool relights it.
+      const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
+      const finished = status?.doneAt != null && status.doneAt >= lastSignal;
+      const running = evMtime != null && !closed && !finished && (thinking || recentActivity);
       return {
         id,
         mtime,

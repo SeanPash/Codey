@@ -1898,10 +1898,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
         args = args.slice();
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
-        function findFile(baseDir, baseName) {
-          const localBin = path.resolve(baseDir, baseName);
+        function findFile(baseDir, baseName2) {
+          const localBin = path.resolve(baseDir, baseName2);
           if (fs.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path.extname(baseName))) return void 0;
+          if (sourceExt.includes(path.extname(baseName2))) return void 0;
           const foundExt = sourceExt.find(
             (ext) => fs.existsSync(`${localBin}${ext}`)
           );
@@ -4459,7 +4459,9 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
     const thinking = evMtime != null && status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
     const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
     const closed = status?.closedAt != null && status.closedAt >= lastActivity;
-    const running = evMtime != null && !closed && (thinking || recentActivity);
+    const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
+    const finished = status?.doneAt != null && status.doneAt >= lastSignal;
+    const running = evMtime != null && !closed && !finished && (thinking || recentActivity);
     return {
       id,
       mtime,
@@ -5231,6 +5233,17 @@ function currentLabel(tool, input) {
   const a = actionLabel(tool, input);
   return cap(`${a.tag} ${shortTarget(a.target)}`).trim();
 }
+function baseName(p) {
+  const parts = p.replace(/["']/g, "").split(/[\\/]/);
+  return parts[parts.length - 1] || p;
+}
+function currentDetail(tool, input) {
+  const raw = rawTarget(tool, input);
+  if (!raw) return null;
+  if (tool === "Read" || tool === "Edit" || tool === "MultiEdit" || tool === "Write") return baseName(raw);
+  const line = raw.trim().split("\n")[0];
+  return line.length > 56 ? line.slice(0, 55) + "\u2026" : line;
+}
 function pastLabel(tool, input) {
   const a = actionLabel(tool, input);
   return cap(`${pastTense(a.tag)} ${shortTarget(a.target)}`).trim();
@@ -5260,11 +5273,18 @@ function buildNowView(events, status, now) {
   const openCalls = computeOpenCalls(events);
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
   const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
+  const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
+  const finished = status?.doneAt != null && status.doneAt >= lastSignal;
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  const live = !!current || thinking || recent;
+  const live = !!current || thinking || recent && !finished;
   const steps = completedSteps(events).slice(-TRAIL).reverse();
   if (current) {
-    return { live, action: { label: currentLabel(current.tool, current.input), tool: current.tool }, since: current.timestamp, thinking: false, steps };
+    const action = {
+      label: currentLabel(current.tool, current.input),
+      tool: current.tool,
+      detail: currentDetail(current.tool, current.input)
+    };
+    return { live, action, since: current.timestamp, thinking: false, steps };
   }
   if (thinking) {
     return { live, action: null, since: status.promptAt, thinking: true, steps };
@@ -5321,6 +5341,9 @@ function isRunning(dir, now) {
   const status = readStatus(dir);
   if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
   const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
+  const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
+  const finished = status?.doneAt != null && status.doneAt >= lastSignal;
+  if (finished) return false;
   return withinWindow || isThinking;
 }
 function loadSnapshot(sessionId, root = defaultRoot()) {
@@ -5420,7 +5443,9 @@ function loadLive(root = defaultRoot()) {
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
       runningTool,
-      acted: s.acted
+      acted: s.acted,
+      // Live but no tool open: Claude is thinking (before the first tool) or between calls.
+      thinking: s.running && !runningTool
     };
   });
   return { sessions, liveCount: sessions.filter((s) => s.running).length, hidden };
