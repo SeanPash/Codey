@@ -14,7 +14,9 @@
       --bg:#0c0e12; --card:#14171f; --line:#232a36; --inset:#0b0e15;
       --sky:#5fb0ff; --sky-dim:#3d7fc4; --violet:#9b8cff; --coral:#f0654f; --green:#6cc08a; --amber:#e6a24e;
       --ink:#f1f4f9; --ink2:#cad1de; --body:#a9b1c0; --muted:#7a8392;
+      --topbar:52px; --titlerow:50px; --head:102px;
     }
+    body.split { --titlerow:0px; --head:52px; }
     * { box-sizing:border-box; }
     body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink);
       margin:0; line-height:1.45; -webkit-font-smoothing:antialiased; letter-spacing:-0.005em; }
@@ -30,20 +32,37 @@
     .ptag { font-size:11px; color:var(--ink2); background:#0c0f16; border:1px solid #283246; border-radius:6px; padding:2px 8px; }
     .cdot { width:9px; height:9px; border-radius:50%; flex:none; display:inline-block; }
     .cdot.run { box-shadow:0 0 0 0 rgba(95,176,255,.5); animation:pp 1.8s infinite; }
-    .livewrap { display:inline-flex; align-items:center; gap:9px; padding:5px 12px; border-radius:9px; border:1px solid #283246; background:#0c0f16; }
+    .livewrap { display:inline-flex; align-items:center; gap:9px; padding:5px 12px; border-radius:9px; border:1px solid #283246; background:#0c0f16; transition:border-color .3s, background .3s; }
     .eq { display:inline-flex; align-items:flex-end; gap:2px; height:13px; }
     .eq i { width:3px; background:var(--sky); border-radius:1px; animation:bounce 1s ease-in-out infinite; }
     .eq i:nth-child(1){animation-delay:0s} .eq i:nth-child(2){animation-delay:.2s} .eq i:nth-child(3){animation-delay:.4s} .eq i:nth-child(4){animation-delay:.15s}
     @keyframes bounce { 0%,100%{height:4px} 50%{height:13px} }
     .livewrap b { font-size:12px; font-weight:700; color:#bfe0ff; } .livewrap span { font-size:11px; color:var(--body); }
+    /* idle: calm and obviously not-live, so a still "0" never reads as frozen */
+    .livewrap.idle { border-color:#222a36; background:#0b0e14; }
+    .livewrap.idle .eq i { animation:none; height:4px; background:#3a4454; }
+    .livewrap.idle b { color:var(--muted); } .livewrap.idle span { color:var(--muted); }
+
+    /* title row: the session name gets its own line so long names breathe */
+    .titlerow { display:flex; align-items:center; gap:11px; padding:9px 20px; border-bottom:1px solid var(--line);
+      background:#0d1016; position:sticky; top:var(--topbar); z-index:4; }
+    body.split .titlerow { display:none; }
+    .titlerow .stitle { font-size:20px; font-weight:400; color:var(--ink); margin:0; line-height:1.2;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .titlerow .renamebtn { flex:none; background:transparent; border:1px solid transparent; color:var(--muted);
+      border-radius:7px; padding:3px 8px; font-size:13px; cursor:pointer; opacity:0; transition:opacity .15s, border-color .15s, color .15s; }
+    .titlerow:hover .renamebtn { opacity:1; }
+    .titlerow .renamebtn:hover { color:var(--sky); border-color:rgba(95,176,255,.3); }
+    .titlerow .stitle-input { font:inherit; font-size:20px; background:var(--inset); border:1px solid var(--sky-dim);
+      color:var(--ink); border-radius:7px; padding:3px 9px; min-width:280px; }
     .toggle { margin-left:auto; display:flex; background:#0c0f16; border:1px solid #283246; border-radius:8px; padding:2px; }
     .toggle button { font:inherit; font-size:12px; padding:5px 13px; border:none; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; }
     .toggle button.on { background:rgba(95,176,255,.14); color:#bfe0ff; box-shadow:inset 0 0 0 1px rgba(95,176,255,.3); }
     .jumplive { font:inherit; font-size:11px; color:var(--sky); background:transparent; border:1px solid rgba(95,176,255,.3); border-radius:7px; padding:5px 10px; cursor:pointer; }
 
     /* three-zone layout */
-    .cols { display:flex; align-items:flex-start; min-height:calc(100vh - 52px); }
-    .rail { width:210px; flex:none; border-right:1px solid var(--line); padding:14px 11px; position:sticky; top:52px; align-self:stretch; }
+    .cols { display:flex; align-items:flex-start; min-height:calc(100vh - var(--head)); }
+    .rail { width:232px; flex:none; border-right:1px solid var(--line); padding:12px 10px; position:sticky; top:var(--head); align-self:stretch; max-height:calc(100vh - var(--head)); overflow-y:auto; }
     .rh { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin:0 0 9px 3px; font-weight:600; }
     .sess { padding:8px 10px; border-radius:8px; margin-bottom:4px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:none; background:transparent; color:var(--ink); font:inherit; }
     .sess:hover { background:#11141b; }
@@ -56,10 +75,11 @@
     @keyframes pp { 0%{box-shadow:0 0 0 0 rgba(95,176,255,.5)} 70%{box-shadow:0 0 0 5px rgba(95,176,255,0)} 100%{box-shadow:0 0 0 0 rgba(95,176,255,0)} }
 
     .center { flex:1; min-width:0; padding:16px 20px; }
-    .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:52px; align-self:stretch; }
+    .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:var(--head); align-self:stretch; }
 
     /* task cards */
-    .card { position:relative; background:var(--card); border:1px solid var(--line); border-radius:11px; padding:13px 16px; margin-bottom:9px; overflow:hidden; }
+    .card { position:relative; background:var(--card); border:1px solid #283040; border-radius:11px; padding:13px 16px; margin-bottom:10px; overflow:hidden; }
+    .grp .card:last-child { margin-bottom:2px; }
     .card.open { background:#151a23; }
     .card.warn { border-color:#3a3324; }
     .card::before { content:""; position:absolute; inset:0; border-radius:11px; padding:1px; opacity:0; transition:opacity .25s; pointer-events:none;
@@ -88,13 +108,16 @@
     .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
     .pill.amber { background:#2a2113; color:var(--amber); }
 
-    /* per-prompt group */
-    .grp { margin-bottom:20px; }
-    .grphd { display:flex; align-items:flex-start; gap:12px; padding:0 2px 9px; margin-bottom:4px; border-bottom:1px solid var(--line); }
-    .grphd .gp { flex:1; min-width:0; font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.4;
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .grphd .gp .gq { color:var(--sky-dim); margin-right:5px; font-weight:700; }
-    .grpmeta { flex:none; text-align:right; font-size:10px; color:var(--muted); line-height:1.6; white-space:nowrap; }
+    /* per-prompt group: an outer card that visibly contains its task cards */
+    .grp { background:#0f1219; border:1px solid var(--line); border-radius:14px; padding:14px 15px 11px; margin-bottom:18px; }
+    .grp.live { border-color:#2f4f74; box-shadow:0 0 0 1px rgba(95,176,255,.10); }
+    .grphd { display:flex; align-items:flex-start; gap:14px; padding:0 1px 12px; margin-bottom:13px; border-bottom:1px solid var(--line); }
+    .grphd .gp { flex:1; min-width:0; }
+    .geyebrow { display:block; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--sky); margin-bottom:5px; font-weight:600; }
+    .geyebrow.glive .rdot { margin-right:5px; }
+    .gtext { font-size:14.5px; font-weight:600; color:var(--ink); line-height:1.42;
+      display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .grpmeta { flex:none; text-align:right; font-size:10px; color:var(--muted); line-height:1.7; white-space:nowrap; }
     .grpmeta .gtok { color:var(--ink2); font-weight:600; }
     .grpmeta .running { color:var(--sky); font-weight:600; }
     .grpmeta .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--sky);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
@@ -139,7 +162,7 @@
     /* expanded per-line detail: raw command/path + why + raw error */
     .ldetail { padding:4px 14px 12px 47px; border-bottom:1px solid #141b27; display:flex; flex-direction:column; gap:7px; }
     .ld { display:flex; gap:9px; align-items:baseline; }
-    .ld .lk { flex:none; width:34px; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding-top:2px; }
+    .ld .lk { flex:none; width:72px; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding-top:2px; }
     .ld code { font-family:ui-monospace,monospace; font-size:11.5px; color:#cdd3de; background:#0c1018; border:1px solid #1c2433; border-radius:6px; padding:5px 8px; white-space:pre-wrap; word-break:break-word; flex:1; }
     .ld .lv { font-size:12px; color:var(--body); line-height:1.5; flex:1; }
     .ld.err code { color:#e7b0a6; border-color:#3a2024; background:#1c1416; }
@@ -189,7 +212,7 @@
     .empty { color:var(--muted); padding:48px 0; text-align:center; }
 
     /* Active Terminals grid: fills the page, adapts to how many are open */
-    .splitwrap { display:flex; flex-direction:column; gap:10px; height:calc(100vh - 52px - 32px); }
+    .splitwrap { display:flex; flex-direction:column; gap:10px; height:calc(100vh - var(--head) - 32px); }
     .grid { display:grid; gap:12px; flex:1; min-height:0; grid-auto-rows:minmax(0,1fr); }
     .grid.n1 { grid-template-columns:1fr; }
     .grid.n2 { grid-template-columns:repeat(2,1fr); }
@@ -240,14 +263,18 @@
 <body>
   <div class="topbar">
     <span class="eyebrow disp">Codey Timeline</span>
-    <span class="wm disp" id="sname">Codey</span>
-    <span class="sproj" id="sproj"></span>
-    <span class="livewrap" id="livewrap" hidden><span class="eq"><i></i><i></i><i></i><i></i></span><b id="livecount">0</b><span>live</span></span>
+    <span class="livewrap idle" id="livewrap"><span class="eq"><i></i><i></i><i></i><i></i></span><b id="livecount">0</b><span id="livelabel">idle</span></span>
     <div class="toggle">
-      <button id="tb-single" class="on" type="button">Single</button>
-      <button id="tb-split" type="button">Active Terminals</button>
+      <button id="tb-single" class="on" type="button">Single terminal</button>
+      <button id="tb-split" type="button">Active terminals</button>
     </div>
     <button id="jumplive" class="jumplive" type="button" hidden>Jump to live</button>
+  </div>
+
+  <div class="titlerow" id="titlerow">
+    <span class="sproj" id="sproj"></span>
+    <h1 class="stitle disp" id="sname">Codey</h1>
+    <button class="renamebtn" id="rename-current" type="button" title="Rename this terminal" aria-label="Rename this terminal">&#9998;</button>
   </div>
 
   <div class="cols">
@@ -287,7 +314,6 @@
     const liveTimer = (sinceTs) => `<span class="timer" data-since="${sinceTs}">${fmtDur(Date.now() - sinceTs)}</span>`;
 
     const open = new Set();        // expanded chunk ids (whole card)
-    const ctxOpen = new Set();     // expanded background-context panels, by chunk id
     const lineOpen = new Set();    // expanded work lines, key "chunkId:idx"
     const workCollapsed = new Set();// folded work lists, by chunk id (default expanded)
     const confirmed = new Map();   // chunk id -> intervention action (survives the live re-render)
@@ -346,7 +372,7 @@
       const parts = [];
       if (l.ts) parts.push(`<div class="ld"><span class="lk">at</span><span class="lv">${fmtClockSec(l.ts)}</span></div>`);
       if (l.raw) parts.push(`<div class="ld"><span class="lk">ran</span><code>${esc(l.raw)}</code></div>`);
-      if (l.why) parts.push(`<div class="ld"><span class="lk">why</span><span class="lv">${esc(l.why)}</span></div>`);
+      if (l.why) parts.push(`<div class="ld"><span class="lk">explanation</span><span class="lv">${esc(l.why)}</span></div>`);
       if (l.status === "fail" && l.errorText) parts.push(`<div class="ld err"><span class="lk">error</span><code>${esc(l.errorText)}</code></div>`);
       if (!parts.length) parts.push(`<div class="ld"><span class="lv">No extra detail for this step.</span></div>`);
       return `<div class="ldetail">${parts.join("")}</div>`;
@@ -374,16 +400,11 @@
       const collapsed = workCollapsed.has(c.id);
       const wchev = collapsed ? "&#9656;" : "&#9662;";
       const work = collapsed ? "" : r.workLines.map((l, idx) => workLineHtml(c, l, idx)).join("");
-      const ctxO = ctxOpen.has(c.id);
       return `<div class="rcpt">`
         + `<div class="rhead js-work" role="button" tabindex="0" aria-expanded="${!collapsed}" data-id="${c.id}">`
         + `<span class="x">${wchev}</span><span class="ttl">Work Claude did</span><span class="colh">tokens</span><span class="tot">${fmt(c.workTotal)}</span></div>`
         + work
-        + `<div class="ctx${ctxO ? " open" : ""}">`
-        + `<div class="ctxsum js-ctx" role="button" tabindex="0" aria-expanded="${ctxO}" data-id="${c.id}">`
-        + `<span class="cx">${ctxO ? "&#9662;" : "&#9656;"}</span><span class="ctt">Background context</span><span class="ctot">${fmt(c.contextTotal)} tokens</span></div>`
-        + (ctxO ? `<div class="note">This is the conversation, your files, and memory Claude keeps in view on every step. It gets reused rather than regenerated, so it costs much less than its size suggests. The work figure above is the real cost of what got done.</div>` : "")
-        + `</div></div>`;
+        + `</div>`;
     }
 
     // A task is still open (running) when its end is past the last recorded activity; in a
@@ -419,10 +440,13 @@
         ? `<span class="running"><span class="rdot"></span>${liveTimer(g.startTs)}</span>`
         : fmtDur(g.durationMs || 0);
       const cards = g.chunks.map((c) => cardHtml(c, maxWork, barFor(c), snap)).join("")
-        || `<div class="grpnote">${g.live ? "Working…" : "Answered directly, no tools used."}</div>`;
-      return `<section class="grp">`
-        + `<div class="grphd"><div class="gp">${esc(g.prompt)}</div>`
-        + `<div class="grpmeta">${fmtClock(g.startTs)} &middot; ${dur} &middot; <span class="gtok">${fmt(g.tokenTotal)} tok</span> &middot; ${g.taskCount} task${g.taskCount === 1 ? "" : "s"}</div>`
+        || `<div class="grpnote">${g.live ? "Working on it…" : "Answered directly, no tools used."}</div>`;
+      const eyebrow = g.live
+        ? `<span class="geyebrow glive"><span class="rdot"></span>You asked &middot; working now</span>`
+        : `<span class="geyebrow">You asked</span>`;
+      return `<section class="grp${g.live ? " live" : ""}">`
+        + `<div class="grphd"><div class="gp">${eyebrow}<span class="gtext">${esc(g.prompt)}</span></div>`
+        + `<div class="grpmeta">${fmtClock(g.startTs)} &middot; ${dur} &middot; <span class="gtok">${fmt(g.workTotal)} tokens</span> &middot; ${g.taskCount} task${g.taskCount === 1 ? "" : "s"}</div>`
         + `</div>${cards}</section>`;
     }
 
@@ -436,12 +460,11 @@
         : fmtDur((snap.lastActivityAt || snap.startedAt) - snap.startedAt);
       document.getElementById("summary").innerHTML =
         `<p class="rh">This session</p>`
-        + `<div class="scard"><div class="k">Work done</div><div class="big">${fmt(snap.workTotal)} <span class="u">tokens</span></div><div class="subline">${kfmt(snap.totalTokens)} total with context</div></div>`
+        + `<div class="scard"><div class="k">Work done</div><div class="big">${fmt(snap.workTotal)} <span class="u">tokens</span></div><div class="subline">what Claude actually generated</div></div>`
         + `<div class="scard"><div class="k">Time</div><div class="big" style="font-size:18px">${sessDur}</div><div class="subline">${snap.live ? "running now" : "total session time"}</div></div>`
         + `<div class="scard"><div class="k">Overview</div><div class="pair"><span>Tasks</span><b>${snap.taskCount}</b></div>`
-        + `<div class="pair"><span>Priciest</span><b>${esc(snap.priciestTaskName || "–")}</b></div></div>`
-        + `<div class="scard"><div class="k">Status</div>${status}</div>`
-        + `<div class="scard"><div class="expl"><span class="t">Background context</span>The big total is mostly the conversation Claude re-reads on each step. You are not charged full price for it again, so the work number is the real cost of what got done.</div></div>`;
+        + `<div class="pair"><span>Priciest</span><b>${esc(snap.priciestTaskName || "none")}</b></div></div>`
+        + `<div class="scard"><div class="k">Status</div>${status}</div>`;
     }
 
     function renderHeader(snap) {
@@ -494,7 +517,6 @@
 
       wire(".js-toggle", (el) => { const id = el.closest(".card").dataset.id; open.has(id) ? open.delete(id) : open.add(id); });
       wire(".js-work", (el) => { const id = el.dataset.id; workCollapsed.has(id) ? workCollapsed.delete(id) : workCollapsed.add(id); });
-      wire(".js-ctx", (el) => { const id = el.dataset.id; ctxOpen.has(id) ? ctxOpen.delete(id) : ctxOpen.add(id); });
       wire(".rline.can", (el) => { const k = el.dataset.line; lineOpen.has(k) ? lineOpen.delete(k) : lineOpen.add(k); });
       wireIntervention(main);
     }
