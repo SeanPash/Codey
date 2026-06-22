@@ -11,6 +11,7 @@ export type RouteResult =
   | { type: "session"; id: string }
   | { type: "intervene"; id: string }
   | { type: "rename"; id: string }
+  | { type: "explain"; id: string }
   | { type: "delete"; id: string }
   | { type: "live" }
   | { type: "font"; file: string }
@@ -35,6 +36,8 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (mi) return { type: "intervene", id: decodeURIComponent(mi[1]) };
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
     if (mn) return { type: "rename", id: decodeURIComponent(mn[1]) };
+    const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
+    if (me) return { type: "explain", id: decodeURIComponent(me[1]) };
   }
   if (method === "DELETE") {
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
@@ -58,6 +61,7 @@ export interface ServerDeps {
   intervene: (id: string, action: string) => boolean;
   rename: (id: string, name: string) => boolean;
   remove: (id: string) => boolean;
+  explain: (id: string, body: unknown) => Promise<{ text: string | null; cached: boolean; paused: boolean }>;
 }
 
 function readBody(req: import("node:http").IncomingMessage): Promise<string> {
@@ -101,6 +105,17 @@ export function createServer(deps: ServerDeps): Server {
           try { name = String((JSON.parse(body || "{}") as { name?: unknown }).name ?? ""); } catch { name = ""; }
           const ok = deps.rename(route.id, name);
           sendJson(res, ok ? 200 : 400, { ok });
+        });
+      } else if (route.type === "explain") {
+        void readBody(req).then(async (body) => {
+          let parsed: unknown = {};
+          try { parsed = JSON.parse(body || "{}"); } catch { parsed = {}; }
+          try {
+            const result = await deps.explain(route.id, parsed);
+            sendJson(res, 200, result);
+          } catch (err) {
+            sendJson(res, 500, { error: String(err) });
+          }
         });
       } else if (route.type === "delete") {
         const ok = deps.remove(route.id);

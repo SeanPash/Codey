@@ -13,6 +13,12 @@ import { reconcileErrors } from "../warnings/reconcile.js";
 import { listSessions, RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
 import { selectActive } from "./active.js";
 import { readStatus } from "../statusline/state.js";
+import { readSessionMode } from "../statusline/active-mode.js";
+import { explain, fillCachedExplanations, timelineDefaults, type ExplainResult } from "../timeline/explain-service.js";
+import type { ExplainScope } from "../timeline/explain-cache.js";
+import type { ExplainDepth } from "../timeline/explain-prompt.js";
+import { runClaudeMetered } from "../narration/claude-metered.js";
+import { readBudget, budgetLeftLabel } from "../budget/budget.js";
 import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
 
 // Running = the freshest of a captured tool call or a submitted prompt is within the window,
@@ -55,6 +61,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   // timestamps, labeled generically, when no transcript is available.
   let prompts: UserPrompt[] = readUserPrompts(meta?.transcriptPath ?? null);
   if (prompts.length === 0) prompts = readPrompts(store.dir).map((ts) => ({ ts, text: "" }));
+  const { seedDepth, genAuto } = timelineDefaults(readSessionMode(store.dir));
   const snap = buildSnapshot({
     sessionId,
     sessionName: name,
@@ -66,9 +73,43 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     turns,
     prompts,
     now,
+    seedDepth,
+    genAuto,
   });
   const reconciled = reconcileErrors(events, turns);
-  return { ...snap, activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null };
+  const withMeta = {
+    ...snap,
+    activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null,
+    budgetLeft: budgetLeftLabel(readBudget(store.dir)),
+  };
+  // Show any explanations already generated at the seed depth without another round-trip.
+  return fillCachedExplanations(withMeta, seedDepth, root);
+}
+
+function isScope(s: unknown): s is ExplainScope {
+  return s === "task" || s === "action" || s === "summary";
+}
+function isDepth(s: unknown): s is ExplainDepth {
+  return s === "simple" || s === "deep" || s === "teach";
+}
+function safeId(id: string): boolean {
+  return !!id && !id.includes("/") && !id.includes("\\") && !id.includes("..");
+}
+
+// Entry point for the explain endpoint: build the session snapshot, validate the request, and
+// resolve it through the cache-or-generate service using the metered headless Claude.
+export async function runExplain(sessionId: string, body: unknown, root: string = defaultRoot()): Promise<ExplainResult> {
+  if (!safeId(sessionId)) return { text: null, cached: false, paused: false };
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  if (!isScope(b.scope) || !isDepth(b.depth) || typeof b.id !== "string") {
+    return { text: null, cached: false, paused: false };
+  }
+  const snap = loadSnapshot(sessionId, root);
+  return explain(
+    snap,
+    { sessionId, scope: b.scope, id: b.id, depth: b.depth },
+    { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join(root, sessionId) },
+  );
 }
 
 // Compact snapshot for Live Split: one entry per active session, already ordered most

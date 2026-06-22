@@ -55,7 +55,7 @@ export interface TokenBreakdown {
 export interface TimelineChunk {
   id: string;
   name: string;
-  narration: string;
+  narration: string;             // the cheap "what" sentence, shown collapsed (near-free)
   startTs: number;
   endTs: number;                 // exclusive upper bound (next chunk start, or open-ended)
   tokenTotal: number;            // workTotal + contextTotal (legacy combined field)
@@ -63,6 +63,7 @@ export interface TimelineChunk {
   contextTotal: number;          // input + cache for this chunk
   warnings: Warning[];
   receipt: TokenBreakdown;
+  explanation: string | null;    // generated why/how at the seed depth, or null until asked for
 }
 
 // One user prompt and everything it set off: its tasks, cost, and how long it ran. A
@@ -79,6 +80,7 @@ export interface PromptGroup {
   taskCount: number;
   chunks: TimelineChunk[];
   live: boolean;                 // the active group of a live session
+  summary: string | null;        // generated recap of what this prompt accomplished, or null
 }
 
 export interface SessionSnapshot {
@@ -97,6 +99,9 @@ export interface SessionSnapshot {
   groups: PromptGroup[];           // per-prompt grouping, the Single view's structure
   chunks: TimelineChunk[];         // flat task list, still used by the Active Terminals view
   activeWarning: Warning | null;   // Plan 3: the live "stuck" warning, or null; drives the bar
+  seedDepth: "simple" | "deep" | "teach"; // depth to open the timeline at (from the session mode)
+  genAuto: boolean;                // true when the session mode wants summaries to auto-generate
+  budgetLeft: string | null;       // a "12k left" / "budget reached" cue, or null when uncapped
 }
 
 // --- Live Split: compact multi-session view ---

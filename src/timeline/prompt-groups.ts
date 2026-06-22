@@ -84,6 +84,7 @@ export function groupByPrompt(
       taskCount: groupChunks.length,
       chunks: groupChunks,
       live: liveGroup,
+      summary: null,
     };
   });
 }

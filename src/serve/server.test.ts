@@ -46,6 +46,14 @@ describe("resolveRoute", () => {
     expect(resolveRoute("POST", "/api/session/abc/name")).toEqual({ type: "rename", id: "abc" });
   });
 
+  it("routes POST /api/session/:id/explain to explain", () => {
+    expect(resolveRoute("POST", "/api/session/abc/explain")).toEqual({ type: "explain", id: "abc" });
+  });
+
+  it("does not treat a GET on the explain path as a snapshot", () => {
+    expect(resolveRoute("GET", "/api/session/abc/explain")).toEqual({ type: "notfound" });
+  });
+
   it("routes DELETE /api/session/:id to delete", () => {
     expect(resolveRoute("DELETE", "/api/session/abc")).toEqual({ type: "delete", id: "abc" });
   });

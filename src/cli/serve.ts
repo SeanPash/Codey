@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { rmSync } from "node:fs";
 import { createServer } from "../serve/server.js";
 import { buildIdFrom } from "../serve/build-id.js";
-import { loadSnapshot, loadLive } from "../serve/load-snapshot.js";
+import { loadSnapshot, loadLive, runExplain } from "../serve/load-snapshot.js";
 import { recordIntervention } from "../intervene/record.js";
 import { listSessions } from "./sessions.js";
 import { defaultRoot } from "../store/session-store.js";
@@ -51,6 +51,7 @@ export function runServe(opts: { session?: string; port: number }): void {
         return false;
       }
     },
+    explain: (id, body) => runExplain(id, body),
   });
   // If the port is already taken, fail loudly instead of dying silently. The launcher relies
   // on a failed bind so a stale server can never quietly outlive the one we meant to start.

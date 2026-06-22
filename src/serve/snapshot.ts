@@ -34,6 +34,8 @@ export interface SnapshotInput {
   turns: AssistantTurn[];
   prompts: UserPrompt[];
   now: number;
+  seedDepth?: "simple" | "deep" | "teach"; // depth the timeline opens at; defaults to deep
+  genAuto?: boolean;                        // whether the session wants auto summaries
 }
 
 interface Boundary { startIndex: number; name: string; narration: string; }
@@ -70,9 +72,9 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     const endTs = next ? (events[next.startIndex]?.timestamp ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
     const slice = events.slice(rc.startIndex, endIndex);
     const raw = attributeChunk(turns, startTs, endTs);
-    // Fill narration only where the line has no real per-action explanation.
-    const why = rc.narration || null;
-    const workLines = groupThinking(raw.workLines).map((l) => ({ ...l, why: l.why ?? why }));
+    // Each line keeps its own reasoning (Claude's words for that turn). We no longer smear the
+    // single task sentence across every row; the real why/how is generated on demand instead.
+    const workLines = groupThinking(raw.workLines);
     const receipt = { ...raw, workLines };
     return {
       id: `c${idx}`,
@@ -85,6 +87,7 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
       contextTotal: receipt.contextTotal,
       warnings: chunkWarnings(slice, turns),
       receipt,
+      explanation: null,
     };
   });
 
@@ -123,5 +126,8 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     groups,
     chunks,
     activeWarning: null,
+    seedDepth: input.seedDepth ?? "deep",
+    genAuto: input.genAuto ?? false,
+    budgetLeft: null,
   };
 }

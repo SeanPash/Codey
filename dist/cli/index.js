@@ -18,9 +18,9 @@ var __commonJS = (cb, mod) => function __require2() {
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    for (let key2 of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key2) && key2 !== except)
+        __defProp(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc(from, key2)) || desc.enumerable });
   }
   return to;
 };
@@ -837,9 +837,9 @@ var require_option = __commonJS({
             this.positiveOptions.set(option.attributeName(), option);
           }
         });
-        this.negativeOptions.forEach((value, key) => {
-          if (this.positiveOptions.has(key)) {
-            this.dualOptions.add(key);
+        this.negativeOptions.forEach((value, key2) => {
+          if (this.positiveOptions.has(key2)) {
+            this.dualOptions.add(key2);
           }
         });
       }
@@ -1723,11 +1723,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} key
        * @return {object} value
        */
-      getOptionValue(key) {
+      getOptionValue(key2) {
         if (this._storeOptionsAsProperties) {
-          return this[key];
+          return this[key2];
         }
-        return this._optionValues[key];
+        return this._optionValues[key2];
       }
       /**
        * Store option value.
@@ -1736,8 +1736,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {object} value
        * @return {Command} `this` command for chaining
        */
-      setOptionValue(key, value) {
-        return this.setOptionValueWithSource(key, value, void 0);
+      setOptionValue(key2, value) {
+        return this.setOptionValueWithSource(key2, value, void 0);
       }
       /**
        * Store option value and where the value came from.
@@ -1747,13 +1747,13 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} source - expected values are default/config/env/cli/implied
        * @return {Command} `this` command for chaining
        */
-      setOptionValueWithSource(key, value, source) {
+      setOptionValueWithSource(key2, value, source) {
         if (this._storeOptionsAsProperties) {
-          this[key] = value;
+          this[key2] = value;
         } else {
-          this._optionValues[key] = value;
+          this._optionValues[key2] = value;
         }
-        this._optionValueSources[key] = source;
+        this._optionValueSources[key2] = source;
         return this;
       }
       /**
@@ -1763,8 +1763,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} key
        * @return {string}
        */
-      getOptionValueSource(key) {
-        return this._optionValueSources[key];
+      getOptionValueSource(key2) {
+        return this._optionValueSources[key2];
       }
       /**
        * Get source of option value. See also .optsWithGlobals().
@@ -1773,11 +1773,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} key
        * @return {string}
        */
-      getOptionValueSourceWithGlobals(key) {
+      getOptionValueSourceWithGlobals(key2) {
         let source;
         this._getCommandAndAncestors().forEach((cmd) => {
-          if (cmd.getOptionValueSource(key) !== void 0) {
-            source = cmd.getOptionValueSource(key);
+          if (cmd.getOptionValueSource(key2) !== void 0) {
+            source = cmd.getOptionValueSource(key2);
           }
         });
         return source;
@@ -2432,8 +2432,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
           const result = {};
           const len = this.options.length;
           for (let i = 0; i < len; i++) {
-            const key = this.options[i].attributeName();
-            result[key] = key === this._versionOptionName ? this._version : this[key];
+            const key2 = this.options[i].attributeName();
+            result[key2] = key2 === this._versionOptionName ? this._version : this[key2];
           }
           return result;
         }
@@ -3270,10 +3270,10 @@ function detectLoop(events, threshold) {
   const pres = events.filter((e) => e.phase === "pre");
   if (pres.length === 0) return null;
   const last = pres[pres.length - 1];
-  const key = last.tool + "|" + last.inputHash;
+  const key2 = last.tool + "|" + last.inputHash;
   let count = 0;
   for (let i = pres.length - 1; i >= 0; i--) {
-    if (pres[i].tool + "|" + pres[i].inputHash === key) count++;
+    if (pres[i].tool + "|" + pres[i].inputHash === key2) count++;
     else break;
   }
   if (count < threshold) return null;
@@ -3289,10 +3289,10 @@ function detectRepeatError(events, threshold) {
   const errs = events.filter((e) => e.phase === "post" && e.isError);
   if (errs.length === 0) return null;
   const last = errs[errs.length - 1];
-  const key = last.tool + "|" + (last.errorText ?? "");
+  const key2 = last.tool + "|" + (last.errorText ?? "");
   let count = 0;
   for (let i = errs.length - 1; i >= 0; i--) {
-    if (errs[i].tool + "|" + (errs[i].errorText ?? "") === key) count++;
+    if (errs[i].tool + "|" + (errs[i].errorText ?? "") === key2) count++;
     else break;
   }
   if (count < threshold) return null;
@@ -3389,11 +3389,11 @@ function summarizeEvent(e) {
 }
 function buildNarrationPrompt(events, mode) {
   const lines = events.map(summarizeEvent).join("\n");
-  const instruction = mode === "teach" ? "In a few plain-English sentences for someone learning to code, explain what Claude is doing and why, then briefly teach the key concept involved (define any technical term you use). Do not list the tools; describe the goal." : mode === "deep" ? "In 2-3 plain-English sentences for a non-technical person, explain what Claude is doing, why it matters, and how this change actually addresses the problem. Do not list the tools; describe the goal." : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Do not list the tools; describe the goal.";
+  const instruction2 = mode === "teach" ? "In a few plain-English sentences for someone learning to code, explain what Claude is doing and why, then briefly teach the key concept involved (define any technical term you use). Do not list the tools; describe the goal." : mode === "deep" ? "In 2-3 plain-English sentences for a non-technical person, explain what Claude is doing, why it matters, and how this change actually addresses the problem. Do not list the tools; describe the goal." : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Do not list the tools; describe the goal.";
   return `These are the most recent actions an AI coding agent took:
 ${lines}
 
-${instruction}
+${instruction2}
 Write plain English. Never use em dashes; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }
 
@@ -3476,9 +3476,9 @@ function basename(p) {
   const parts = p.replace(/["']/g, "").split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
-function str(input, key) {
+function str(input, key2) {
   if (input && typeof input === "object") {
-    const v = input[key];
+    const v = input[key2];
     if (typeof v === "string") return v;
   }
   return null;
@@ -3666,18 +3666,18 @@ async function processTick(events, state, now) {
     }
   }
   if (action) {
-    const key = `${action.tag}|${action.target}`;
-    if (key !== state.lastActionKey) {
+    const key2 = `${action.tag}|${action.target}`;
+    if (key2 !== state.lastActionKey) {
       lines.push(renderAction(action));
-      state.lastActionKey = key;
+      state.lastActionKey = key2;
     }
   }
   const w = activeWarning(events, now);
   if (w) {
-    const key = warningKey(w);
-    if (key !== state.lastWarningKey) {
+    const key2 = warningKey(w);
+    if (key2 !== state.lastWarningKey) {
       lines.push(formatWarning(w));
-      state.lastWarningKey = key;
+      state.lastWarningKey = key2;
     }
   }
   const narration = await state.engine.onEvents(events, now);
@@ -4526,7 +4526,7 @@ function runStatusLine() {
 
 // src/cli/serve.ts
 import { fileURLToPath } from "node:url";
-import { dirname as dirname2, join as join16 } from "node:path";
+import { dirname as dirname2, join as join17 } from "node:path";
 import { rmSync as rmSync6 } from "node:fs";
 
 // src/serve/server.ts
@@ -4551,6 +4551,8 @@ function resolveRoute(method, url) {
     if (mi) return { type: "intervene", id: decodeURIComponent(mi[1]) };
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
     if (mn) return { type: "rename", id: decodeURIComponent(mn[1]) };
+    const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
+    if (me) return { type: "explain", id: decodeURIComponent(me[1]) };
   }
   if (method === "DELETE") {
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
@@ -4611,6 +4613,21 @@ function createServer(deps) {
           const ok = deps.rename(route.id, name);
           sendJson(res, ok ? 200 : 400, { ok });
         });
+      } else if (route.type === "explain") {
+        void readBody(req).then(async (body) => {
+          let parsed = {};
+          try {
+            parsed = JSON.parse(body || "{}");
+          } catch {
+            parsed = {};
+          }
+          try {
+            const result = await deps.explain(route.id, parsed);
+            sendJson(res, 200, result);
+          } catch (err) {
+            sendJson(res, 500, { error: String(err) });
+          }
+        });
       } else if (route.type === "delete") {
         const ok = deps.remove(route.id);
         sendJson(res, ok ? 200 : 400, { ok });
@@ -4635,7 +4652,7 @@ function buildIdFrom(entryPath) {
 
 // src/serve/load-snapshot.ts
 import { statSync as statSync2 } from "node:fs";
-import { join as join13 } from "node:path";
+import { join as join14 } from "node:path";
 
 // src/timeline/attribution.ts
 function basename2(p) {
@@ -4836,7 +4853,8 @@ function groupByPrompt(prompts, chunks, turns, sessionEndTs, live) {
       tokenTotal: work,
       taskCount: groupChunks.length,
       chunks: groupChunks,
-      live: liveGroup
+      live: liveGroup,
+      summary: null
     };
   });
 }
@@ -4882,8 +4900,7 @@ function buildSnapshot(input) {
     const endTs = next ? events[next.startIndex]?.timestamp ?? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER;
     const slice = events.slice(rc.startIndex, endIndex);
     const raw = attributeChunk(turns, startTs, endTs);
-    const why = rc.narration || null;
-    const workLines = groupThinking(raw.workLines).map((l) => ({ ...l, why: l.why ?? why }));
+    const workLines = groupThinking(raw.workLines);
     const receipt = { ...raw, workLines };
     return {
       id: `c${idx}`,
@@ -4895,7 +4912,8 @@ function buildSnapshot(input) {
       workTotal: receipt.workTotal,
       contextTotal: receipt.contextTotal,
       warnings: chunkWarnings(slice, turns),
-      receipt
+      receipt,
+      explanation: null
     };
   });
   const totals = sessionTotals(turns);
@@ -4928,7 +4946,10 @@ function buildSnapshot(input) {
     priciestTaskName: priciest ? priciest.name : null,
     groups,
     chunks,
-    activeWarning: null
+    activeWarning: null,
+    seedDepth: input.seedDepth ?? "deep",
+    genAuto: input.genAuto ?? false,
+    budgetLeft: null
   };
 }
 
@@ -4944,11 +4965,210 @@ function selectActive(items) {
   return items.filter((s) => s.open).sort((a, b) => b.lastPromptTs - a.lastPromptTs);
 }
 
+// src/timeline/explain-prompt.ts
+function actionContext(l) {
+  const status = l.status === "fail" ? " [failed]" : "";
+  const detail = l.raw ? ` (${l.raw})` : "";
+  const reason = l.why ? ` reasoning: ${l.why}` : "";
+  const fail = l.failSummary ? ` ${l.failSummary}` : "";
+  return `- ${l.label}${detail}${status}${reason}${fail}`;
+}
+function taskInstruction(depth) {
+  switch (depth) {
+    case "simple":
+      return "In one plain English sentence for a non-technical person, say what Claude did in this task and why.";
+    case "teach":
+      return "In a few plain English sentences for someone learning to code, explain what Claude did in this task and why, then briefly teach the key concept involved (define any technical term you use).";
+    default:
+      return "In a few plain English sentences for a non-technical person, explain what Claude did in this task, why it matters, and how it actually addresses the problem.";
+  }
+}
+function actionInstruction(depth) {
+  switch (depth) {
+    case "simple":
+      return "In one plain English sentence for a non-technical person, say what Claude did in this single step and why.";
+    case "teach":
+      return "In a few plain English sentences for someone learning to code, explain what Claude did in this single step and why, then briefly teach the key concept involved (define any technical term you use).";
+    default:
+      return "In a few plain English sentences for a non-technical person, explain what Claude did in this single step, why it matters, and how it works.";
+  }
+}
+var TAIL = "Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation, no preamble.";
+function buildTaskExplainPrompt(taskName, lines, depth) {
+  const body = lines.map(actionContext).join("\n");
+  return [
+    `An AI coding agent worked on a task called "${taskName}". These are the steps it took, with its own reasoning:`,
+    body,
+    "",
+    `${taskInstruction(depth)} ${TAIL}`
+  ].join("\n");
+}
+function buildActionExplainPrompt(line, depth) {
+  return [
+    "An AI coding agent took this single step, with its own reasoning:",
+    actionContext(line),
+    "",
+    `${actionInstruction(depth)} ${TAIL}`
+  ].join("\n");
+}
+
+// src/timeline/summary-prompt.ts
+function taskBlock(t) {
+  const reasons = t.lines.map((l) => l.why ? `    - ${l.why}` : `    - ${l.label}`).join("\n");
+  return `- ${t.name}
+${reasons}`;
+}
+function instruction(depth) {
+  switch (depth) {
+    case "simple":
+      return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt.";
+    case "teach":
+      return "In a few plain English sentences for someone learning to code, recap what Claude accomplished for this prompt and why it matters, then briefly teach the key concept involved (define any technical term you use).";
+    default:
+      return "In two or three plain English sentences for a non-technical person, recap what Claude accomplished for this prompt and how it addressed the request.";
+  }
+}
+function buildSummaryPrompt(promptText, tasks, depth) {
+  const body = tasks.map(taskBlock).join("\n");
+  return [
+    `A user asked an AI coding agent: "${promptText}"`,
+    "It worked through these tasks, with its own reasoning:",
+    body,
+    "",
+    `${instruction(depth)} Focus on the outcome, do not list the tools. Use plain hyphens, not em dashes. Reply with only the recap, no preamble.`
+  ].join("\n");
+}
+
+// src/timeline/explain-cache.ts
+import { readFileSync as readFileSync15, writeFileSync as writeFileSync7, existsSync as existsSync15, mkdirSync as mkdirSync7 } from "node:fs";
+import { join as join13 } from "node:path";
+function cachePath2(sessionId, root) {
+  return join13(root, sessionId, "explanations.json");
+}
+function idPrefix(scope, id) {
+  return `${scope}:${id}:`;
+}
+function key(scope, id, contentHash, depth) {
+  return `${idPrefix(scope, id)}${contentHash}:${depth}`;
+}
+function read(sessionId, root) {
+  const p = cachePath2(sessionId, root);
+  if (!existsSync15(p)) return {};
+  try {
+    const o = JSON.parse(readFileSync15(p, "utf8"));
+    return o && typeof o === "object" ? o : {};
+  } catch {
+    return {};
+  }
+}
+function readExplanation(sessionId, scope, id, contentHash, depth, root = defaultRoot()) {
+  const store = read(sessionId, root);
+  return store[key(scope, id, contentHash, depth)] ?? null;
+}
+function writeExplanation(sessionId, scope, id, contentHash, depth, text, root = defaultRoot()) {
+  const store = read(sessionId, root);
+  const prefix = idPrefix(scope, id);
+  const live = key(scope, id, contentHash, depth);
+  for (const k of Object.keys(store)) {
+    if (k.startsWith(prefix) && !k.startsWith(`${prefix}${contentHash}:`) && k !== live) delete store[k];
+  }
+  store[live] = text;
+  mkdirSync7(join13(root, sessionId), { recursive: true });
+  writeFileSync7(cachePath2(sessionId, root), JSON.stringify(store));
+}
+
+// src/util/hash.ts
+import { createHash } from "node:crypto";
+function stableStringify(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return "[" + value.map(stableStringify).join(",") + "]";
+  const keys = Object.keys(value).sort();
+  return "{" + keys.map((k) => JSON.stringify(k) + ":" + stableStringify(value[k])).join(",") + "}";
+}
+function hashContent(value) {
+  return createHash("sha256").update(stableStringify(value)).digest("hex").slice(0, 16);
+}
+
+// src/timeline/explain-service.ts
+function timelineDefaults(mode) {
+  switch (mode) {
+    case "simple":
+      return { seedDepth: "simple", genAuto: false };
+    case "teach":
+      return { seedDepth: "teach", genAuto: true };
+    case "deep":
+      return { seedDepth: "deep", genAuto: true };
+    default:
+      return { seedDepth: "deep", genAuto: false };
+  }
+}
+function lineKey(l) {
+  return [l.label, l.tool, l.status, l.why, l.raw, l.failSummary];
+}
+function parseActionId(id) {
+  const at = id.lastIndexOf("#");
+  if (at < 0) return null;
+  const index = Number(id.slice(at + 1));
+  if (!Number.isInteger(index) || index < 0) return null;
+  return { chunkId: id.slice(0, at), index };
+}
+function summaryTasks(chunks) {
+  return chunks.map((c) => ({ name: c.name, lines: c.receipt.workLines }));
+}
+function locate(snap, req) {
+  if (req.scope === "task") {
+    const c = snap.chunks.find((x) => x.id === req.id);
+    if (!c) return null;
+    const lines = c.receipt.workLines;
+    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth), hash: hashContent(lines.map(lineKey)) };
+  }
+  if (req.scope === "action") {
+    const parsed = parseActionId(req.id);
+    if (!parsed) return null;
+    const c = snap.chunks.find((x) => x.id === parsed.chunkId);
+    const line = c?.receipt.workLines[parsed.index];
+    if (!line) return null;
+    return { prompt: buildActionExplainPrompt(line, req.depth), hash: hashContent(lineKey(line)) };
+  }
+  const g = snap.groups.find((x) => x.id === req.id);
+  if (!g) return null;
+  const tasks = summaryTasks(g.chunks);
+  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)])]);
+  return { prompt: buildSummaryPrompt(g.prompt, tasks, req.depth), hash };
+}
+async function explain(snap, req, deps) {
+  const loc = locate(snap, req);
+  if (!loc) return { text: null, cached: false, paused: false };
+  const hit = readExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, deps.root);
+  if (hit != null) return { text: hit, cached: true, paused: false };
+  if (!budgetAllows(readBudget(deps.sessionDir))) return { text: null, cached: false, paused: true };
+  const res = await deps.narrate(loc.prompt);
+  if (!res || !res.text.trim()) return { text: null, cached: false, paused: false };
+  addSpend(deps.sessionDir, res.tokens);
+  const text = res.text.trim();
+  writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
+  return { text, cached: false, paused: false };
+}
+function fillCachedExplanations(snap, depth, root) {
+  const chunks = snap.chunks.map((c) => {
+    const loc = locate(snap, { sessionId: snap.sessionId, scope: "task", id: c.id, depth });
+    const hit = loc ? readExplanation(snap.sessionId, "task", c.id, loc.hash, depth, root) : null;
+    return { ...c, explanation: hit };
+  });
+  const byId = new Map(chunks.map((c) => [c.id, c]));
+  const groups = snap.groups.map((g) => {
+    const loc = locate(snap, { sessionId: snap.sessionId, scope: "summary", id: g.id, depth });
+    const hit = loc ? readExplanation(snap.sessionId, "summary", g.id, loc.hash, depth, root) : null;
+    return { ...g, summary: hit, chunks: g.chunks.map((c) => byId.get(c.id) ?? c) };
+  });
+  return { ...snap, chunks, groups };
+}
+
 // src/serve/load-snapshot.ts
 function isRunning(dir, now) {
   let evMtime = 0;
   try {
-    evMtime = statSync2(join13(dir, "events.jsonl")).mtimeMs;
+    evMtime = statSync2(join14(dir, "events.jsonl")).mtimeMs;
   } catch {
     evMtime = 0;
   }
@@ -4983,6 +5203,7 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   });
   let prompts = readUserPrompts(meta?.transcriptPath ?? null);
   if (prompts.length === 0) prompts = readPrompts(store.dir).map((ts) => ({ ts, text: "" }));
+  const { seedDepth, genAuto } = timelineDefaults(readSessionMode(store.dir));
   const snap = buildSnapshot({
     sessionId,
     sessionName: name,
@@ -4993,10 +5214,39 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     rawChunks,
     turns,
     prompts,
-    now
+    now,
+    seedDepth,
+    genAuto
   });
   const reconciled = reconcileErrors(events, turns);
-  return { ...snap, activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null };
+  const withMeta = {
+    ...snap,
+    activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null,
+    budgetLeft: budgetLeftLabel(readBudget(store.dir))
+  };
+  return fillCachedExplanations(withMeta, seedDepth, root);
+}
+function isScope(s) {
+  return s === "task" || s === "action" || s === "summary";
+}
+function isDepth(s) {
+  return s === "simple" || s === "deep" || s === "teach";
+}
+function safeId(id) {
+  return !!id && !id.includes("/") && !id.includes("\\") && !id.includes("..");
+}
+async function runExplain(sessionId, body, root = defaultRoot()) {
+  if (!safeId(sessionId)) return { text: null, cached: false, paused: false };
+  const b = body && typeof body === "object" ? body : {};
+  if (!isScope(b.scope) || !isDepth(b.depth) || typeof b.id !== "string") {
+    return { text: null, cached: false, paused: false };
+  }
+  const snap = loadSnapshot(sessionId, root);
+  return explain(
+    snap,
+    { sessionId, scope: b.scope, id: b.id, depth: b.depth },
+    { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join14(root, sessionId) }
+  );
 }
 function loadLive(root = defaultRoot()) {
   const active = selectActive(listSessions(root));
@@ -5022,14 +5272,14 @@ function loadLive(root = defaultRoot()) {
 }
 
 // src/intervene/file-io.ts
-import { writeFileSync as writeFileSync7, readFileSync as readFileSync15, existsSync as existsSync15, rmSync as rmSync4, mkdirSync as mkdirSync7 } from "node:fs";
-import { join as join14 } from "node:path";
+import { writeFileSync as writeFileSync8, readFileSync as readFileSync16, existsSync as existsSync16, rmSync as rmSync4, mkdirSync as mkdirSync8 } from "node:fs";
+import { join as join15 } from "node:path";
 function interventionPath(sessionId, root = defaultRoot()) {
-  return join14(root, sessionId, "intervene.json");
+  return join15(root, sessionId, "intervene.json");
 }
 function writeInterventionFile(sessionId, file6, root = defaultRoot()) {
-  mkdirSync7(join14(root, sessionId), { recursive: true });
-  writeFileSync7(interventionPath(sessionId, root), JSON.stringify(file6));
+  mkdirSync8(join15(root, sessionId), { recursive: true });
+  writeFileSync8(interventionPath(sessionId, root), JSON.stringify(file6));
 }
 
 // src/intervene/record.ts
@@ -5051,8 +5301,8 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 }
 
 // src/store/session-prune.ts
-import { readdirSync as readdirSync3, statSync as statSync3, existsSync as existsSync16, rmSync as rmSync5 } from "node:fs";
-import { join as join15 } from "node:path";
+import { readdirSync as readdirSync3, statSync as statSync3, existsSync as existsSync17, rmSync as rmSync5 } from "node:fs";
+import { join as join16 } from "node:path";
 function newestMtime(dir) {
   let newest = statSync3(dir).mtimeMs;
   let entries;
@@ -5063,7 +5313,7 @@ function newestMtime(dir) {
   }
   for (const name of entries) {
     try {
-      const ms = statSync3(join15(dir, name)).mtimeMs;
+      const ms = statSync3(join16(dir, name)).mtimeMs;
       if (ms > newest) newest = ms;
     } catch {
     }
@@ -5071,7 +5321,7 @@ function newestMtime(dir) {
   return newest;
 }
 function pruneEventless(root, now, maxAgeMs) {
-  if (!existsSync16(root)) return [];
+  if (!existsSync17(root)) return [];
   let entries;
   try {
     entries = readdirSync3(root);
@@ -5080,10 +5330,10 @@ function pruneEventless(root, now, maxAgeMs) {
   }
   const removed = [];
   for (const name of entries) {
-    const dir = join15(root, name);
+    const dir = join16(root, name);
     try {
       if (!statSync3(dir).isDirectory()) continue;
-      if (existsSync16(join15(dir, "events.jsonl"))) continue;
+      if (existsSync17(join16(dir, "events.jsonl"))) continue;
       const age = now - newestMtime(dir);
       if (age < maxAgeMs) continue;
       rmSync5(dir, { recursive: true, force: true });
@@ -5097,7 +5347,7 @@ function pruneEventless(root, now, maxAgeMs) {
 // src/cli/serve.ts
 var here = dirname2(fileURLToPath(import.meta.url));
 function publicDir() {
-  return join16(here, "..", "serve", "public");
+  return join17(here, "..", "serve", "public");
 }
 function runServe(opts) {
   try {
@@ -5105,8 +5355,8 @@ function runServe(opts) {
   } catch {
   }
   const server = createServer({
-    pagePath: join16(publicDir(), "index.html"),
-    fontsDir: join16(publicDir(), "fonts"),
+    pagePath: join17(publicDir(), "index.html"),
+    fontsDir: join17(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
     getSnapshot: (id) => loadSnapshot(id),
@@ -5115,7 +5365,7 @@ function runServe(opts) {
     rename: (id, name) => {
       if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
       try {
-        writeCustomName(join16(defaultRoot(), id), name);
+        writeCustomName(join17(defaultRoot(), id), name);
         return true;
       } catch {
         return false;
@@ -5124,12 +5374,13 @@ function runServe(opts) {
     remove: (id) => {
       if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
       try {
-        rmSync6(join16(defaultRoot(), id), { recursive: true, force: true });
+        rmSync6(join17(defaultRoot(), id), { recursive: true, force: true });
         return true;
       } catch {
         return false;
       }
-    }
+    },
+    explain: (id, body) => runExplain(id, body)
   });
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {
@@ -5146,8 +5397,8 @@ function runServe(opts) {
 }
 
 // src/cli/feed.ts
-import { existsSync as existsSync17, watchFile as watchFile3 } from "node:fs";
-import { join as join17 } from "node:path";
+import { existsSync as existsSync18, watchFile as watchFile3 } from "node:fs";
+import { join as join18 } from "node:path";
 
 // src/feed/render.ts
 var RESET2 = "\x1B[0m";
@@ -5243,12 +5494,12 @@ function advanceFeed(items, cursor, prompts) {
 // src/cli/feed.ts
 function runFeed(sessionId) {
   const store = new SessionStore(sessionId);
-  const narrationPath = join17(store.dir, "narration.jsonl");
-  const promptsPath = join17(store.dir, "prompts.jsonl");
+  const narrationPath = join18(store.dir, "narration.jsonl");
+  const promptsPath = join18(store.dir, "prompts.jsonl");
   let cursor = { lastSeq: 0, whysShownFor: /* @__PURE__ */ new Set(), turnsHeadered: /* @__PURE__ */ new Set(), turnsSummarized: /* @__PURE__ */ new Set() };
   const build = () => feedItems(cardsFromEvents(store.readAll()), readWhys(store.dir));
   const flush = () => {
-    if (!existsSync17(store.path)) return;
+    if (!existsSync18(store.path)) return;
     const r = advanceFeed(build(), cursor, readPrompts(store.dir));
     cursor = r.cursor;
     if (r.text) process.stdout.write(r.text + "\n");
@@ -5261,9 +5512,9 @@ function runFeed(sessionId) {
 }
 
 // src/cli/toggle.ts
-import { readFileSync as readFileSync16, writeFileSync as writeFileSync8, existsSync as existsSync18, mkdirSync as mkdirSync8, rmSync as rmSync7 } from "node:fs";
+import { readFileSync as readFileSync17, writeFileSync as writeFileSync9, existsSync as existsSync19, mkdirSync as mkdirSync9, rmSync as rmSync7 } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join18, dirname as dirname3 } from "node:path";
+import { join as join19, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
 function withStatusLine(s, command) {
   return { ...s, statusLine: { type: "command", command } };
@@ -5274,31 +5525,31 @@ function withoutStatusLine(s) {
   return next;
 }
 function settingsPath() {
-  return join18(homedir2(), ".claude", "settings.json");
+  return join19(homedir2(), ".claude", "settings.json");
 }
 function readSettings() {
   const p = settingsPath();
-  if (!existsSync18(p)) return {};
+  if (!existsSync19(p)) return {};
   try {
-    return JSON.parse(readFileSync16(p, "utf8"));
+    return JSON.parse(readFileSync17(p, "utf8"));
   } catch {
     return {};
   }
 }
 function writeSettings(s) {
   const p = settingsPath();
-  mkdirSync8(dirname3(p), { recursive: true });
-  writeFileSync8(p, JSON.stringify(s, null, 2));
+  mkdirSync9(dirname3(p), { recursive: true });
+  writeFileSync9(p, JSON.stringify(s, null, 2));
 }
 function statusLineCommand(self) {
   return `node "${self}" statusline`;
 }
 function pidPath(sessionDir) {
-  return join18(sessionDir, "narrator.pid");
+  return join19(sessionDir, "narrator.pid");
 }
 function stopNarrator(path, kill = (pid) => process.kill(pid)) {
-  if (!existsSync18(path)) return;
-  const pid = Number(readFileSync16(path, "utf8").trim());
+  if (!existsSync19(path)) return;
+  const pid = Number(readFileSync17(path, "utf8").trim());
   if (pid > 0) {
     try {
       kill(pid);
@@ -5309,8 +5560,8 @@ function stopNarrator(path, kill = (pid) => process.kill(pid)) {
 }
 function turnOn(mode, session) {
   const self = process.argv[1];
-  const dir = join18(defaultRoot(), session);
-  mkdirSync8(dir, { recursive: true });
+  const dir = join19(defaultRoot(), session);
+  mkdirSync9(dir, { recursive: true });
   stopNarrator(pidPath(dir));
   writeSessionMode(mode, dir);
   patchStatus(dir, { mode });
@@ -5321,10 +5572,10 @@ function turnOn(mode, session) {
     windowsHide: true
   });
   child.unref();
-  writeFileSync8(pidPath(dir), String(child.pid ?? ""));
+  writeFileSync9(pidPath(dir), String(child.pid ?? ""));
 }
 function turnOff(session) {
-  const dir = join18(defaultRoot(), session);
+  const dir = join19(defaultRoot(), session);
   stopNarrator(pidPath(dir));
   clearBudget(dir);
   clearSessionMode(dir);
@@ -5332,7 +5583,7 @@ function turnOff(session) {
 }
 
 // src/cli/budget.ts
-import { join as join19 } from "node:path";
+import { join as join20 } from "node:path";
 function parseBudgetArg(raw) {
   const s = (raw ?? "").trim().toLowerCase();
   if (!s) return { kind: "report" };
@@ -5349,7 +5600,7 @@ function runBudget(raw) {
     console.error("No Codey sessions found yet.");
     process.exit(1);
   }
-  const dir = join19(defaultRoot(), session);
+  const dir = join20(defaultRoot(), session);
   const arg = parseBudgetArg(raw);
   switch (arg.kind) {
     case "report":
@@ -5370,8 +5621,8 @@ function runBudget(raw) {
 }
 
 // src/cli/explain.ts
-import { join as join21 } from "node:path";
-import { existsSync as existsSync20, readFileSync as readFileSync18 } from "node:fs";
+import { join as join22 } from "node:path";
+import { existsSync as existsSync21, readFileSync as readFileSync19 } from "node:fs";
 
 // src/narration/explain.ts
 var DEPTHS = ["simple", "deep", "teach"];
@@ -5421,12 +5672,12 @@ function depthInstruction(depth) {
 }
 function buildExplainPrompt(events, priorPasses, depth = "deep") {
   const lines = events.map(summarizeEvent2).join("\n");
-  const instruction = depthInstruction(depth);
+  const instruction2 = depthInstruction(depth);
   if (priorPasses.length === 0) {
     return `These are the actions an AI coding agent took for the current task:
 ${lines}
 
-${instruction} Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation.`;
+${instruction2} Describe the goal, do not list the tools. Use plain hyphens, not em dashes. Reply with only the explanation.`;
   }
   const heard = priorPasses.map((p, i) => `${i + 1}. ${p}`).join("\n");
   return `These are the actions an AI coding agent took for the current task:
@@ -5435,23 +5686,23 @@ ${lines}
 The user has already been told:
 ${heard}
 
-Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction} Use plain hyphens, not em dashes. Reply with only the explanation.`;
+Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction2} Use plain hyphens, not em dashes. Reply with only the explanation.`;
 }
 
 // src/narration/explain-log.ts
-import { appendFileSync as appendFileSync4, readFileSync as readFileSync17, existsSync as existsSync19 } from "node:fs";
-import { join as join20 } from "node:path";
+import { appendFileSync as appendFileSync4, readFileSync as readFileSync18, existsSync as existsSync20 } from "node:fs";
+import { join as join21 } from "node:path";
 function file5(dir) {
-  return join20(dir, "explain.jsonl");
+  return join21(dir, "explain.jsonl");
 }
 function appendPass(dir, scope, text) {
   appendFileSync4(file5(dir), JSON.stringify({ scope, text }) + "\n");
 }
 function passesForScope(dir, scope) {
   const p = file5(dir);
-  if (!existsSync19(p)) return [];
+  if (!existsSync20(p)) return [];
   const out = [];
-  for (const line of readFileSync17(p, "utf8").split("\n")) {
+  for (const line of readFileSync18(p, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
       const o = JSON.parse(line);
@@ -5464,10 +5715,10 @@ function passesForScope(dir, scope) {
 
 // src/cli/explain.ts
 function readEvents2(dir) {
-  const p = join21(dir, "events.jsonl");
-  if (!existsSync20(p)) return [];
+  const p = join22(dir, "events.jsonl");
+  if (!existsSync21(p)) return [];
   const out = [];
-  for (const line of readFileSync18(p, "utf8").split("\n")) {
+  for (const line of readFileSync19(p, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
       out.push(JSON.parse(line));
@@ -5476,13 +5727,13 @@ function readEvents2(dir) {
   }
   return out;
 }
-async function runExplain(args = []) {
+async function runExplain2(args = []) {
   const session = latestSessionId();
   if (!session) {
     console.error("No Codey sessions found yet.");
     process.exit(1);
   }
-  const dir = join21(defaultRoot(), session);
+  const dir = join22(defaultRoot(), session);
   const { depth, task } = parseExplainArgs(args);
   const start = currentTurnStart(readPrompts(dir));
   const turnEvents = eventsForCurrentTurn(readEvents2(dir), start);
@@ -5550,8 +5801,8 @@ function runCosts() {
 import { spawn as spawn2 } from "node:child_process";
 import { connect } from "node:net";
 import { get as httpGet } from "node:http";
-import { readFileSync as readFileSync19, writeFileSync as writeFileSync9, existsSync as existsSync21 } from "node:fs";
-import { join as join22 } from "node:path";
+import { readFileSync as readFileSync20, writeFileSync as writeFileSync10, existsSync as existsSync22 } from "node:fs";
+import { join as join23 } from "node:path";
 var DEFAULT_PORT = 4317;
 function timelineDecision(lock, currentBuild, probe) {
   if (!lock) return { action: "spawn", port: DEFAULT_PORT };
@@ -5561,13 +5812,13 @@ function timelineDecision(lock, currentBuild, probe) {
   return { action: "replace", port: lock.port, pid: lock.pid };
 }
 function lockPath(root) {
-  return join22(root, "serve.lock");
+  return join23(root, "serve.lock");
 }
 function readLock(root) {
   const p = lockPath(root);
-  if (!existsSync21(p)) return null;
+  if (!existsSync22(p)) return null;
   try {
-    const o = JSON.parse(readFileSync19(p, "utf8"));
+    const o = JSON.parse(readFileSync20(p, "utf8"));
     if (typeof o.port === "number" && typeof o.pid === "number") {
       return { port: o.port, pid: o.pid, build: typeof o.build === "string" ? o.build : "" };
     }
@@ -5669,19 +5920,19 @@ async function runTimeline() {
     console.error(`A different timeline build is serving port ${port}. Close it and try again.`);
     process.exit(1);
   }
-  writeFileSync9(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
+  writeFileSync10(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
   if (ready) console.log(`Codey timeline at http://localhost:${port}`);
   else console.log(`Codey timeline starting at http://localhost:${port} (give it a moment to open).`);
 }
 
 // src/cli/index.ts
-import { join as join23 } from "node:path";
+import { join as join24 } from "node:path";
 function parseMode(m) {
   return ["simple", "deep", "teach", "ask"].includes(m) ? m : "simple";
 }
 function resolveWatchMode(opt, session) {
   if (opt) return parseMode(opt);
-  const snap = readStatus(join23(defaultRoot(), session));
+  const snap = readStatus(join24(defaultRoot(), session));
   return snap?.mode ?? "simple";
 }
 var program2 = new Command();
@@ -5728,7 +5979,7 @@ program2.command("on").description("Turn narration on in the status line").optio
   console.log(`  node "${process.argv[1]}" feed`);
 });
 program2.command("explain").description("Explain the most recent task in depth; run again to go deeper").argument("[args...]", "optional depth (simple | deep | teach) and/or a task number").action((args) => {
-  void runExplain(args);
+  void runExplain2(args);
 });
 program2.command("budget").description("Set or report the token budget for automatic narration").argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report").action((amount) => runBudget(amount));
 program2.command("costs").description("Show the token cost of each task in this session").action(() => runCosts());
