@@ -41,6 +41,18 @@ describe("groupByPrompt", () => {
     expect(g[1].chunks.map((c) => c.id)).toEqual(["c2"]);
   });
 
+  it("marks the group whose window holds a user interrupt as cancelled", () => {
+    // The cancel landed during the second prompt's window: only that group is flagged.
+    const g = groupByPrompt(prompts, chunks, turns, 9000, false, 5500);
+    expect(g[0].cancelled).toBe(false);
+    expect(g[1].cancelled).toBe(true);
+  });
+
+  it("leaves every group uncancelled when there is no interrupt", () => {
+    const g = groupByPrompt(prompts, chunks, turns, 9000, false);
+    expect(g.every((x) => x.cancelled === false)).toBe(true);
+  });
+
   it("computes per-group totals and finished durations", () => {
     const g = groupByPrompt(prompts, chunks, turns, 9000, false);
     expect(g[0].workTotal).toBe(300);           // 100 + 200

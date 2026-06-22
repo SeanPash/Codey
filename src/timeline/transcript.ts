@@ -151,6 +151,43 @@ export function readUserPrompts(path: string | null): UserPrompt[] {
   }
 }
 
+// The timestamp of the most recent user-interrupt marker, or 0 if there is none. When you press
+// Esc mid-turn Claude Code fires no Stop hook, so the only record of the cancel is the user turn
+// "[Request interrupted by user]" (sometimes "...for tool use") it writes to the transcript.
+export function lastInterruptTs(text: string): number {
+  let last = 0;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    let r: Record<string, any>;
+    try { r = JSON.parse(line); } catch { continue; }
+    if (r.type !== "user") continue;
+    const c = r.message?.content;
+    let t: string | null = null;
+    if (typeof c === "string") t = c;
+    else if (Array.isArray(c)) {
+      const tb = c.find((b) => b && typeof b === "object" && b.type === "text");
+      if (tb && typeof tb.text === "string") t = tb.text;
+    }
+    if (t && /^\[request interrupted by user/i.test(t.trim())) {
+      const ts = Date.parse(r.timestamp ?? "") || 0;
+      if (ts > last) last = ts;
+    }
+  }
+  return last;
+}
+
+// Glue: read the transcript and report when it was last interrupted; tolerate a missing path.
+export function readLastInterrupt(path: string | null): number {
+  if (!path) return 0;
+  try {
+    if (!existsSync(path)) return 0;
+    return lastInterruptTs(readFileSync(path, "utf8"));
+  } catch {
+    return 0;
+  }
+}
+
 // Session-control commands carry no intent, so they make poor titles. We skip them when
 // naming a session (a /clear then "hi" is named "hi"), but still fall back to one if it is
 // the only prompt there is.

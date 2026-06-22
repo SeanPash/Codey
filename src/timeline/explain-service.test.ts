@@ -16,7 +16,7 @@ function chunk(id: string, lines: ReceiptLine[]): TimelineChunk {
 }
 function group(id: string, chunks: TimelineChunk[]): PromptGroup {
   return { id, prompt: "do the thing", startTs: 0, endTs: 1, durationMs: 1, workTotal: 0,
-    contextTotal: 0, tokenTotal: 0, taskCount: chunks.length, chunks, live: false, summary: null };
+    contextTotal: 0, tokenTotal: 0, taskCount: chunks.length, chunks, live: false, cancelled: false, summary: null };
 }
 function snapshot(): SessionSnapshot {
   const c0 = chunk("c0", [rl(), rl({ label: "Editing a.ts", tool: "Edit" })]);

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { SessionStore, defaultRoot } from "../store/session-store.js";
 import { readMeta } from "../store/session-meta.js";
 import { readPrompts } from "../capture/prompts.js";
-import { readTranscriptTurns, readFirstPrompt, readUserPrompts, type UserPrompt } from "../timeline/transcript.js";
+import { readTranscriptTurns, readFirstPrompt, readUserPrompts, readLastInterrupt, type UserPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
 import { readCustomName } from "../store/session-name-store.js";
 import { chunksFor } from "../timeline/segment-cache.js";
@@ -26,7 +26,7 @@ import type { SessionSnapshot, LiveSnapshot, LiveSession } from "../types.js";
 // Running = the freshest of a captured tool call or a submitted prompt is within the window,
 // so a session lights up the instant it is prompted, before any tool has run.
 // Also stays live while Claude is thinking: promptAt newer than doneAt means a response is in flight.
-export function isRunning(dir: string, now: number): boolean {
+export function isRunning(dir: string, now: number, cancelledAt = 0): boolean {
   let evMtime = 0;
   try { evMtime = statSync(join(dir, "events.jsonl")).mtimeMs; } catch { evMtime = 0; }
   const prompts = readPrompts(dir);
@@ -47,6 +47,10 @@ export function isRunning(dir: string, now: number): boolean {
   const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
   const finished = status?.doneAt != null && status.doneAt >= lastSignal;
   if (finished) return false;
+  // A user interrupt fires no Stop hook, so doneAt never lands and the prompt looks "in flight"
+  // for the whole thinking window. The transcript's cancel marker is the only record: when it is
+  // newer than every other signal, treat it exactly like a finish and drop live now.
+  if (cancelledAt > 0 && cancelledAt >= lastSignal) return false;
   return withinWindow || isThinking;
 }
 
@@ -55,8 +59,9 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
   const turns = readTranscriptTurns(meta?.transcriptPath ?? null);
+  const cancelledAt = readLastInterrupt(meta?.transcriptPath ?? null);
   const now = Date.now();
-  const live = isRunning(store.dir, now);
+  const live = isRunning(store.dir, now, cancelledAt);
   // Freeze completed prompts: segmentation may only rework the current (live) turn. The turn
   // begins at the first event on or after the last prompt mark; everything before stays locked.
   const promptMarks = readPrompts(store.dir);
@@ -91,6 +96,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     now,
     seedDepth,
     genAuto,
+    cancelledAt,
   });
   const reconciled = reconcileErrors(events, turns);
   const withMeta = {
@@ -110,7 +116,8 @@ export function loadNow(sessionId: string, root: string = defaultRoot()): NowVie
   // live strip flips to the new prompt the instant it lands instead of trailing the old turn.
   const marks = readPrompts(store.dir);
   const turnStart = marks.length ? marks[marks.length - 1] : Number.NEGATIVE_INFINITY;
-  return buildNowView(store.readAll(), readStatus(store.dir), Date.now(), turnStart);
+  const cancelledAt = readLastInterrupt(readMeta(sessionId, root)?.transcriptPath ?? null);
+  return buildNowView(store.readAll(), readStatus(store.dir), Date.now(), turnStart, cancelledAt);
 }
 
 function isScope(s: unknown): s is ExplainScope {
@@ -151,21 +158,25 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
     const snap = loadSnapshot(s.id, root);
     const events = new SessionStore(s.id, root).readAll();
     const last = events[events.length - 1];
-    const runningTool = s.running && last && last.phase === "pre" ? last.tool : null;
+    // listSessions reads only the statusline, so a cancelled turn still looks "thinking" to it.
+    // The snapshot parsed the transcript and folded in the cancel, so trust its `live` here: a
+    // terminal the user interrupted drops out of the pulse instead of lingering the full window.
+    const running = s.running && snap.live;
+    const runningTool = running && last && last.phase === "pre" ? last.tool : null;
     return {
       sessionId: s.id,
       name: s.name,
       project: s.project,
       color: s.color,
       workTotal: snap.workTotal,
-      running: s.running,
+      running,
       open: s.open,
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
       runningTool,
       acted: s.acted,
       // Live but no tool open: Claude is thinking (before the first tool) or between calls.
-      thinking: s.running && !runningTool,
+      thinking: running && !runningTool,
     };
   });
   // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".

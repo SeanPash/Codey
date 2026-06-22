@@ -100,6 +100,26 @@ describe("buildNowView", () => {
     expect(v.steps.length).toBe(1);
   });
 
+  it("goes quiet when the user interrupted mid-tool, leaving a dangling open call", () => {
+    // A cancel fires no Stop hook, so doneAt never lands and the open "pre" looks like a running
+    // step. The transcript's interrupt timestamp, newer than every signal, ends the turn.
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 1000 }),
+    ];
+    const v = buildNowView(events, status({ promptAt: 500 }), 3000, Number.NEGATIVE_INFINITY, 2000);
+    expect(v.live).toBe(false);
+    expect(v.action).toBeNull();
+  });
+
+  it("stays live when the interrupt predates the current turn", () => {
+    // An old cancel must not silence a fresh tool call that came after it.
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 5000 }),
+    ];
+    const v = buildNowView(events, status({}), 6000, Number.NEGATIVE_INFINITY, 2000);
+    expect(v.live).toBe(true);
+  });
+
   it("goes quiet after the turn ends even with a dangling open call from an errored tool", () => {
     // A tool that errors fires no PostToolUse, so its "pre" never gets a "post" and looks
     // open forever. Once the Stop hook stamps doneAt past every signal the turn is over, so

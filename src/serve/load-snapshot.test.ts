@@ -79,4 +79,16 @@ describe("isRunning", () => {
     mockReadStatus.mockReturnValue({ promptAt: NOW - THINKING_WINDOW_MS - 1, doneAt: null, updatedAt: NOW });
     expect(isRunning(DIR, NOW)).toBe(false);
   });
+
+  it("returns false when the user interrupted after the last prompt (no Stop fires on cancel)", () => {
+    // Mid-response by the prompt/doneAt rule, but a cancel landed after it: not live.
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 4000, doneAt: null, updatedAt: NOW });
+    expect(isRunning(DIR, NOW, NOW - 1000)).toBe(false);
+  });
+
+  it("stays live when a newer prompt followed the interrupt", () => {
+    // The user cancelled, then prompted again: the new prompt outranks the old cancel.
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 1000, doneAt: null, updatedAt: NOW });
+    expect(isRunning(DIR, NOW, NOW - 4000)).toBe(true);
+  });
 });

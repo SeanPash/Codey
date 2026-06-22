@@ -36,6 +36,7 @@ export interface SnapshotInput {
   now: number;
   seedDepth?: "simple" | "deep" | "teach"; // depth the timeline opens at; defaults to deep
   genAuto?: boolean;                        // whether the session wants auto summaries
+  cancelledAt?: number;                     // when the user last interrupted, 0 if never
 }
 
 interface Boundary { startIndex: number; name: string; narration: string; }
@@ -108,7 +109,7 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
   const activity = [...events.map((e) => e.timestamp), ...turns.map((t) => t.ts)].filter((t) => t > 0);
   const lastActivityAt = activity.length ? Math.max(...activity) : startedAt;
   const sessionEndTs = input.live ? input.now : (lastActivityAt || input.now);
-  const groups = groupByPrompt(input.prompts, chunks, turns, sessionEndTs, input.live);
+  const groups = groupByPrompt(input.prompts, chunks, turns, sessionEndTs, input.live, input.cancelledAt ?? 0);
 
   return {
     sessionId: input.sessionId,

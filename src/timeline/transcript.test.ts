@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseTranscript, userPrompts, cleanPromptText, readFirstPrompt } from "./transcript.js";
+import { parseTranscript, userPrompts, cleanPromptText, readFirstPrompt, lastInterruptTs } from "./transcript.js";
 
 // One assistant turn that calls Write, then a user turn carrying its tool_result (success),
 // then an assistant turn that calls Bash, then a failing tool_result for it.
@@ -174,6 +174,26 @@ describe("userPrompts", () => {
       JSON.stringify({ type: "user", message: { content: "<system-reminder>be good</system-reminder>" }, timestamp: "2026-06-21T00:00:03Z" }),
     ].join("\n");
     expect(userPrompts(text).map((p) => p.text)).toEqual(["/codey:timeline", "fix the layout please"]);
+  });
+});
+
+describe("lastInterruptTs", () => {
+  it("returns the timestamp of the most recent interrupt marker", () => {
+    const text = [
+      JSON.stringify({ type: "user", message: { content: "do the thing" }, timestamp: "2026-06-22T00:00:01Z" }),
+      JSON.stringify({ type: "user", message: { content: "[Request interrupted by user]" }, timestamp: "2026-06-22T00:00:05Z" }),
+      JSON.stringify({ type: "user", message: { content: [{ type: "text", text: "[Request interrupted by user for tool use]" }] }, timestamp: "2026-06-22T00:00:09Z" }),
+    ].join("\n");
+    expect(lastInterruptTs(text)).toBe(Date.parse("2026-06-22T00:00:09Z"));
+  });
+
+  it("returns 0 when no interrupt marker is present", () => {
+    const text = JSON.stringify({ type: "user", message: { content: "hello" }, timestamp: "2026-06-22T00:00:01Z" });
+    expect(lastInterruptTs(text)).toBe(0);
+  });
+
+  it("ignores blank and unparseable lines", () => {
+    expect(lastInterruptTs("\nnot json\n")).toBe(0);
   });
 });
 
