@@ -11,33 +11,38 @@
     @font-face { font-family:'W95FA'; font-display:swap; src:url('/fonts/W95FA.woff') format('woff'); }
 
     :root {
-      --bg:#0b0d11; --card:#14171f; --line:#222a37; --inset:#0a0d14;
-      /* Accent family. Each hue carries one meaning so the page reads in zones, not one flat blue:
-         violet = tokens & spend, teal = time, green = success, coral = failure, info = links.
-         Structure (rails, hairlines, inactive nav) is now the neutral grey below, never a hue, so
-         the accents actually get to mean something. Each accent is tuned to roughly equal perceived
-         brightness on this near-black base (Radix dark step 9-11) so the hues coexist cleanly. */
-      --structure:#8b94a7; --structure-ink:#cad1de;
-      --info:#5fb0ff; --info-ink:#a8d4ff;
-      --sky:#5fb0ff; --sky-dim:#3d7fc4; --sky-ink:#bfe0ff;
-      --violet:#8b7bf0; --violet-dim:#5a4ea6; --violet-ink:#c4b9ff;
-      --teal:#22c1ab; --teal-dim:#1d8576; --teal-ink:#5fe3cf;
-      --coral:#f0654f; --coral-ink:#ff9885;
-      --green:#52c98a; --green-ink:#86e0ad;
-      --warn:#e0a23a; --warn-ink:#f2c46b; --amber:#e0a23a;
-      /* --accent re-tints the "active / where you are" chrome to the current narration mode
-         (Simple = calm neutral-blue, Deep = violet, Teach = warm gold). Swapped on <body>. */
-      --accent:#8b7bf0; --accent-ink:#c4b9ff; --accent-rgb:139,123,240;
-      /* Live = right now. Reserved for the single thing happening this instant (NOW bar, the
-         current step, the live group edge). Nothing else uses it, so live always stands out. */
-      --live:#f5a623; --live-dim:#8a5b16; --live-ink:#ffc658;
-      --ink:#f1f4f9; --ink2:#cad1de; --body:#a9b1c0; --muted:#7a8392;
+      /* ---- V9 color ---- */
+      --bg:#0b0d11; --surf:#0f1318; --surf-h:#141a21; --line:#1f2733; --hair:#171d27; --inset:#0a0d13;
+      /* ink ramp */
+      --ink:#f1f4f9; --ink2:#c6cdd9; --body:#97a0af; --muted:#6b7482; --faint:#3c4452;
+      /* live = green, only for the single thing happening right now */
+      --live:#34d399; --live-ink:#7fe9c2; --live-dim:#246c54; --live-deep:#173f31;
+      /* state */
+      --warn:#e0a23a; --coral:#f0654f;
+      /* ---- radius ---- */
+      --r-sm:6px; --r-task:8px; --r-card:10px;
+      /* ---- motion ---- */
+      --ease:cubic-bezier(.2,.6,.2,1); --t-hover:.15s; --t-drawer:.24s;
+      /* ---- layout (app-specific, not in V9 mockup) ---- */
       --topbar:52px; --titlerow:50px; --head:102px;
+
+      /* ---- temporary aliases: old token names still used in component rules below.
+              these will be removed task-by-task as call sites are migrated to V9 names. ---- */
+      --card:var(--surf);
+      /* accent is now a neutral bright-ink; mode colors are retired */
+      --accent:var(--ink2); --accent-ink:var(--ink); --accent-rgb:198,205,217;
+      --amber:var(--warn); --warn-ink:#f2c46b;
+      --coral-ink:#ff9885;
+      /* old success-green folds into live-green for now */
+      --green:var(--live); --green-ink:var(--live-ink);
+      /* per-hue spend/time/structure tokens all map to neutral ink */
+      --violet:var(--ink2); --violet-dim:var(--muted); --violet-ink:var(--ink2);
+      --teal:var(--ink2); --teal-dim:var(--muted); --teal-ink:var(--ink2);
+      --sky:var(--ink2); --sky-dim:var(--muted); --sky-ink:var(--ink2);
+      --info:var(--ink2); --info-ink:var(--ink2);
+      --structure:var(--muted); --structure-ink:var(--ink2);
     }
     body.split { --titlerow:0px; --head:52px; }
-    body[data-mode="simple"] { --accent:#7e8aa0; --accent-ink:#aeb8c8; --accent-rgb:126,138,160; }
-    body[data-mode="deep"]   { --accent:#8b7bf0; --accent-ink:#c4b9ff; --accent-rgb:139,123,240; }
-    body[data-mode="teach"]  { --accent:#e0a23a; --accent-ink:#f2c46b; --accent-rgb:224,162,58; }
     * { box-sizing:border-box; }
     body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink);
       margin:0; line-height:1.45; -webkit-font-smoothing:antialiased; letter-spacing:-0.005em; }
@@ -46,93 +51,103 @@
 
     /* top bar */
     .topbar { display:flex; align-items:center; gap:12px; padding:13px 20px; border-bottom:1px solid var(--line);
-      background:linear-gradient(180deg,#11141b,#0e1117); position:sticky; top:0; z-index:5; }
-    .eyebrow { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); }
+      background:var(--surf); position:sticky; top:0; z-index:5; }
+    .eyebrow { font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
     .wm { font-size:17px; color:var(--ink); }
     .sproj { display:inline-flex; align-items:center; gap:7px; }
-    .ptag { font-size:11px; color:var(--ink2); background:#0c0f16; border:1px solid #283246; border-radius:6px; padding:2px 8px; }
+    .ptag { font-size:11px; color:var(--ink2); background:var(--inset); border:1px solid var(--line); border-radius:6px; padding:2px 8px; }
     .cdot { width:9px; height:9px; border-radius:50%; flex:none; display:inline-block; }
-    .cdot.run { box-shadow:0 0 0 0 rgba(var(--accent-rgb),.5); animation:pp 1.8s infinite; }
-    .livewrap { display:inline-flex; align-items:center; gap:9px; padding:5px 12px; border-radius:9px; border:1px solid #283246; background:#0c0f16; transition:border-color .3s, background .3s; }
+    /* running dot pulses green - it marks the single live thing */
+    .cdot.run { box-shadow:0 0 0 0 rgba(52,211,153,.5); animation:pp 1.8s infinite; }
+    .livewrap { display:inline-flex; align-items:center; gap:9px; padding:5px 12px; border-radius:9px; border:1px solid var(--line); background:var(--inset); transition:border-color .3s, background .3s; }
     .eq { display:inline-flex; align-items:flex-end; gap:2px; height:13px; }
-    .eq i { width:3px; background:var(--accent); border-radius:1px; animation:bounce 1s ease-in-out infinite; }
+    /* live bars are green when running, grey when idle */
+    .eq i { width:3px; background:var(--live); border-radius:1px; animation:bounce 1s ease-in-out infinite; }
     .eq i:nth-child(1){animation-delay:0s} .eq i:nth-child(2){animation-delay:.2s} .eq i:nth-child(3){animation-delay:.4s} .eq i:nth-child(4){animation-delay:.15s}
     @keyframes bounce { 0%,100%{height:4px} 50%{height:13px} }
-    .livewrap b { font-size:12px; font-weight:700; color:var(--accent-ink); } .livewrap span { font-size:11px; color:var(--body); }
-    /* idle: calm and obviously not-live, so a still "0" never reads as frozen */
-    .livewrap.idle { border-color:#222a36; background:#0b0e14; }
-    .livewrap.idle .eq i { animation:none; height:4px; background:#3a4454; }
+    .livewrap b { font-size:12px; font-weight:700; color:var(--live-ink); } .livewrap span { font-size:11px; color:var(--body); }
+    /* idle: calm neutral, so a still "0" never reads as frozen */
+    .livewrap.idle { border-color:var(--hair); background:var(--inset); }
+    .livewrap.idle .eq i { animation:none; height:4px; background:var(--faint); }
     .livewrap.idle b { color:var(--muted); } .livewrap.idle span { color:var(--muted); }
 
     /* title row: the session name gets its own line so long names breathe */
     .titlerow { display:flex; align-items:center; gap:11px; padding:9px 20px; border-bottom:1px solid var(--line);
-      background:#0d1016; position:sticky; top:var(--topbar); z-index:4; }
+      background:var(--surf); position:sticky; top:var(--topbar); z-index:4; }
     body.split .titlerow { display:none; }
     .titlerow .stitle { font-size:20px; font-weight:400; color:var(--ink); margin:0; line-height:1.2;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     /* current-terminal actions: always visible (so the affordance is obvious), brighten on hover */
     .titleacts { display:flex; gap:6px; flex:none; }
-    .tact { font:inherit; font-size:12px; display:inline-flex; align-items:center; gap:5px; background:#0c0f16;
-      border:1px solid #283246; color:var(--body); border-radius:7px; padding:4px 10px; cursor:pointer;
+    .tact { font:inherit; font-size:12px; display:inline-flex; align-items:center; gap:5px; background:var(--inset);
+      border:1px solid var(--line); color:var(--body); border-radius:7px; padding:4px 10px; cursor:pointer;
       transition:color .15s, border-color .15s, background .15s; }
-    .tact:hover { color:var(--accent); border-color:rgba(var(--accent-rgb),.4); background:#0e1320; }
+    /* hover = brighter ink + line border, no hue */
+    .tact:hover { color:var(--ink2); border-color:var(--line); background:var(--surf-h); }
     .tact.del:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
     .tact .tg { font-size:13px; line-height:1; }
-    .titlerow .stitle-input { font:inherit; font-size:20px; background:var(--inset); border:1px solid var(--accent);
+    .titlerow .stitle-input { font:inherit; font-size:20px; background:var(--inset); border:1px solid var(--line);
       color:var(--ink); border-radius:7px; padding:3px 9px; min-width:280px; }
-    .toggle { margin-left:auto; display:flex; background:#0c0f16; border:1px solid #283246; border-radius:8px; padding:2px; }
+    .titlerow .stitle-input:focus { outline:none; border-color:var(--ink); }
+    .toggle { margin-left:auto; display:flex; background:var(--inset); border:1px solid var(--line); border-radius:8px; padding:2px; }
     .toggle button { font:inherit; font-size:12px; padding:5px 13px; border:none; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; }
-    .toggle button.on { background:rgba(var(--accent-rgb),.16); color:var(--accent-ink); box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.34); }
-    .jumplive { font:inherit; font-size:11px; color:var(--accent); background:transparent; border:1px solid rgba(var(--accent-rgb),.3); border-radius:7px; padding:5px 10px; cursor:pointer; }
+    /* ON state: brighter ink + subtle raised surface + inset border, no color fill */
+    .toggle button.on { background:var(--surf-h); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
+    .jumplive { font:inherit; font-size:11px; color:var(--ink2); background:transparent; border:1px solid var(--line); border-radius:7px; padding:5px 10px; cursor:pointer; }
 
     /* three-zone layout */
     .cols { display:flex; align-items:flex-start; min-height:calc(100vh - var(--head)); }
     .rail { width:232px; flex:none; border-right:1px solid var(--line); padding:12px 10px; position:sticky; top:var(--head); align-self:stretch; max-height:calc(100vh - var(--head)); overflow-y:auto; }
     .rh { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin:0 0 9px 3px; font-weight:600; }
     /* sessions search + day headers */
-    .railsearch { width:100%; margin:0 0 10px; background:var(--inset); border:1px solid #283246; color:var(--ink);
+    .railsearch { width:100%; margin:0 0 10px; background:var(--inset); border:1px solid var(--line); color:var(--ink);
       border-radius:8px; padding:7px 10px; font:inherit; font-size:12px; }
     .railsearch::placeholder { color:var(--muted); }
-    .railsearch:focus { outline:none; border-color:var(--accent); }
+    .railsearch:focus { outline:none; border-color:var(--ink); }
     /* date range filter: a quiet disclosure so it never crowds the list */
     .datefilter { margin:0 0 10px; }
     .datefilter > summary { list-style:none; cursor:pointer; font-size:11px; color:var(--muted); padding:2px 3px;
       display:flex; align-items:center; gap:6px; user-select:none; }
     .datefilter > summary::-webkit-details-marker { display:none; }
-    .datefilter > summary::before { content:"\25b8"; font-size:9px; color:#5b6470; }
+    .datefilter > summary::before { content:"\25b8"; font-size:9px; color:var(--muted); }
     .datefilter[open] > summary::before { content:"\25be"; }
     .datefilter > summary:hover { color:var(--ink2); }
-    .datefilter .on { color:var(--accent); }
+    /* active filter label reads as brighter ink, not a hue */
+    .datefilter .on { color:var(--ink2); }
     /* From and To stack so neither input is ever clipped or needs sideways scrolling. */
     .daterow { display:flex; flex-direction:column; gap:8px; margin:8px 0 6px; }
     .dlab { font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:600;
       display:flex; flex-direction:column; gap:4px; }
-    .dinput { width:100%; background:var(--inset); border:1px solid #283246; color:var(--ink); border-radius:7px; padding:6px 8px;
+    .dinput { width:100%; background:var(--inset); border:1px solid var(--line); color:var(--ink); border-radius:7px; padding:6px 8px;
       font:inherit; font-size:11.5px; color-scheme:dark; }
-    .dinput:focus { outline:none; border-color:var(--accent); }
+    .dinput:focus { outline:none; border-color:var(--line); }
     .dclear { font:inherit; font-size:10.5px; color:var(--muted); background:transparent; border:none; cursor:pointer; padding:2px 3px; }
-    .dclear:hover { color:var(--accent); }
+    .dclear:hover { color:var(--ink2); }
     /* Sticky day dividers so the date a run of sessions belongs to stays visible while you scroll
        the list. A dot + count make each day legible at a glance instead of a faint label. */
     .dayhd { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:8px;
       font-size:9.5px; text-transform:uppercase; letter-spacing:.13em; color:var(--ink2); font-weight:700;
       margin:14px 0 6px; padding:5px 4px 6px 6px; background:var(--bg); border-bottom:1px solid var(--line); }
-    .dayhd::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--accent); flex:none; }
+    /* day dot is muted - not an accent, just a visual marker */
+    .dayhd::before { content:""; width:5px; height:5px; border-radius:50%; background:var(--muted); flex:none; }
     .dayhd .dcount { margin-left:auto; color:var(--muted); font-weight:600; font-size:9px;
-      background:#11141b; border:1px solid #222a37; border-radius:20px; padding:1px 7px; }
+      background:var(--surf); border:1px solid var(--line); border-radius:20px; padding:1px 7px; }
     .dayhd:first-of-type { margin-top:2px; }
     .sess { position:relative; padding:8px 10px; border-radius:8px; margin-bottom:4px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:none; background:transparent; color:var(--ink); font:inherit; }
-    .sess:hover { background:#11141b; }
+    .sess:hover { background:var(--surf-h); }
     .sessrename { width:100%; display:flex; gap:5px; align-items:center; padding:5px 6px; }
-    .sessrename input { flex:1; min-width:0; background:var(--inset); border:1px solid var(--accent); color:var(--ink);
+    .sessrename input { flex:1; min-width:0; background:var(--inset); border:1px solid var(--line); color:var(--ink);
       border-radius:6px; padding:5px 7px; font:inherit; font-size:12px; }
-    .sess.active { background:#141925; box-shadow:inset 0 0 0 1px var(--accent); }
-    .sess.active .sname { color:var(--accent); }
+    /* active session: raised surface + inset border; name brightens to ink, no hue */
+    .sess.active { background:var(--surf-h); box-shadow:inset 0 0 0 1px var(--line); }
+    .sess.active .sname { color:var(--ink); }
     .sess .sname { font-weight:600; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:7px; }
     .sess .smeta { color:var(--muted); font-size:9.5px; margin-top:3px; padding-left:16px; }
     .sess .rproj { color:var(--body); }
-    .sdot { width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none;animation:pp 1.8s infinite; }
-    @keyframes pp { 0%{box-shadow:0 0 0 0 rgba(var(--accent-rgb),.35)} 70%{box-shadow:0 0 0 3px rgba(var(--accent-rgb),0)} 100%{box-shadow:0 0 0 0 rgba(var(--accent-rgb),0)} }
+    /* live session dot is green - it marks the single running thing */
+    .sdot { width:6px;height:6px;border-radius:50%;background:var(--live);flex:none;animation:pp 1.8s infinite; }
+    /* pp keyframe: green pulse for live dots (cdot.run, sdot) */
+    @keyframes pp { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.35)} 70%{box-shadow:0 0 0 3px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
 
     .center { flex:1; min-width:0; padding:16px 20px; }
     .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:var(--head); align-self:stretch; }
@@ -324,7 +339,7 @@
     .nowstrip .nact.think { color:var(--violet-ink); }
     .nowstrip .ntime { font-variant-numeric:tabular-nums; color:#f0d9af; font-size:13px; flex:none; }
     .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
-      background:#0c0f16; border:1px solid #283246; color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
+      background:var(--inset); border:1px solid var(--line); color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
     .nowstrip .follow.on { background:rgba(245,166,35,.14); color:#f0d9af; border-color:rgba(245,166,35,.42); }
     .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
     .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
@@ -336,11 +351,12 @@
     .tlctl { margin-left:auto; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
     .ctlgrp { display:flex; align-items:center; gap:7px; }
     .ctlgrp .cl { font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:600; }
-    .seg { display:flex; background:#0c0f16; border:1px solid #283246; border-radius:8px; padding:2px; }
+    .seg { display:flex; background:var(--inset); border:1px solid var(--line); border-radius:8px; padding:2px; }
     .seg button { font:inherit; font-size:11.5px; padding:4px 11px; border:none; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; }
-    .seg button.on { background:rgba(var(--accent-rgb),.16); color:var(--accent-ink); box-shadow:inset 0 0 0 1px rgba(var(--accent-rgb),.34); }
+    /* ON state: monochrome raised surface, no hue fill */
+    .seg button.on { background:var(--surf-h); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
     .budgetcue { font-size:10.5px; color:var(--muted); }
-    .budgetcue.low { color:var(--amber); }
+    .budgetcue.low { color:var(--warn); }
 
     /* generated why/how panel inside an open task card */
     .expla { margin-top:13px; border:1px solid #2a2747; background:linear-gradient(180deg,#191630,#11101d); border-radius:10px; padding:12px 14px; }
