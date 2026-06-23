@@ -184,66 +184,64 @@
     .timer { font-variant-numeric:tabular-nums; }
 
     /* receipt */
-    .rcpt { margin-top:13px; background:var(--inset); border:1px solid #1e2636; border-radius:9px; overflow:hidden; }
-    .rhead { display:flex; align-items:center; gap:8px; padding:9px 14px; background:#0e131d; border-bottom:1px solid #1c2433; cursor:pointer; user-select:none; }
-    .rhead:hover .ttl { color:#fff; }
-    .rhead:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-    .rhead .x { color:var(--accent); font-size:10px; width:10px; }
+    .rcpt { margin-top:13px; background:var(--inset); border:1px solid var(--line); border-radius:9px; overflow:hidden; }
+    .rhead { display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--inset); border-bottom:1px solid var(--hair); cursor:pointer; user-select:none; }
+    .rhead:hover .ttl { color:var(--ink); }
+    .rhead:focus-visible { outline:2px solid var(--ink); outline-offset:-2px; }
+    .rhead .x { color:var(--muted); font-size:10px; width:10px; }
     .rhead .ttl { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink2); font-weight:600; }
     .rhead .colh { margin-left:auto; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
     .rhead .tot { color:var(--ink2); font-weight:600; font-size:12px; margin-left:14px; }
-    .rline { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid #141b27; transition:background .15s; }
+    .rline { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid var(--hair); transition:background .15s; }
     .rline.can, .rline.brow { cursor:pointer; }
-    .rline.can:hover, .rline.brow:hover, .rline.lo { background:#0e131d; }
+    .rline.can:hover, .rline.brow:hover, .rline.lo { background:var(--surf-h); }
     /* a burst: one row standing in for a run of same-kind steps, expanding to the real rows */
-    .tag.steps { background:rgba(139,123,240,.1); color:var(--violet-ink); border:1px solid rgba(139,123,240,.2); }
-    .bchildren { margin-left:18px; border-left:2px solid #1c2433; }
+    .tag.steps { background:var(--surf-h); color:var(--ink2); border:1px solid var(--line); }
+    .bchildren { margin-left:18px; border-left:2px solid var(--line); }
     .bchildren .rline { padding-left:14px; }
     .bchildren .ldetail, .bchildren .failnote { padding-left:47px; }
-    .lchev { width:9px; flex:none; color:#5b6470; font-size:9px; }
-    .rline.lo .lchev { color:var(--accent); }
+    .lchev { width:9px; flex:none; color:var(--muted); font-size:9px; }
+    .rline.lo .lchev { color:var(--ink2); }
     .lchev.sp { visibility:hidden; }
-    /* A plain tool step is a calm slate pip; the loud colors are saved for what carries meaning
-       (violet thinking, coral failure, amber the live step). */
-    .sw { width:6px;height:6px;border-radius:2px;background:#7e8aa0;flex:none;box-shadow:0 0 6px rgba(126,138,160,.4); }
-    .sw.think { background:var(--violet); box-shadow:0 0 7px rgba(139,123,240,.5); }
+    /* plain pips are quiet; thinking is neutral too - only failure and the live step use color */
+    .sw { width:6px;height:6px;border-radius:2px;background:var(--faint);flex:none; }
+    .sw.think { background:var(--muted); }
     .sw.fail { background:var(--coral); box-shadow:0 0 7px rgba(240,101,79,.5); }
     .lbl { flex:1; font-size:12.5px; color:var(--ink2); }
     .tag { font-size:10px; font-family:ui-monospace,monospace; padding:2px 7px; border-radius:5px; flex:none; }
-    .tag.tool { background:rgba(126,138,160,.1); color:#b3bdcd; border:1px solid rgba(126,138,160,.2); }
-    .tag.think { background:rgba(139,123,240,.1); color:var(--violet-ink); border:1px solid rgba(139,123,240,.2); }
-    .num { width:64px; text-align:right; font-size:12.5px; color:var(--ink); font-weight:500; }
-    .st { width:20px; text-align:right; font-size:11px; color:#5b6470; }
-    .st.ok { color:var(--green); }
+    .tag.tool { background:var(--surf-h); color:var(--ink2); border:1px solid var(--line); }
+    .tag.think { background:var(--surf-h); color:var(--muted); border:1px solid var(--line); }
+    .num { width:64px; text-align:right; font-size:12.5px; color:var(--ink2); font-weight:500; }
+    .st { width:20px; text-align:right; font-size:11px; color:var(--muted); }
+    /* done checks are muted - green is only for the live state */
+    .st.ok { color:var(--muted); }
     .st.fail { color:var(--coral); font-weight:600; }
-    /* the step Claude is on right now: a solid AMBER accent bar, a clearly brighter background,
-       and a gentle pulse. Amber is the live color and nothing else uses it, so the current step
-       can never be mistaken for a hovered row (hover stays neutral grey). */
-    .rline.cur { background:rgba(245,166,35,.15); border-radius:6px; box-shadow:inset 3px 0 0 var(--live); animation:livepulse 2.6s ease-in-out infinite; }
-    .rline.cur .lbl { color:#ffe9c2; font-weight:700; }
-    .rline.cur .sw { background:var(--live); box-shadow:0 0 0 0 rgba(245,166,35,.35); animation:ppl 2s infinite; }
+    /* the step Claude is on right now: green inset bar, green-tinted surface, green text */
+    .rline.cur { background:rgba(52,211,153,.10); border-radius:6px; box-shadow:inset 3px 0 0 var(--live); animation:livepulse 2.6s ease-in-out infinite; }
+    .rline.cur .lbl { color:var(--live-ink); font-weight:700; }
+    .rline.cur .sw { background:var(--live); animation:ppl 2s infinite; }
     .rline.cur .st { color:var(--live); }
-    @keyframes livepulse { 0%,100% { background:rgba(245,166,35,.15); } 50% { background:rgba(245,166,35,.115); } }
-    /* the amber pulse ring, for any dot/pip that marks the live instant */
-    @keyframes ppl { 0%{box-shadow:0 0 0 0 rgba(245,166,35,.35)} 70%{box-shadow:0 0 0 3px rgba(245,166,35,0)} 100%{box-shadow:0 0 0 0 rgba(245,166,35,0)} }
+    @keyframes livepulse { 0%,100% { background:rgba(52,211,153,.10); } 50% { background:rgba(52,211,153,.07); } }
+    /* green pulse ring for any dot/pip marking the live instant */
+    @keyframes ppl { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.35)} 70%{box-shadow:0 0 0 3px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
     @media (prefers-reduced-motion: reduce) { .rline.cur { animation:none; } }
     .curpip { width:6px; height:6px; border-radius:50%; background:var(--live); animation:ppl 1.4s infinite; flex:none; }
     /* plain-English failure note, shown inline under a failed line */
-    .failnote { padding:0 14px 9px 47px; margin-top:-4px; border-bottom:1px solid #141b27; font-size:11.5px; color:#e7b0a6; }
+    .failnote { padding:0 14px 9px 47px; margin-top:-4px; border-bottom:1px solid var(--hair); font-size:11.5px; color:var(--coral); background:rgba(240,101,79,.04); }
     .failnote .note { color:var(--muted); }
     /* expanded per-line detail: raw command/path + why + raw error */
-    .ldetail { padding:4px 14px 12px 47px; border-bottom:1px solid #141b27; display:flex; flex-direction:column; gap:7px; }
+    .ldetail { padding:4px 14px 12px 47px; border-bottom:1px solid var(--hair); display:flex; flex-direction:column; gap:7px; }
     .ld { display:flex; gap:9px; align-items:baseline; }
     .ld .lk { flex:none; width:72px; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding-top:2px; }
-    .ld code { font-family:ui-monospace,monospace; font-size:11.5px; color:#cdd3de; background:#0c1018; border:1px solid #1c2433; border-radius:6px; padding:5px 8px; white-space:pre-wrap; word-break:break-word; flex:1; }
+    .ld code { font-family:ui-monospace,monospace; font-size:11.5px; color:var(--ink2); background:var(--inset); border:1px solid var(--line); border-radius:6px; padding:5px 8px; white-space:pre-wrap; word-break:break-word; flex:1; }
     .ld .lv { font-size:12px; color:var(--body); line-height:1.5; flex:1; }
-    .ld.err code { color:#e7b0a6; border-color:#3a2024; background:#1c1416; }
+    .ld.err code { color:var(--coral); border-color:rgba(240,101,79,.28); background:rgba(240,101,79,.05); }
     /* background context, JS-toggled so it survives the live refresh */
-    .ctx { border-top:1px solid #1c2433; }
+    .ctx { border-top:1px solid var(--line); }
     .ctxsum { display:flex; align-items:center; gap:8px; padding:9px 14px; cursor:pointer; user-select:none; }
-    .ctxsum:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
-    .ctxsum .cx { color:#5b6470; font-size:10px; width:10px; }
-    .ctx.open .ctxsum .cx { color:var(--accent); }
+    .ctxsum:focus-visible { outline:2px solid var(--ink); outline-offset:-2px; }
+    .ctxsum .cx { color:var(--muted); font-size:10px; width:10px; }
+    .ctx.open .ctxsum .cx { color:var(--ink2); }
     .ctxsum .ctt { font-size:11px; color:var(--muted); letter-spacing:.03em; }
     .ctxsum .ctot { margin-left:auto; color:var(--muted); font-size:11px; }
     .ctx .note { padding:2px 14px 11px 32px; font-size:10.5px; color:var(--body); line-height:1.55; max-width:640px; }
@@ -280,29 +278,29 @@
     .expl .t { color:var(--violet-ink); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:8px; display:block; margin-bottom:5px; }
 
     /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
-       in the live amber with a soft glow so it is unmistakably the live element on the page. */
+       in green with a soft glow - unmistakably the live element on the page. */
     .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
-      background:linear-gradient(180deg,#1d1408,#15100a); border:1px solid var(--live-dim); border-radius:12px;
-      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(245,166,35,.08); }
+      background:linear-gradient(180deg,#0e1a15,#0b1410); border:1px solid var(--live-dim); border-radius:12px;
+      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(52,211,153,.10); }
     .nowstrip .nowtop { display:flex; align-items:center; gap:10px; }
-    .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#1a1206;
+    .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#0b1410;
       font-weight:800; display:inline-flex; align-items:center; gap:6px; flex:none;
       background:var(--live); border-radius:6px; padding:3px 8px; }
-    .nowstrip .ndot { width:7px; height:7px; border-radius:50%; background:#1a1206; animation:pp 1.6s infinite; }
-    /* the tool the current step is using: a tight mono tag, so the strip names what is running */
-    .nowstrip .ntool { flex:none; font-family:ui-monospace,monospace; font-size:11px; color:#f3d3a0;
-      background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.28); border-radius:6px; padding:2px 8px; }
+    .nowstrip .ndot { width:7px; height:7px; border-radius:50%; background:#0b1410; animation:pp 1.6s infinite; }
+    /* the tool the current step is using: a tight green-tinted mono tag */
+    .nowstrip .ntool { flex:none; font-family:ui-monospace,monospace; font-size:11px; color:var(--live-ink);
+      background:rgba(52,211,153,.10); border:1px solid rgba(52,211,153,.28); border-radius:6px; padding:2px 8px; }
     .nowstrip .nact { font-size:14.5px; font-weight:600; color:var(--ink); flex:1; min-width:0;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .nowstrip .nact.think { color:var(--violet-ink); }
-    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:#f0d9af; font-size:13px; flex:none; }
+    .nowstrip .nact.think { color:var(--ink2); }
+    .nowstrip .ntime { font-variant-numeric:tabular-nums; color:var(--live-ink); font-size:13px; flex:none; }
     .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
       background:var(--inset); border:1px solid var(--line); color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
-    .nowstrip .follow.on { background:rgba(245,166,35,.14); color:#f0d9af; border-color:rgba(245,166,35,.42); }
+    .nowstrip .follow.on { background:rgba(52,211,153,.14); color:var(--live-ink); border-color:rgba(52,211,153,.42); }
     .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
     .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
     .nowstrip .ntrail .lab { color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:9px; font-weight:600; }
-    .nowstrip .ntrail .k { color:var(--green); } .nowstrip .ntrail .k.f { color:var(--coral); }
+    .nowstrip .ntrail .k { color:var(--live); } .nowstrip .ntrail .k.f { color:var(--coral); }
     @media (prefers-reduced-motion: reduce) { .nowstrip .ndot { animation:none; } }
 
     /* depth + summaries controls in the title row */
@@ -317,28 +315,29 @@
     .budgetcue.low { color:var(--warn); }
 
     /* generated why/how panel inside an open task card */
-    .expla { margin-top:13px; border:1px solid #2a2747; background:linear-gradient(180deg,#191630,#11101d); border-radius:10px; padding:12px 14px; }
-    .expla .et { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--violet-ink); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .expla { margin-top:13px; border:1px solid var(--line); background:var(--surf); border-radius:var(--r-card); padding:12px 14px; }
+    .expla .et { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:7px; }
     .expla .etext { font-size:13px; color:var(--ink2); line-height:1.62; white-space:pre-wrap; }
     .expla .edepth { color:var(--muted); font-weight:600; letter-spacing:.08em; }
     .genwrap { margin-top:13px; }
-    .genbtn { font:inherit; font-size:12.5px; font-weight:600; color:var(--violet-ink); background:rgba(139,123,240,.1); border:1px solid rgba(139,123,240,.34); border-radius:9px; padding:9px 14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
-    .genbtn:hover { background:rgba(139,123,240,.18); }
+    .genbtn { font:inherit; font-size:12.5px; font-weight:600; color:var(--ink2); background:var(--surf-h); border:1px solid var(--line); border-radius:9px; padding:9px 14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .genbtn:hover { background:var(--inset); border-color:var(--muted); }
     .genbtn .ic { font-size:12px; }
     .genhint { font-size:10.5px; color:var(--muted); margin-top:8px; }
     .gening { font-size:12.5px; color:var(--body); display:inline-flex; align-items:center; gap:9px; }
     .expla .gening, .genwrap .gening, .recap .gening { margin-top:0; }
-    .spin { width:12px; height:12px; border:2px solid #2a3344; border-top-color:var(--violet); border-radius:50%; animation:spin .7s linear infinite; flex:none; }
+    /* generation spinner: neutral, not green - this is a generation wait, not a live step */
+    .spin { width:12px; height:12px; border:2px solid var(--line); border-top-color:var(--ink2); border-radius:50%; animation:spin .7s linear infinite; flex:none; }
     @keyframes spin { to { transform:rotate(360deg); } }
-    .gpaused { margin-top:13px; font-size:12px; color:#e8d9b8; background:#191510; border:1px solid #3a3324; border-radius:9px; padding:10px 12px; line-height:1.55; }
-    .gpaused b { color:var(--amber); }
+    .gpaused { margin-top:13px; font-size:12px; color:var(--body); background:var(--surf); border:1px solid var(--line); border-radius:9px; padding:10px 12px; line-height:1.55; }
+    .gpaused b { color:var(--warn); }
 
     /* per-action explain control, inside the expanded line detail */
-    .whybtn { font:inherit; font-size:11px; font-weight:600; color:var(--violet-ink); background:rgba(139,123,240,.08); border:1px solid rgba(139,123,240,.28); border-radius:7px; padding:4px 11px; cursor:pointer; }
-    .whybtn:hover { background:rgba(139,123,240,.16); }
+    .whybtn { font:inherit; font-size:11px; font-weight:600; color:var(--ink2); background:var(--surf-h); border:1px solid var(--line); border-radius:7px; padding:4px 11px; cursor:pointer; }
+    .whybtn:hover { background:var(--inset); border-color:var(--muted); }
     .ld .lv.gen { color:var(--ink2); }
 
-    /* closing recap on a prompt group (gecho is defined once in the V9 group block above) */
+    /* closing recap on a prompt group */
     .recap { margin-top:13px; background:var(--inset); border:1px solid var(--line); border-radius:var(--r-card); padding:11px 13px; }
     .recap .rt { font-size:9px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:6px; }
     .recap .rt .ic { color:var(--ink2); }
