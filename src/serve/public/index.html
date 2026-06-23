@@ -455,73 +455,90 @@
     .tstack { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; flex:1; min-height:0; }
     /* A lone terminal on the last page stretches across both columns instead of leaving a gap. */
     .tstack.solo { grid-template-columns:minmax(0,1fr); }
-    .pane { position:relative; background:#0f131b; border:1px solid #232c3c; border-radius:11px; overflow:hidden; display:flex; flex-direction:column; min-height:0; height:100%; }
+    .pane { position:relative; background:var(--surf); border:1px solid var(--line); border-radius:11px; overflow:hidden; display:flex; flex-direction:column; min-height:0; height:100%; }
+    /* running pane: green frame + beam - green is live/active only */
     .pane.run { border-color:var(--live-dim); }
     .pane.run::before { content:""; position:absolute; inset:0; border-radius:11px; padding:1px; pointer-events:none;
       background:linear-gradient(110deg,transparent 25%,var(--live) 50%,transparent 75%); background-size:200% 100%;
       -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; animation:beam 3s linear infinite; opacity:.5; }
-    .phead { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid #1b2331; background:#0c1018; flex-wrap:wrap; }
+    .phead { display:flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line); background:var(--inset); flex-wrap:wrap; }
     .phead .pname { font-weight:600; font-size:12.5px; color:var(--ink); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .phead .pproj { font-size:10px; color:var(--body); background:#11151d; border:1px solid #232c3c; border-radius:5px; padding:1px 6px; }
-    .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--accent); }
-    /* A cancelled (interrupted) terminal is not running, so it gets a quiet static amber frame
-       instead of the live beam, to signal the turn was cut short. */
-    .pane.cancelled { border-color:rgba(230,162,78,.4); }
+    .phead .pproj { font-size:10px; color:var(--body); background:var(--surf-h); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
+    .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--ink2); }
+    /* cancelled pane: quiet amber frame, no beam - not running, just interrupted */
+    .pane.cancelled { border-color:rgba(224,162,58,.4); }
     /* Pinned prompt strip: echoes the single view's "You asked" heading at the top of a pane and
        stays put while the body scrolls. Clamped to a few lines so a long prompt never crowds out
        the breakdowns below it. */
-    .pprompt { flex:none; padding:9px 12px; border-bottom:1px solid #1b2331; background:#0c1018; }
+    .pprompt { flex:none; padding:9px 12px; border-bottom:1px solid var(--line); background:var(--inset); }
     .pprompt .geyebrow { margin-bottom:4px; }
     .pprompt .geyebrow.gcancel { color:var(--warn); }
     .pptext { font-size:12.5px; font-weight:600; color:var(--ink); line-height:1.4;
       display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-    .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:var(--accent-ink); background:rgba(var(--accent-rgb),.12); border:1px solid rgba(var(--accent-rgb),.32); }
-    /* live but no tool open yet: Claude is thinking. Framed in amber like any live element. */
-    .badge.think { color:var(--violet-ink); background:rgba(139,123,240,.14); border-color:rgba(139,123,240,.34); }
+    /* badge: neutral chip; thinking is also neutral (not violet) */
+    .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:var(--ink2); background:var(--surf-h); border:1px solid var(--line); }
+    .badge.think { color:var(--body); background:var(--surf-h); border-color:var(--line); }
     /* a calm note for a terminal that answered with no tools, or has not acted yet: not an error,
        not dimmed-to-save-tokens (the live view costs nothing), just an honest state line. */
     .pnote { margin:auto; padding:22px 14px; text-align:center; color:var(--muted); font-size:12px; line-height:1.5; }
     .pnote .pn1 { color:var(--ink2); font-weight:600; display:block; margin-bottom:3px; }
-    .pthink { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--violet-ink); padding:10px 11px; }
-    .pthink .pip { width:6px;height:6px;border-radius:50%;background:var(--violet);animation:pp 1.4s infinite; }
+    /* thinking pip is green - it marks a live thinking moment, same as the running pip */
+    .pthink { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--body); padding:10px 11px; }
+    .pthink .pip { width:6px;height:6px;border-radius:50%;background:var(--live);animation:pp 1.4s infinite; }
     /* dismiss (X) to hide a terminal from the grid; non-destructive, restorable below */
     .pdismiss { flex:none; width:20px; height:20px; line-height:1; display:inline-flex; align-items:center; justify-content:center;
-      border:1px solid #232c3c; background:#0c1018; color:var(--muted); border-radius:6px; cursor:pointer; font-size:13px; }
+      border:1px solid var(--line); background:var(--inset); color:var(--muted); border-radius:6px; cursor:pointer; font-size:13px; }
     .pdismiss:hover { color:var(--coral); border-color:rgba(240,101,79,.4); }
     /* the "Hidden (N)" tray under the grid, listing dismissed terminals with a restore action */
     .hiddentray { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:7px 2px 0; font-size:11px; color:var(--muted); }
     .hiddentray .htlab { letter-spacing:.04em; }
-    .hidchip { display:inline-flex; align-items:center; gap:7px; padding:4px 9px; border-radius:8px; background:#0f131b; border:1px solid #232c3c; color:var(--ink2); }
+    .hidchip { display:inline-flex; align-items:center; gap:7px; padding:4px 9px; border-radius:8px; background:var(--surf); border:1px solid var(--line); color:var(--ink2); }
     .hidchip .hcdot { width:7px; height:7px; border-radius:50%; flex:none; }
-    .hidchip button { font:inherit; font-size:10.5px; color:var(--accent); background:transparent; border:none; cursor:pointer; padding:0; }
+    .hidchip button { font:inherit; font-size:10.5px; color:var(--ink2); background:transparent; border:none; cursor:pointer; padding:0; }
     .hidchip button:hover { text-decoration:underline; }
     /* Each pane scrolls on its own, so one busy terminal never crushes the others. min-height:0
        lets the flex child actually shrink and hand its overflow to this scroller. */
     .pbody { padding:9px; display:flex; flex-direction:column; gap:8px; overflow-y:auto; flex:1 1 0; min-height:0;
-      scrollbar-width:thin; scrollbar-color:#2a3344 transparent; }
+      scrollbar-width:thin; scrollbar-color:var(--line) transparent; }
     .pbody::-webkit-scrollbar { width:9px; }
-    .pbody::-webkit-scrollbar-thumb { background:#2a3344; border-radius:5px; border:2px solid #0f131b; }
-    .pbody::-webkit-scrollbar-thumb:hover { background:#3a4658; }
-    .ptc { background:#141925; border:1px solid #232c3c; border-radius:8px; padding:8px 10px; }
-    .ptc.cur { background:#141b27; border-color:#2f4f74; }
+    .pbody::-webkit-scrollbar-thumb { background:var(--surf-h); border-radius:5px; border:2px solid var(--surf); }
+    .pbody::-webkit-scrollbar-thumb:hover { background:var(--line); }
+    /* task card inside a pane: neutral surface, V9 border */
+    .ptc { background:var(--surf-h); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+    /* current task in a pane gets a green left edge - it is the live task */
+    .ptc.cur { background:var(--surf-h); border-color:var(--live-dim); box-shadow:inset 2px 0 0 var(--live-dim); }
     .ptcr { display:flex; align-items:flex-start; gap:8px; }
     .ptcr .pn { flex:1; min-width:0; } .ptcr .pn b { font-size:11.5px; font-weight:600; color:var(--ink2); }
     .ptcr .pn span { display:block; font-size:9.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .pchip { display:inline-flex; align-items:baseline; gap:3px; padding:3px 7px; border-radius:7px; border:1px solid rgba(139,123,240,.26); background:rgba(139,123,240,.07); flex:none; }
-    .pchip b { font-size:11px; font-weight:700; color:#b6abf0; } .pchip small { font-size:8px; color:var(--muted); }
-    .prun { display:flex; align-items:center; gap:6px; font-size:9.5px; color:#f3d3a0; padding-top:4px; }
+    /* chip: neutral, no violet */
+    .pchip { display:inline-flex; align-items:baseline; gap:3px; padding:3px 7px; border-radius:7px; border:1px solid var(--line); background:var(--surf-h); flex:none; }
+    .pchip b { font-size:11px; font-weight:700; color:var(--ink2); } .pchip small { font-size:8px; color:var(--muted); }
+    /* running line: green text - it marks the live step */
+    .prun { display:flex; align-items:center; gap:6px; font-size:9.5px; color:var(--live-ink); padding-top:4px; }
     .prun .pip { width:5px;height:5px;border-radius:50%;background:var(--live);animation:ppl 1.4s infinite; }
     .pager { display:flex; align-items:center; justify-content:center; gap:14px; padding:6px; flex:none; }
-    .pager .nav { width:28px;height:28px;border-radius:7px;border:1px solid #283246;background:#10141d;color:var(--ink2);font:inherit;font-size:13px;cursor:pointer; }
-    .pager .nav:hover { border-color:var(--accent); color:var(--accent); }
+    /* pager nav: monochrome, no hue on hover */
+    .pager .nav { width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:var(--surf);color:var(--ink2);font:inherit;font-size:13px;cursor:pointer; }
+    .pager .nav:hover { border-color:var(--muted); color:var(--ink); }
     .pager .nav:disabled { opacity:.4; cursor:default; }
-    .dots { display:flex; gap:6px; } .dot { width:7px;height:7px;border-radius:50%;background:#2a3344; }
-    .dot.on { background:var(--accent); box-shadow:0 0 7px rgba(var(--accent-rgb),.5); }
+    /* dots: monochrome; the active dot uses ink2 (not live/accent) - page indicator, not a live state */
+    .dots { display:flex; gap:6px; } .dot { width:7px;height:7px;border-radius:50%;background:var(--surf-h);border:1px solid var(--line); }
+    .dot.on { background:var(--ink2); border-color:var(--ink2); box-shadow:none; }
     .prange { font-size:11.5px; color:var(--ink2); font-weight:500; }
 
     @keyframes beam { to { background-position:-200% 0; } }
+
+    /* focus rings: visible on keyboard navigation, 2px ink outline, offset so it floats above the surface */
+    .task:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+    .sidehd .tog:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+
+    /* reduced-motion: kill all animations and key transitions broadly, then keep existing specifics */
     @media (prefers-reduced-motion: reduce) {
-      .eq i, .sdot, .cdot.run, .pane.run::before, .prun .pip, .task, .task .go { animation:none; transition:none; }
+      * { animation:none !important; }
+      .task, .task .go, .summary, .statsbody, .tact, .toggle button, .seg button,
+      .drawer, .drawer > .inner, .rline.cur, .nowstrip .ndot { transition:none !important; }
+      /* keep these selectors for clarity even though * covers them */
+      .eq i, .sdot, .cdot.run, .pane.run::before, .prun .pip { animation:none; transition:none; }
       .geye .geye-dot, .feed .pmark.live::before, .feed .task.live::before { animation:none; }
     }
     @media (max-width: 1000px) {
