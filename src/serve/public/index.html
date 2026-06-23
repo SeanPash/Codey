@@ -152,54 +152,19 @@
     .center { flex:1; min-width:0; padding:16px 20px; }
     .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:var(--head); align-self:stretch; }
 
-    /* task cards */
-    .card { position:relative; background:var(--card); border:1px solid #283040; border-radius:11px; padding:13px 16px; margin-bottom:10px; overflow:hidden; }
-    .grp .card:last-child { margin-bottom:2px; }
-    .card.open { background:#151a23; }
-    .card.warn { border-color:#3a3324; }
-    .card::before { content:""; position:absolute; inset:0; border-radius:11px; padding:1px; opacity:0; transition:opacity .25s; pointer-events:none;
-      background:linear-gradient(110deg,transparent 20%,var(--violet) 50%,transparent 80%); background-size:200% 100%;
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; }
-    .card:hover::before, .card.open::before { opacity:.45; animation:beam 3s linear infinite; }
-    @keyframes beam { to { background-position:-200% 0; } }
-    .row { display:flex; align-items:center; gap:13px; cursor:pointer; position:relative; }
-    .row:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:6px; }
-    .chev { color:#5b6470; font-size:11px; flex:none; }
-    .card.open .chev { color:var(--accent); }
-    .nm { flex:1; min-width:0; }
-    .nm .name { font-weight:600; font-size:14px; color:var(--ink); display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
-    .nm .sub { color:var(--body); font-size:12px; margin-top:4px; line-height:1.4;
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-    .right { display:flex; align-items:center; gap:18px; flex:none; }
-    .meta { text-align:right; font-size:9.5px; color:var(--muted); line-height:1.5; }
-    .meta .ok { color:var(--green); }
-    /* token chip (bordered, share bar inside) */
-    .chip { padding:7px 12px 8px; border-radius:9px; border:1px solid #283246; background:var(--inset); min-width:112px; }
-    .chip .top { display:flex; align-items:baseline; justify-content:flex-end; gap:5px; }
-    .chip .tok { font-weight:700; font-size:16px; color:var(--ink); }
-    .chip .u { color:var(--muted); font-size:10px; }
-    .chip .bar { height:3px; background:#1b2230; border-radius:2px; margin-top:7px; }
-    /* Token spend reads violet everywhere (matches the Tokens card), so the share bars on every
-       task card are not one more stripe of blue. */
-    .chip .bar > i { display:block; height:3px; background:linear-gradient(90deg,var(--violet-dim),var(--violet)); border-radius:2px; }
+    /* pill warning badge on a task row */
     .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
     .pill.amber { background:#2a2113; color:var(--amber); }
+    /* tasks inside split panes need no bottom margin (pane uses flex gap) */
+    .pbody .task { margin-bottom:0; }
 
-    /* per-prompt group: an outer card that visibly contains its task cards */
-    .grp { background:#0f1219; border:1px solid var(--line); border-radius:14px; padding:14px 15px 11px; margin-bottom:18px; }
-    .grp.live { border-color:var(--live-dim); box-shadow:0 0 0 1px rgba(245,166,35,.12); }
-    /* a quiet amber glow on the group being followed, so it is obvious where the live view is anchored */
-    .grp.live.following { border-color:var(--live); box-shadow:0 0 0 1px rgba(245,166,35,.26), 0 0 26px rgba(245,166,35,.10); }
-    /* Hover stays a neutral grey everywhere, including inside the live group, so it can never be
-       mistaken for the live element. Live uses the sky accent + pulse below; hover does not. */
+    /* per-prompt group: transparent positioning wrapper, no border/background/padding */
+    .grp { position:relative; margin-bottom:28px; }
+    /* .grp.live and .grp.following kept as JS hooks - no border/box styling here */
+    /* keep neutral hover inside followed groups */
     .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:#161b24; }
     .grp.following .rcpt .rhead:hover { background:#141923; }
-    .grp.following .card:hover { background:#161a22; }
-    .grphd { display:flex; align-items:flex-start; gap:14px; padding:0 1px 12px; margin-bottom:13px; border-bottom:1px solid var(--line); }
-    .grphd .gp { flex:1; min-width:0; }
-    /* The prompt eyebrow: a small accent dot + label, not the old floating bar. The dot picks up
-       the mode accent (and the live/cancel state when set), so it reads as an intentional marker
-       instead of a stray line beside the text. */
+    /* eyebrow kept for split-pane prompt strip (geyebrow.glive / geyebrow.gcancel) */
     .geyebrow { display:inline-flex; align-items:center; gap:7px; font-size:9px; letter-spacing:.15em;
       text-transform:uppercase; color:var(--accent); margin-bottom:6px; font-weight:700; }
     .geyebrow::before { content:""; width:5px; height:5px; border-radius:50%; background:currentColor; flex:none;
@@ -209,18 +174,11 @@
     .geyebrow.gcancel { color:var(--warn); }
     .geyebrow.gcancel::before { box-shadow:none; }
     .geyebrow.glive .rdot { margin-right:1px; background:var(--live); animation:ppl 1.6s infinite; }
-    .gtext { font-size:14.5px; font-weight:600; color:var(--ink); line-height:1.42;
-      display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-    .grpmeta { flex:none; text-align:right; font-size:10px; color:var(--muted); line-height:1.7; white-space:nowrap; }
-    .grpmeta .gtok { color:#b6abf0; font-weight:600; }
-    .grpmeta .running { color:var(--accent); font-weight:600; }
-    .grpmeta .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
     .grpnote { color:var(--muted); font-size:11.5px; padding:8px 4px 2px; }
-    .grpcancel { color:var(--amber); font-size:11.5px; font-weight:600; padding:8px 4px 2px; }
-    /* time bits on a task card */
-    .meta .mtime { color:var(--body); }
-    .meta .mdur { color:#67c3b6; }
-    .meta .mdur .rdot { display:inline-block; width:5px;height:5px;border-radius:50%;background:var(--accent);margin-right:3px;animation:pp 1.6s infinite; }
+    .grpcancel { color:var(--warn); font-size:11.5px; font-weight:600; padding:8px 4px 2px; }
+    /* echo: first sentence of the recap, for scanning a completed prompt */
+    .gecho { font-size:12px; color:var(--body); line-height:1.5; margin-top:9px; padding:1px 0 1px 10px; border-left:2px solid var(--line); }
+    /* the session timer in the sidebar still uses .running for its green ticking elapsed */
     .running { color:var(--accent); font-weight:600; }
     .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
     .timer { font-variant-numeric:tabular-nums; }
@@ -380,13 +338,13 @@
     .whybtn:hover { background:rgba(139,123,240,.16); }
     .ld .lv.gen { color:var(--ink2); }
 
-    /* heading echo + closing recap on a prompt group */
-    .gecho { font-size:12px; color:var(--body); line-height:1.5; margin-top:9px; padding:1px 0 1px 10px; border-left:2px solid rgba(var(--accent-rgb),.4); }
-    .recap { margin-top:9px; background:#141220; border:1px solid #2a2747; border-radius:11px; padding:13px 15px; }
-    .recap .rt { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--violet-ink); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:7px; }
-    .recap .rx { font-size:13px; color:var(--ink2); line-height:1.62; white-space:pre-wrap; }
+    /* closing recap on a prompt group (gecho is defined once in the V9 group block above) */
+    .recap { margin-top:13px; background:var(--inset); border:1px solid var(--line); border-radius:var(--r-card); padding:11px 13px; }
+    .recap .rt { font-size:9px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:6px; }
+    .recap .rt .ic { color:var(--ink2); }
+    .recap .rx { font-size:12.5px; color:var(--ink2); line-height:1.6; }
     .recap .pend { font-size:12px; color:var(--muted); }
-    .recap .pend.warn { color:var(--amber); }
+    .recap .pend.warn { color:var(--warn); }
 
     /* intervention bar (Plan 3, preserved) */
     .intervene { margin:12px 0 2px; border:1px solid #3a3324; background:#191510; border-radius:10px; padding:12px 14px; }
@@ -408,6 +366,68 @@
     .copybtn:hover { border-color:var(--accent); }
 
     .empty { color:var(--muted); padding:48px 0; text-align:center; }
+
+    /* ===== V9 feed spine ===== */
+    .feed { position:relative; padding-left:27px; }
+    .feed::before { content:""; position:absolute; left:6px; top:7px; bottom:8px; width:1px;
+      background:linear-gradient(180deg,transparent,var(--line) 18px,var(--line) calc(100% - 28px),transparent); }
+
+    /* ===== V9 prompt chapter marker ===== */
+    .pmark { position:relative; margin-top:28px; }
+    .pmark:first-child { margin-top:0; }
+    /* spine node for prompts - scoped to .feed so split panes are unaffected */
+    .feed .pmark::before { content:""; position:absolute; left:-24.5px; top:3px; width:9px; height:9px; border-radius:50%;
+      background:var(--bg); border:2px solid var(--faint); }
+    .feed .pmark.live::before { border-color:var(--live); box-shadow:0 0 0 3px var(--bg), 0 0 7px rgba(52,211,153,.45); }
+    .geye { display:inline-flex; align-items:center; gap:6px; font-size:9px; letter-spacing:.15em; text-transform:uppercase;
+      font-weight:700; color:var(--muted); margin-bottom:6px; }
+    .geye.live { color:var(--live); }
+    .geye .geye-dot { width:5px; height:5px; border-radius:50%; background:var(--live); box-shadow:0 0 6px var(--live); animation:softpulse 2.8s ease-in-out infinite; }
+    .gtext { font-size:16px; font-weight:600; color:var(--ink); line-height:1.32; letter-spacing:-0.012em;
+      display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .pmeta { margin-top:6px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .pmeta .s { color:var(--faint); margin:0 7px; }
+    .pmeta b { color:var(--body); font-weight:600; }
+    .nodes { margin-top:11px; display:flex; flex-direction:column; gap:4px; }
+
+    /* ===== V9 task row ===== */
+    .task { position:relative; display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:var(--r-task);
+      cursor:pointer; background:var(--surf); border:1px solid transparent;
+      transition:background var(--t-hover) var(--ease), border-color var(--t-hover) var(--ease),
+        transform var(--t-hover) var(--ease), box-shadow var(--t-hover) var(--ease); }
+    .task:hover { background:var(--surf-h); border-color:var(--line); transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.26); }
+    /* spine node for tasks - scoped to .feed only */
+    .feed .task::before { content:""; position:absolute; left:-21.5px; top:50%; transform:translateY(-50%);
+      width:7px; height:7px; border-radius:50%; background:var(--bg); border:1.5px solid var(--faint);
+      box-shadow:0 0 0 3px var(--bg); transition:border-color var(--t-hover) var(--ease); }
+    .feed .task:hover::before, .feed .task.open::before { border-color:var(--muted); }
+    .task .nm { flex:1; min-width:0; font-size:13px; color:var(--ink2); font-weight:500;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .task .rmeta { flex:none; width:auto; font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .task .rtok { flex:none; width:auto; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .task .rtok::before { content:"\2022"; color:var(--faint); margin-right:9px; }
+    .task .rtok::after { content:" tok"; color:var(--faint); }
+    .task .go { flex:none; width:10px; text-align:center; color:var(--faint); font-size:12px;
+      transition:color var(--t-hover) var(--ease), transform var(--t-hover) var(--ease); }
+    .task:hover .go { color:var(--muted); transform:translateX(2px); }
+    .task.open .go { transform:rotate(90deg); color:var(--ink2); }
+    /* open and live tasks wrap so the body flows beneath the row */
+    .task.open, .task.live { flex-wrap:wrap; }
+    .tbody { width:100%; }
+    /* narration lead line at the top of the expanded body */
+    .tlead { font-size:12px; color:var(--body); margin:6px 0 2px; line-height:1.45; }
+    /* live task accent: dim inset on the left */
+    .task.live { background:var(--surf-h); box-shadow:inset 2px 0 0 var(--live-deep); }
+    .task.live:hover { box-shadow:inset 2px 0 0 var(--live-dim), 0 4px 14px rgba(0,0,0,.26); }
+    /* live spine node - scoped to .feed */
+    .feed .task.live::before { border-color:var(--live); box-shadow:0 0 0 3px var(--bg), 0 0 5px rgba(52,211,153,.3); animation:softpulse 2.8s ease-in-out infinite; }
+    .task.live .nm { color:var(--ink); font-weight:600; }
+    /* live badge pill */
+    .livetag { flex:none; font-size:8.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+      padding:1px 8px; border-radius:999px; color:var(--live-ink); border:1px solid var(--live-dim); background:rgba(52,211,153,.05); }
+    /* green running timer for live tasks - weight 400 (override the global .running 600) */
+    .rmeta.running { color:var(--live); font-weight:400; }
+    @keyframes softpulse { 0%,100% { box-shadow:0 0 0 3px var(--bg), 0 0 0 0 rgba(52,211,153,0) } 50% { box-shadow:0 0 0 3px var(--bg), 0 0 6px rgba(52,211,153,.32) } }
 
     /* Active Terminals: two full-size terminals side by side, paged. Each pane keeps the full
        height of the row and scrolls its own breakdowns, so a busy terminal never squishes its
@@ -433,7 +453,7 @@
        the breakdowns below it. */
     .pprompt { flex:none; padding:9px 12px; border-bottom:1px solid #1b2331; background:#0c1018; }
     .pprompt .geyebrow { margin-bottom:4px; }
-    .pprompt .geyebrow.gcancel { color:var(--amber); }
+    .pprompt .geyebrow.gcancel { color:var(--warn); }
     .pptext { font-size:12.5px; font-weight:600; color:var(--ink); line-height:1.4;
       display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:9.5px; font-weight:600; color:var(--accent-ink); background:rgba(var(--accent-rgb),.12); border:1px solid rgba(var(--accent-rgb),.32); }
@@ -463,7 +483,6 @@
     .pbody::-webkit-scrollbar { width:9px; }
     .pbody::-webkit-scrollbar-thumb { background:#2a3344; border-radius:5px; border:2px solid #0f131b; }
     .pbody::-webkit-scrollbar-thumb:hover { background:#3a4658; }
-    .pbody .card { margin-bottom:0; }
     .ptc { background:#141925; border:1px solid #232c3c; border-radius:8px; padding:8px 10px; }
     .ptc.cur { background:#141b27; border-color:#2f4f74; }
     .ptcr { display:flex; align-items:flex-start; gap:8px; }
@@ -481,9 +500,10 @@
     .dot.on { background:var(--accent); box-shadow:0 0 7px rgba(var(--accent-rgb),.5); }
     .prange { font-size:11.5px; color:var(--ink2); font-weight:500; }
 
+    @keyframes beam { to { background-position:-200% 0; } }
     @media (prefers-reduced-motion: reduce) {
-      .eq i, .sdot, .cdot.run, .card::before, .pane.run::before, .prun .pip { animation:none; }
-      .chip .bar > i { transition:none; }
+      .eq i, .sdot, .cdot.run, .pane.run::before, .prun .pip, .task, .task .go { animation:none; transition:none; }
+      .geye .geye-dot, .feed .pmark.live::before, .feed .task.live::before { animation:none; }
     }
     @media (max-width: 1000px) {
       .summary { display:none; }
@@ -662,7 +682,7 @@
       if (view !== "single") return "";
       const key = ekey("summary", g.id);
       const cached = explCache.get(key);
-      if (cached) return `<div class="recap"><div class="rt">&#10022; What Claude got done</div><div class="rx">${esc(cached)}</div></div>`;
+      if (cached) return `<div class="recap"><div class="rt"><span class="ic">&#9670;</span> What Claude got done</div><div class="rx">${esc(cached)}</div></div>`;
       if (explLoading.has(key)) return `<div class="recap"><span class="gening"><span class="spin"></span>Summarizing this prompt…</span></div>`;
       if (g.live) return `<div class="recap"><span class="pend">A recap appears here once Claude finishes this prompt.</span></div>`;
       if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached. Raise it with /codey:budget, then summarize.</span></div>`;
@@ -905,54 +925,71 @@
 
     // A task is still open (running) when its end is past the last recorded activity; in a
     // live session that one ticks, otherwise we show how long it took.
+    // Returns the bare duration string (no "took" prefix) for the inline .rmeta slot.
     function durLabel(c, snap) {
       const openEnd = c.endTs > snap.lastActivityAt;
-      if (openEnd && snap.live) return `<span class="running"><span class="rdot"></span>${liveTimer(c.startTs)}</span>`;
+      if (openEnd && snap.live) return `<span class="timer" data-since="${c.startTs}">${fmtDur(Date.now() - c.startTs)}</span>`;
       const end = openEnd ? snap.lastActivityAt : c.endTs;
-      return c.startTs ? `took ${fmtDur(end - c.startTs)}` : "";
+      return c.startTs ? fmtDur(end - c.startTs) : "";
     }
 
-    function cardHtml(c, maxWork, barWarning, snap) {
+    function cardHtml(c, barWarning, snap) {
       const isOpen = isCardOpen(c.id);
       const liveTask = snap.live && c.id === liveOpenId;
-      const pct = maxWork > 0 ? Math.round((c.workTotal / maxWork) * 100) : 0;
-      const cls = "card" + (isOpen ? " open" : "") + (c.warnings.length ? " warn" : "");
-      const chev = isOpen ? "&#9662;" : "&#9656;";
-      const acts = actionCount(c.receipt);
-      const done = c.warnings.length ? "" : '<span class="ok">&#10003; done</span>';
-      return `<div class="${cls}" data-id="${c.id}">`
-        + `<div class="row js-toggle" role="button" tabindex="0" aria-expanded="${isOpen}">`
-        + `<span class="chev">${chev}</span>`
-        + `<div class="nm"><div class="name">${esc(c.name)} ${warningPill(c.warnings)}</div><div class="sub">${esc(c.narration)}</div></div>`
-        + `<div class="right"><div class="meta"><div class="mtime">${fmtClock(c.startTs)}</div><div class="mdur">${durLabel(c, snap)}</div><div>${acts} action${acts === 1 ? "" : "s"} ${done}</div></div>`
-        + `<div class="chip"><div class="top"><span class="tok">${fmt(c.workTotal)}</span><span class="u">tokens</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`
-        + `</div></div>`
-        + (isOpen ? explainBlock("task", c.id) + receiptHtml(c, liveTask) : "")
-        + (barWarning ? interventionBar(barWarning, c.id) : "")
-        + `</div>`;
+      // class list: task is the base; open/live add state. warn is a semantic hook only - it
+      // carries no structural CSS; the warning shows via the amber pill on the name.
+      const cls = "task"
+        + (isOpen ? " open" : "")
+        + (liveTask ? " live" : "")
+        + (c.warnings.length ? " warn" : "");
+      // bare duration, no "took" prefix - the rmeta slot is compact
+      const dur = durLabel(c, snap);
+      const durCls = liveTask ? "rmeta running" : "rmeta";
+      const liveBadge = liveTask ? `<span class="livetag">Live</span>` : "";
+      const body = isOpen
+        ? `<div class="tbody">`
+          + (c.narration ? `<div class="tlead">${esc(c.narration)}</div>` : "")
+          + explainBlock("task", c.id)
+          + receiptHtml(c, liveTask)
+          + `</div>`
+        : "";
+      return `<div class="${cls} js-toggle" data-id="${c.id}" role="button" tabindex="0" aria-expanded="${isOpen}">`
+        + `<span class="nm">${esc(c.name)} ${warningPill(c.warnings)}</span>`
+        + liveBadge
+        + `<span class="${durCls}">${dur}</span>`
+        + `<span class="rtok">${fmt(c.workTotal)}</span>`
+        + `<span class="go">&#9656;</span>`
+        + body
+        + `</div>`
+        + (barWarning ? interventionBar(barWarning, c.id) : "");
     }
 
-    function groupHtml(g, maxWork, snap, barFor) {
-      const dur = g.live
-        ? `<span class="running"><span class="rdot"></span>${liveTimer(g.startTs)}</span>`
-        : fmtDur(g.durationMs || 0);
-      const cards = g.chunks.map((c) => cardHtml(c, maxWork, barFor(c), snap)).join("")
+    function groupHtml(g, snap, barFor) {
+      const cards = g.chunks.map((c) => cardHtml(c, barFor(c), snap)).join("")
         || `<div class="grpnote">${g.live ? "Working on it…" : "Answered directly, no tools used."}</div>`;
+      // Eyebrow: live gets the pulsing dot, cancelled gets a quiet note, otherwise "You asked".
       const eyebrow = g.live
-        ? `<span class="geyebrow glive"><span class="rdot"></span>You asked &middot; working now</span>`
-        : `<span class="geyebrow">You asked</span>`;
-      // Heading echo: the first sentence of the recap, for skimming a completed prompt.
+        ? `<div class="geye live"><span class="geye-dot"></span>Working now</div>`
+        : g.cancelled
+        ? `<div class="geye">You asked &middot; cancelled</div>`
+        : `<div class="geye">You asked</div>`;
+      // Meta one-liner: clock, duration, tokens, task count with dot separators.
+      const clock = fmtClock(g.startTs);
+      const dur = g.live ? liveTimer(g.startTs) : `<b>${fmtDur(g.durationMs || 0)}</b>`;
+      const promptDur = g.live ? `running ${dur}` : `took ${dur}`;
+      const metaLine = `<div class="pmeta">${clock}<span class="s">&bull;</span>${promptDur}<span class="s">&bull;</span><b>${fmt(g.workTotal)}</b> tok<span class="s">&bull;</span>${g.taskCount} task${g.taskCount === 1 ? "" : "s"}</div>`;
+      // Heading echo: first sentence of cached summary, for skimming a completed prompt.
       const sumKey = ekey("summary", g.id);
       const sum = explCache.get(sumKey);
       const echo = (!g.live && sum && view === "single") ? `<div class="gecho">${esc(firstSentence(sum))}</div>` : "";
       const following = g.live && followLive ? " following" : "";
-      // When the user pressed Esc mid-turn, close the group with a plain note instead of letting
-      // it read like finished work.
+      // When the user pressed Esc mid-turn, note it after the cards.
       const cancelNote = g.cancelled ? `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>` : "";
+      const pmarkCls = "pmark" + (g.live ? " live" : "");
       return `<section class="grp${g.live ? " live" : ""}${g.cancelled ? " cancelled" : ""}${following}">`
-        + `<div class="grphd"><div class="gp">${eyebrow}<span class="gtext">${esc(g.prompt)}</span>${echo}</div>`
-        + `<div class="grpmeta">${fmtClock(g.startTs)} &middot; ${dur} &middot; <span class="gtok">${fmt(g.workTotal)} tokens</span> &middot; ${g.taskCount} task${g.taskCount === 1 ? "" : "s"}</div>`
-        + `</div>${cards}${cancelNote}${summaryBlock(g)}</section>`;
+        + `<div class="${pmarkCls}">${eyebrow}<div class="gtext">${esc(g.prompt)}</div>${metaLine}${echo}</div>`
+        + `<div class="nodes">${cards}${cancelNote}${summaryBlock(g)}</div>`
+        + `</section>`;
     }
 
     function renderSummary(snap) {
@@ -1138,7 +1175,6 @@
       renderSummary(snap);
       const chunks = snap.chunks || [];
       const groups = snap.groups || [];
-      const maxWork = Math.max(1, ...chunks.map((c) => c.workTotal));
       // The running task is the last task of the live prompt group, auto-opened below. Scoping to
       // the live group (not the last task overall) keeps a new prompt from lighting up the previous
       // prompt's trailing step: a fresh group has no tasks yet, so nothing reads as "running now".
@@ -1150,10 +1186,11 @@
       const lastId = chunks.length ? chunks[chunks.length - 1].id : null;
       const barFor = (c) => (snap.live && snap.activeWarning && c.id === lastId ? snap.activeWarning : null);
 
+      // Wrap in .feed for the continuous spine; empty state does not get the wrapper.
       main.innerHTML = groups.length
-        ? groups.map((g) => groupHtml(g, maxWork, snap, barFor)).join("")
+        ? '<div class="feed">' + groups.map((g) => groupHtml(g, snap, barFor)).join("") + "</div>"
         : (chunks.length
-          ? chunks.map((c) => cardHtml(c, maxWork, barFor(c), snap)).join("")
+          ? '<div class="feed">' + chunks.map((c) => cardHtml(c, barFor(c), snap)).join("") + "</div>"
           : '<div class="empty">No activity recorded for this session yet.</div>');
 
       wireCards(main, () => renderSingle(snap));
@@ -1183,15 +1220,17 @@
       setTimeout(() => generate("summary", target.id), 0);
     }
 
-    // Shared expand/collapse wiring for task cards, used by both Single and Active Terminals.
+    // Shared expand/collapse wiring for task rows, used by both Single and Active Terminals.
     function wireCards(scope, rerender) {
       const wire = (sel, fn) => scope.querySelectorAll(sel).forEach((el) => {
         const run = () => { fn(el); rerender(); };
         el.addEventListener("click", (e) => { e.stopPropagation(); run(); });
         el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(); } });
       });
+      // .js-toggle is on the .task div itself; el.dataset.id holds the chunk id.
       wire(".js-toggle", (el) => {
-        const id = el.closest(".card").dataset.id;
+        const id = el.dataset.id;
+        if (!id) return;
         // Toggle against what is actually showing, so collapsing the auto-opened live task sticks.
         if (isCardOpen(id)) { open.delete(id); closedByUser.add(id); }
         else { open.add(id); closedByUser.delete(id); }
@@ -1327,8 +1366,7 @@
         return e > m ? e : m;
       }, 0) || Date.now();
       const pseudo = { live: s.running, lastActivityAt: lastFinite };
-      const maxWork = Math.max(1, ...chunks.map((c) => c.workTotal));
-      const cards = chunks.map((c) => cardHtml(c, maxWork, null, pseudo)).join("");
+      const cards = chunks.map((c) => cardHtml(c, null, pseudo)).join("");
       // The body: thinking banner, the cards so far, and the live "running X now" line. When a
       // terminal has done no tool work, say so plainly instead of dimming it like it is broken.
       const think = s.thinking ? `<div class="pthink"><span class="pip"></span>Thinking through the prompt…</div>` : "";
