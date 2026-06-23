@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderNarration, renderHeader, renderAction } from "./render.js";
+import { renderNarration, renderHeader, renderCaption } from "./render.js";
+import type { LiveCaption } from "../caption/caption.js";
 
 describe("render", () => {
   it("renders a narration line as an indented why", () => {
@@ -12,9 +13,10 @@ describe("render", () => {
   });
 });
 
-describe("renderAction", () => {
-  it("renders a tagged action line from a label", () => {
-    expect(renderAction({ tag: "editing", target: "auth.ts" })).toContain("[editing]");
-    expect(renderAction({ tag: "editing", target: "auth.ts" })).toContain("auth.ts");
+describe("renderCaption", () => {
+  it("renders a stage chip and a plain-English sentence", () => {
+    const cap: LiveCaption = { stage: "editing", title: "Editing auth.ts", simple: "Claude is editing auth.ts to make a change." };
+    expect(renderCaption(cap)).toContain("Editing");
+    expect(renderCaption(cap)).toContain("Claude is editing auth.ts");
   });
 });

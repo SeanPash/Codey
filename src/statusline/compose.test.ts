@@ -72,125 +72,107 @@ describe("composeView thinking", () => {
   it("is thinking when a prompt arrived after the last tool and we are caught up", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const view = composeView(events, snap({ promptAt: 100 }), 5000);
-    expect(view.thinking).toBe(true);
-    expect(view.why).toBeNull(); // the why is held back while thinking
+    expect(view.state).toBe("thinking");
+    expect(view.stage).toBe("Thinking");
+    expect(view.sentence).toContain("thinking through your request");
   });
 
   it("is not thinking once a newer tool event exists", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 200)];
     const view = composeView(events, snap({ promptAt: 100 }), 5000);
-    expect(view.thinking).toBe(false);
+    expect(view.state).toBe("live");
   });
 });
 
-describe("composeView summary", () => {
-  it("builds a summary with the narrator sentence and a done checklist when finished", () => {
-    const events = [
-      pre("a", "Read", { file_path: "a.ts" }, 0),
-      pre("b", "Write", { file_path: "b.ts" }, 100),
-    ];
-    // doneAt lands after the last tool event and we are caught up
-    const view = composeView(events, snap({ doneAt: 200, why: "Wired the summary section." }), 10000);
-    expect(view.summary?.sentence).toBe("Wired the summary section.");
-    expect(view.summary?.items.map((i) => i.seq)).toEqual([1, 2]);
-  });
-
-  it("keeps only the last three completed cards in the checklist", () => {
-    const events = [
-      pre("a", "Read", { file_path: "a.ts" }, 0),
-      pre("b", "Write", { file_path: "b.ts" }, 9000),
-      pre("c", "Edit", { file_path: "c.ts" }, 18000),
-      pre("d", "Read", { file_path: "d.ts" }, 27000),
-    ];
-    const view = composeView(events, snap({ doneAt: 40000 }), 60000);
-    expect(view.summary?.items.map((i) => i.seq)).toEqual([2, 3, 4]);
-  });
-
-  it("shows the summary immediately, before the reveal animation catches up", () => {
-    const events = [
-      pre("a", "Read", { file_path: "a.ts" }, 0),
-      pre("b", "Write", { file_path: "b.ts" }, 9000),
-    ];
-    // doneAt lands just after the last tool, but now is barely past the first card so the
-    // pointer has not reached the last step. The summary should still snap in.
-    const view = composeView(events, snap({ doneAt: 9001 }), 1000);
-    expect(view.summary).not.toBeNull();
-    expect(view.summary?.items.map((i) => i.seq)).toEqual([1, 2]);
-    expect(view.current).toBeNull();
-  });
-
-  it("has no summary while Claude is still working", () => {
+describe("composeView done", () => {
+  it("shows the AI recap as the done sentence and points at the fuller views", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
-    const view = composeView(events, snap({ doneAt: null }), 1000);
-    expect(view.summary).toBeNull();
+    const view = composeView(events, snap({ doneAt: 200, why: "Wired the summary section." }), 10000);
+    expect(view.state).toBe("done");
+    expect(view.stage).toBe("Done");
+    expect(view.sentence).toBe("Wired the summary section.");
+    expect(view.hint).toContain("/codey:timeline");
   });
 
-  it("drops the summary when a new prompt arrives after finishing", () => {
+  it("falls back to a clean generic line when there is no recap", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+    const view = composeView(events, snap({ doneAt: 200, why: null }), 10000);
+    expect(view.sentence).toBe("Finished this prompt. Open the timeline for the full breakdown.");
+  });
+
+  it("snaps to done even before any reveal would have caught up", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0), pre("b", "Write", { file_path: "b.ts" }, 9000)];
+    const view = composeView(events, snap({ doneAt: 9001, why: null }), 1000);
+    expect(view.state).toBe("done");
+  });
+
+  it("is live while Claude is still working", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+    expect(composeView(events, snap({ doneAt: null }), 1000).state).toBe("live");
+  });
+
+  it("drops the done state when a new prompt arrives after finishing", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const view = composeView(events, snap({ doneAt: 50, promptAt: 100 }), 5000);
-    expect(view.summary).toBeNull();
-    expect(view.thinking).toBe(true);
+    expect(view.state).toBe("thinking");
   });
 });
 
-describe("composeView per-turn numbering", () => {
-  it("restarts the count at the current turn after a new prompt", () => {
+describe("composeView live phase", () => {
+  it("reports the current stage from the latest chunk", () => {
     const events = [
-      pre("a", "Read", { file_path: "a.ts" }, 0), // previous turn
-      pre("b", "Write", { file_path: "b.ts" }, 200), // this turn
-      pre("c", "Edit", { file_path: "c.ts" }, 9000), // this turn, spaced apart
+      pre("a", "Read", { file_path: "a.ts" }, 0),
+      pre("b", "Edit", { file_path: "b.ts" }, 100),
     ];
-    // the prompt landed at 150, between the first tool and the rest
-    const view = composeView(events, snap({ promptAt: 150 }), 60000);
-    expect(view.thinking).toBe(false);
-    expect(view.current?.seq).toBe(2); // b is #1, c is #2 within the turn
-    expect(view.prev.map((p) => p.seq)).toEqual([1]);
-  });
-});
-
-describe("composeView", () => {
-  it("hides the why while catching up to an older card", () => {
-    const events = [pre("a", "Read", { file_path: "a.ts" }, 0), pre("b", "Write", { file_path: "b.ts" }, 0)];
-    const view = composeView(events, snap(), 1000); // still on card 1
-    expect(view.current?.seq).toBe(1);
-    expect(view.why).toBeNull();
-  });
-
-  it("shows the why once the latest card is displayed", () => {
-    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const view = composeView(events, snap(), 1000);
-    expect(view.current?.seq).toBe(1);
-    expect(view.why).toBe("the live why");
-    expect(view.mode).toBe("deep");
+    expect(view.state).toBe("live");
+    expect(view.stage).toBe("Editing");
   });
 
-  it("holds an older why on screen until its read-time passes", () => {
+  it("scopes the live phase to the current turn", () => {
+    const events = [
+      pre("a", "Edit", { file_path: "a.ts" }, 0), // previous turn
+      pre("b", "Read", { file_path: "b.ts" }, 200), // this turn
+    ];
+    const view = composeView(events, snap({ promptAt: 150 }), 60000);
+    expect(view.stage).toBe("Inspecting");
+  });
+
+  it("is idle with no events to show", () => {
+    const view = composeView([], snap(), 1000);
+    expect(view.state).toBe("idle");
+    expect(view.stage).toBe("Idle");
+  });
+
+  it("uses the live why as the deep sentence in deep mode", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+    const view = composeView(events, snap({ mode: "deep", why: "Because the build ships compiled." }), 1000, []);
+    expect(view.sentence).toBe("Because the build ships compiled.");
+  });
+
+  it("holds an older why until its read-time passes", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const whys = [
       { ts: 0, why: "first explanation here" },
       { ts: 100, why: "second explanation here" },
     ];
-    // at 1s the first why is still being read, so it stays even though a newer one exists
-    expect(composeView(events, snap(), 1000, whys).why).toBe("first explanation here");
-    // by 5s the first has been read and the second takes over
-    expect(composeView(events, snap(), 5000, whys).why).toBe("second explanation here");
+    expect(composeView(events, snap(), 1000, whys).sentence).toBe("first explanation here");
+    expect(composeView(events, snap(), 5000, whys).sentence).toBe("second explanation here");
   });
 
-  it("falls back to the snapshot why when there is no why history", () => {
-    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
-    expect(composeView(events, snap(), 1000, []).why).toBe("the live why");
-  });
-
-  it("ask mode shows the explain hint instead of a why", () => {
+  it("ask mode keeps a free deterministic caption and points at the explain command", () => {
     const events = [pre("1", "Read", { file_path: "a.ts" }, 10)];
-    const view = composeView(events, snap({ mode: "ask" }), 1000, []);
-    expect(view.why).toBe("Run /codey:explain for the why");
+    const view = composeView(events, snap({ mode: "ask", why: "an AI why" }), 1000, []);
+    expect(view.sentence).not.toBe("an AI why");
+    expect(view.sentence).toContain("Claude is reading");
+    expect(view.hint).toBe("/codey:explain for the why");
   });
 
-  it("threads the budget-left label and pauses the why when the cap is reached", () => {
+  it("threads the budget-left label and stops spending the why when the cap is reached", () => {
     const events = [pre("1", "Read", { file_path: "a.ts" }, 10)];
     const view = composeView(events, snap({ mode: "deep", why: "old why" }), 1000, [], { cap: 5000, spent: 5000 });
     expect(view.budgetLeft).toBe("budget reached");
-    expect(view.why).toContain("Auto-explaining paused");
+    expect(view.sentence).not.toBe("old why"); // paused: falls back to the free caption
+    expect(view.hint).toContain("paused");
   });
 });

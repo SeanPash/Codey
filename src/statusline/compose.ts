@@ -1,29 +1,20 @@
-import type { ToolEvent } from "../types.js";
+import type { ToolEvent, Mode } from "../types.js";
 import { actionLabel, rawTarget } from "./labels.js";
-import { schedule, type Card } from "./schedule.js";
-import { readMs, scheduleWhy } from "./read-time.js";
+import { type Card } from "./schedule.js";
+import { scheduleWhy } from "./read-time.js";
 import { formatDuration } from "../timeline/duration.js";
 import type { StatusSnapshot } from "./state.js";
-import type { CardView, StatusView, SummaryView } from "./view.js";
+import type { StatusView } from "./view.js";
 import type { WhyEntry } from "../narration/history.js";
 import { budgetLeftLabel, budgetPausedMessage, type Budget } from "../budget/budget.js";
-
-// How many finished steps the summary checklist shows. Enough to recap the turn
-// without growing the box back into the wall of text we are trying to avoid.
-const SUMMARY_ITEMS = 3;
+import { chunkEvents } from "../caption/chunks.js";
+import { buildCaption, type LiveCaption } from "../caption/caption.js";
+import { stripDashes } from "../util/text.js";
 
 // A run of the same kind of action that lands faster than this is treated as one
-// burst. It keeps Codey from falling minutes behind when Claude reads ten files in
-// a second, while still giving deliberate, spaced-out steps their own card.
+// burst. It keeps the /explain card numbering from fragmenting when Claude reads ten
+// files in a second, while still giving deliberate, spaced-out steps their own card.
 const GROUP_WINDOW_MS = 2500;
-
-// Extra dwell per action folded into a burst, so a card that stands for ten reads
-// lingers longer than a single read instead of flashing past in one read-time.
-const GROUP_STEP_MS = 600;
-
-// In ask mode nothing is narrated automatically, so the why slot points the user at the
-// pull command instead of sitting empty.
-const ASK_HINT = "Run /codey:explain for the why";
 
 // Strip the friendly prefix so a group can list bare names: "the file a.ts" -> "a.ts".
 function shortName(target: string): string {
@@ -78,21 +69,21 @@ export function cardsFromEvents(events: ToolEvent[]): Card[] {
   return built.map(({ names, lastTs, ...card }) => card);
 }
 
-const toView = (c: Card): CardView => ({
-  seq: c.seq,
-  endSeq: c.endSeq,
-  tag: c.action.tag,
-  target: c.action.target,
-  raw: c.raw,
-});
-
-// A card dwells for the time it takes to read its own line, plus a step for each extra
-// action it groups, so big bursts get proportionally more time on screen.
-function cardDwell(c: Card): number {
-  const base = readMs(`${c.action.tag} ${c.action.target}`);
-  const count = c.endSeq && c.endSeq > c.seq ? c.endSeq - c.seq + 1 : 1;
-  return base + (count - 1) * GROUP_STEP_MS;
+// The phase chip on line one, Title Case so it reads as a label not a shout.
+function stageChip(stage: string): string {
+  return stage.charAt(0).toUpperCase() + stage.slice(1);
 }
+
+// Pick the sentence for the current mode: simple is one line, deep and teach reach for the
+// richer fields when they exist and fall back gracefully when they do not.
+function pickSentence(caption: LiveCaption, mode: Mode): string {
+  if (mode === "deep") return caption.deep ?? caption.simple;
+  if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
+  return caption.simple;
+}
+
+const DONE_SENTENCE = "Finished this prompt. Open the timeline for the full breakdown.";
+const SEE_MORE = "/codey:timeline · /codey:costs";
 
 export function composeView(
   events: ToolEvent[],
@@ -108,7 +99,7 @@ export function composeView(
   // new is running yet.
   const thinking = snap.promptAt != null && snap.promptAt > newestTs;
   // Claude has finished: the stop hook stamped a doneAt at or after the last tool and no
-  // newer prompt is pending. Then we recap instead of pointing at a live task.
+  // newer prompt is pending. Then we recap instead of pointing at a live phase.
   const done = !thinking && snap.doneAt != null && snap.doneAt >= newestTs;
 
   // Time on the current turn: ticks while Claude works, freezes at the turn's total length
@@ -119,34 +110,43 @@ export function composeView(
     elapsed = formatDuration(Math.max(0, endTs - snap.promptAt));
   }
 
-  // The live line is scoped to the current turn so the numbers restart at #1 each prompt;
-  // a status line that climbs to #87 is noise. The full cross-session history lives in the
-  // feed. Before any prompt is stamped, the whole session counts as one turn.
-  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
-  const cards = cardsFromEvents(events.filter((e) => e.timestamp >= turnStart));
+  const base = { mode: snap.mode, elapsed, budgetLeft };
 
-  // Thinking and done are turn-boundary states, so they preempt the reveal animation: the
-  // line snaps straight to them instead of waiting for the pointer to crawl through the
-  // steps it already missed. That is what kept the summary and the thinking line lagging.
-  if (thinking || done) {
-    const summary: SummaryView | null = done
-      ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) }
-      : null;
-    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft, elapsed };
+  if (thinking) {
+    return { ...base, state: "thinking", stage: "Thinking", sentence: "Claude is thinking through your request.", warning: null, hint: null };
   }
 
-  const { current, prev, isLatest } = schedule(cards, now, cardDwell);
-  const heldWhy = scheduleWhy(whys, now) ?? snap.why;
+  if (done) {
+    // Keep the AI recap when there is one, since it says what the turn actually accomplished;
+    // otherwise fall back to a clean generic line. Either way, point at the fuller views.
+    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : DONE_SENTENCE;
+    return { ...base, state: "done", stage: "Done", sentence: recap, warning: null, hint: SEE_MORE };
+  }
+
+  // The live phase is scoped to the current turn so it resets cleanly on each new prompt.
+  // Before any prompt is stamped, the whole session counts as one turn.
+  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+  const chunks = chunkEvents(events.filter((e) => e.timestamp >= turnStart));
+
+  if (chunks.length === 0) {
+    return { ...base, state: "idle", stage: "Idle", sentence: "Waiting for Claude.", warning: snap.warning, hint: null };
+  }
+
+  // The current phase is simply the latest chunk: it stays put until the stage changes, so the
+  // line holds a meaningful caption instead of flickering once per tool call.
+  const current = chunks[chunks.length - 1];
+  // In ask mode nothing is narrated automatically; when the budget is spent we stop too. In
+  // both cases the caption falls back to its free deterministic wording.
+  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(whys, now) ?? snap.why;
+  const caption = buildCaption(current, snap.mode, ai);
+  const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
+
   return {
-    mode: snap.mode,
-    current: current ? toView(current) : null,
-    prev: prev.map(toView),
-    // why precedence: the ask hint, then a budget-paused notice, then the real why.
-    why: snap.mode === "ask" ? ASK_HINT : (paused ?? (isLatest ? heldWhy : null)),
-    warning: isLatest ? snap.warning : null,
-    thinking: false,
-    summary: null,
-    budgetLeft,
-    elapsed,
+    ...base,
+    state: "live",
+    stage: stageChip(caption.stage),
+    sentence: pickSentence(caption, snap.mode),
+    warning: snap.warning,
+    hint,
   };
 }

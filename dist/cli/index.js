@@ -3493,8 +3493,9 @@ function renderNarration(text) {
 function renderHeader(mode) {
   return `Codey (mode: ${mode}) - watching what Claude is doing`;
 }
-function renderAction(label) {
-  return `[${label.tag}] ${label.target}`;
+function renderCaption(caption) {
+  const stage = caption.stage.charAt(0).toUpperCase() + caption.stage.slice(1);
+  return `\u25B8 ${stage}: ${caption.simple}`;
 }
 
 // src/statusline/labels.ts
@@ -3663,17 +3664,274 @@ function shortTarget(target) {
   return target.replace(/^the (file|folder) /, "");
 }
 
-// src/statusline/from-event.ts
-function actionFromEvent(e) {
-  if (e.phase !== "pre") return null;
-  return actionLabel(e.tool, e.input);
+// src/caption/stage.ts
+var READ_CMDS = /* @__PURE__ */ new Set([
+  "ls",
+  "dir",
+  "cat",
+  "less",
+  "more",
+  "head",
+  "tail",
+  "grep",
+  "rg",
+  "find",
+  "pwd",
+  "cd",
+  "echo",
+  "which",
+  "type",
+  "stat",
+  "wc",
+  "tree",
+  "env"
+]);
+var WRITE_CMDS = /* @__PURE__ */ new Set([
+  "rm",
+  "del",
+  "unlink",
+  "rmdir",
+  "mkdir",
+  "touch",
+  "cp",
+  "mv",
+  "chmod",
+  "chown",
+  "ln"
+]);
+var GIT_WRITE = /* @__PURE__ */ new Set(["commit", "add", "push", "pull", "merge", "rebase", "reset", "checkout", "stash", "tag"]);
+function firstWord(cmd) {
+  return (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
+}
+function stageForBash(cmd) {
+  const word = firstWord(cmd);
+  const rest = cmd.replace(/^\s*\S+\s*/, "");
+  if (/\b(test|vitest|jest|mocha|pytest)\b/.test(cmd)) return "testing";
+  if (word === "npm" || word === "pnpm" || word === "yarn" || word === "npx") {
+    if (/\b(build|typecheck|tsc|lint|eslint)\b/.test(rest)) return "testing";
+    if (/\b(install|ci)\b|^\s*i\b/.test(rest)) return "editing";
+    return "inspecting";
+  }
+  if (word === "tsc" || word === "eslint" || word === "prettier") return "testing";
+  if (word === "git") {
+    const sub = (rest.trim().split(/\s+/)[0] || "").toLowerCase();
+    return GIT_WRITE.has(sub) ? "editing" : "inspecting";
+  }
+  if (WRITE_CMDS.has(word)) return "editing";
+  if (READ_CMDS.has(word)) return "inspecting";
+  return "inspecting";
+}
+function classifyStage(tool, input, isError = false) {
+  if (isError) return "debugging";
+  if (tool === "thinking") return "planning";
+  if (tool === "Task" || tool === "Agent") return "planning";
+  switch (tool) {
+    case "Read":
+    case "NotebookRead":
+    case "Grep":
+    case "Glob":
+      return "inspecting";
+    case "Edit":
+    case "MultiEdit":
+    case "Write":
+    case "NotebookEdit":
+      return "editing";
+    case "Bash": {
+      const cmd = input && typeof input === "object" ? input.command : null;
+      return typeof cmd === "string" ? stageForBash(cmd) : "inspecting";
+    }
+  }
+  return "inspecting";
+}
+
+// src/caption/chunks.ts
+var IDLE_SPLIT_MS = 9e4;
+function outcomes(events) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const e of events) {
+    if (e.phase === "post" && e.toolUseId) byId.set(e.toolUseId, e.isError);
+  }
+  const postsByTool = /* @__PURE__ */ new Map();
+  for (const e of events) {
+    if (e.phase === "post" && !e.toolUseId) {
+      const list = postsByTool.get(e.tool) ?? [];
+      list.push(e.isError);
+      postsByTool.set(e.tool, list);
+    }
+  }
+  const out = /* @__PURE__ */ new Map();
+  for (const e of events) {
+    if (e.phase !== "pre") continue;
+    if (e.toolUseId && byId.has(e.toolUseId)) {
+      out.set(e, byId.get(e.toolUseId));
+      continue;
+    }
+    const list = postsByTool.get(e.tool);
+    if (list && list.length) out.set(e, list.shift());
+  }
+  return out;
+}
+function shortName(tool, input) {
+  return shortTarget(actionLabel(tool, input).target);
+}
+function chunkEvents(events) {
+  const failedBy = outcomes(events);
+  const built = [];
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    if (e.phase !== "pre") continue;
+    const failed = failedBy.get(e) ?? false;
+    const stage = classifyStage(e.tool, e.input, failed);
+    const name = shortName(e.tool, e.input);
+    const last = built[built.length - 1];
+    const stageMatches = last && (last.stage === stage || mutating(last.stage) && mutating(stage));
+    const close = last && e.timestamp - last.endTs <= IDLE_SPLIT_MS;
+    if (last && stageMatches && close) {
+      last.count++;
+      if (last.targets.length < 6) last.targets.push(name);
+      last.endTs = e.timestamp;
+      last.tools.push(e.tool);
+      if (stage === "debugging") last.stage = "debugging";
+      if (failed) {
+        last.failed = true;
+        last.failedTools.push(e.tool);
+      } else if (last.failedTools.includes(e.tool)) {
+        last.resolved = true;
+      }
+    } else {
+      built.push({
+        stage,
+        index: built.length + 1,
+        startIndex: i,
+        count: 1,
+        tool: e.tool,
+        targets: [name],
+        raw: rawTarget(e.tool, e.input),
+        startTs: e.timestamp,
+        endTs: e.timestamp,
+        failed,
+        resolved: false,
+        tools: [e.tool],
+        failedTools: failed ? [e.tool] : []
+      });
+    }
+  }
+  return built.map(({ tools, failedTools, ...chunk }) => chunk);
+}
+function mutating(stage) {
+  return stage === "editing" || stage === "debugging";
+}
+
+// src/caption/caption.ts
+function phraseTargets(targets, fallback) {
+  const names = targets.filter(Boolean);
+  if (names.length === 0) return fallback;
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
+  return fallback;
+}
+function describe(chunk) {
+  const many = chunk.count > 1 || chunk.targets.length > 1;
+  switch (chunk.stage) {
+    case "inspecting": {
+      const subject = phraseTargets(chunk.targets, "the code");
+      return many ? {
+        title: `Reading ${chunk.count} files`,
+        simple: "Claude is checking several project files to understand how the code works.",
+        deep: "Claude is reading through several project files to see how the pieces fit together before changing anything.",
+        teach: "Claude is reading through several project files to see how the pieces fit together before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there."
+      } : {
+        title: `Reading ${subject}`,
+        simple: `Claude is reading ${subject} to understand how it works.`,
+        deep: `Claude is reading ${subject} to understand how it works before changing anything.`,
+        teach: `Claude is reading ${subject} to understand how it works before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.`
+      };
+    }
+    case "editing": {
+      const subject = phraseTargets(chunk.targets, "the code");
+      return many ? {
+        title: `Editing ${chunk.count} files`,
+        simple: "Claude is editing several files to make the change.",
+        deep: "Claude is editing several files, changing the code so it behaves the way the task needs.",
+        teach: "Claude is editing several files, changing the code so it behaves the way the task needs. An edit rewrites part of a source file, and the change only takes effect once the code runs or is rebuilt."
+      } : {
+        title: `Editing ${subject}`,
+        simple: `Claude is editing ${subject} to make a change.`,
+        deep: `Claude is editing ${subject}, changing the code so it behaves the way the task needs.`,
+        teach: `Claude is editing ${subject}, changing the code so it behaves the way the task needs. An edit rewrites part of a source file, and the change only takes effect once the code runs or is rebuilt.`
+      };
+    }
+    case "testing": {
+      const subject = chunk.targets.length === 1 ? chunk.targets[0] : "the tests";
+      return {
+        title: `Running ${subject}`,
+        simple: `Claude is running ${subject} to check its work.`,
+        deep: `Claude is running ${subject} to confirm the changes work and nothing else broke.`,
+        teach: `Claude is running ${subject} to confirm the changes work and nothing else broke. Tests are small programs that check the real code behaves as expected, so a problem shows up right away.`
+      };
+    }
+    case "debugging":
+      return {
+        title: "Debugging",
+        simple: "Claude hit an error and is working out what went wrong.",
+        deep: "Claude is debugging, reading the error from a failed action and trying a different approach.",
+        teach: "Claude is debugging, reading the error from a failed action and trying a different approach. Debugging is the loop of reading an error, guessing the cause, and testing a fix until it holds."
+      };
+    case "planning":
+      return {
+        title: "Planning",
+        simple: "Claude is thinking through what to do next.",
+        deep: "Claude is planning its next step before changing any files.",
+        teach: "Claude is planning its next step before changing any files. Thinking the work through first keeps the changes deliberate instead of guesswork."
+      };
+    case "summarizing":
+      return {
+        title: "Wrapping up",
+        simple: "Claude is wrapping up and pulling together what it did.",
+        deep: "Claude is summarizing the work so the result is easy to follow.",
+        teach: "Claude is summarizing the work so the result is easy to follow. A clear recap is what turns a pile of edits into something a person can review."
+      };
+    case "waiting":
+    default:
+      return {
+        title: "Getting started",
+        simple: "Claude is getting started.",
+        deep: "Claude is getting started on your request.",
+        teach: "Claude is getting started on your request."
+      };
+  }
+}
+function outcomeText(chunk) {
+  if (chunk.failed && chunk.resolved) return "Claude hit an error and then recovered.";
+  if (chunk.failed) return "The latest attempt errored.";
+  return void 0;
+}
+function buildCaption(chunk, mode, why) {
+  const d = describe(chunk);
+  const clean = why ? stripDashes(why) : null;
+  const outcome = outcomeText(chunk);
+  const evidence = chunk.count === 1 && chunk.raw ? chunk.raw : void 0;
+  const caption = { stage: chunk.stage, title: d.title, simple: d.simple, outcome, evidence };
+  if (mode === "ask") return caption;
+  if (mode === "simple") {
+    if (clean) caption.simple = clean;
+    return caption;
+  }
+  if (mode === "deep") {
+    caption.deep = clean ?? d.deep;
+    return caption;
+  }
+  caption.deep = d.deep;
+  caption.teach = clean ?? d.teach;
+  return caption;
 }
 
 // src/cli/watch.ts
 var LOOP_THRESHOLD = 5;
 var REPEAT_ERROR_THRESHOLD = 3;
 function createWatchState(mode, narrate) {
-  return { engine: new NarrationEngine(mode, narrate), lastWarningKey: null, lastActionKey: null };
+  return { engine: new NarrationEngine(mode, narrate), mode, lastWarningKey: null, lastActionKey: null };
 }
 function activeWarning(events, now) {
   const lastActivityTs = events.reduce((m, e) => Math.max(m, e.timestamp), 0) || void 0;
@@ -3684,18 +3942,13 @@ function warningKey(w) {
 }
 async function processTick(events, state, now) {
   const lines = [];
-  let action = null;
-  for (let i = events.length - 1; i >= 0; i--) {
-    const a = actionFromEvent(events[i]);
-    if (a) {
-      action = a;
-      break;
-    }
-  }
-  if (action) {
-    const key2 = `${action.tag}|${action.target}`;
+  const chunks = chunkEvents(events);
+  const current = chunks[chunks.length - 1];
+  if (current) {
+    const caption = buildCaption(current, state.mode, null);
+    const key2 = `${caption.stage}|${caption.title}`;
     if (key2 !== state.lastActionKey) {
-      lines.push(renderAction(action));
+      lines.push(renderCaption(caption));
       state.lastActionKey = key2;
     }
   }
@@ -3919,24 +4172,6 @@ function runNarrate(sessionId, mode) {
 import { join as join11 } from "node:path";
 import { existsSync as existsSync14, readFileSync as readFileSync13 } from "node:fs";
 
-// src/statusline/schedule.ts
-function schedule(cards, now, dwellFor) {
-  if (cards.length === 0) return { current: null, prev: [], isLatest: true };
-  let shownAt = cards[0].ts;
-  let displayed = 0;
-  for (let i = 1; i < cards.length; i++) {
-    const earliest = Math.max(cards[i].ts, shownAt + dwellFor(cards[displayed]));
-    if (earliest > now) break;
-    shownAt = earliest;
-    displayed = i;
-  }
-  return {
-    current: cards[displayed],
-    prev: cards.slice(Math.max(0, displayed - 2), displayed),
-    isLatest: displayed === cards.length - 1
-  };
-}
-
 // src/statusline/read-time.ts
 var PER_WORD_MS = 350;
 var MIN_MS = 4e3;
@@ -3971,11 +4206,8 @@ function formatDuration(ms) {
 }
 
 // src/statusline/compose.ts
-var SUMMARY_ITEMS = 3;
 var GROUP_WINDOW_MS = 2500;
-var GROUP_STEP_MS = 600;
-var ASK_HINT = "Run /codey:explain for the why";
-function shortName(target) {
+function shortName2(target) {
   return target.replace(/^the (file|folder) /, "");
 }
 function groupNoun(tag) {
@@ -3998,7 +4230,7 @@ function cardsFromEvents(events) {
     const last = built[built.length - 1];
     const close = last && e.timestamp - last.lastTs <= GROUP_WINDOW_MS;
     if (last && close && last.action.tag === action.tag) {
-      last.names.push(shortName(action.target));
+      last.names.push(shortName2(action.target));
       last.lastTs = e.timestamp;
       last.endSeq = seq;
       last.ts = e.timestamp;
@@ -4009,25 +4241,23 @@ function cardsFromEvents(events) {
         action,
         raw: rawTarget(e.tool, e.input),
         ts: e.timestamp,
-        names: [shortName(action.target)],
+        names: [shortName2(action.target)],
         lastTs: e.timestamp
       });
     }
   }
   return built.map(({ names, lastTs, ...card }) => card);
 }
-var toView = (c) => ({
-  seq: c.seq,
-  endSeq: c.endSeq,
-  tag: c.action.tag,
-  target: c.action.target,
-  raw: c.raw
-});
-function cardDwell(c) {
-  const base = readMs(`${c.action.tag} ${c.action.target}`);
-  const count = c.endSeq && c.endSeq > c.seq ? c.endSeq - c.seq + 1 : 1;
-  return base + (count - 1) * GROUP_STEP_MS;
+function stageChip(stage) {
+  return stage.charAt(0).toUpperCase() + stage.slice(1);
 }
+function pickSentence(caption, mode) {
+  if (mode === "deep") return caption.deep ?? caption.simple;
+  if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
+  return caption.simple;
+}
+var DONE_SENTENCE = "Finished this prompt. Open the timeline for the full breakdown.";
+var SEE_MORE = "/codey:timeline \xB7 /codey:costs";
 function composeView(events, snap, now, whys = [], budget = null) {
   const budgetLeft = budgetLeftLabel(budget);
   const paused = budgetPausedMessage(budget);
@@ -4039,25 +4269,30 @@ function composeView(events, snap, now, whys = [], budget = null) {
     const endTs = done && snap.doneAt != null ? snap.doneAt : now;
     elapsed = formatDuration(Math.max(0, endTs - snap.promptAt));
   }
-  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
-  const cards = cardsFromEvents(events.filter((e) => e.timestamp >= turnStart));
-  if (thinking || done) {
-    const summary = done ? { sentence: snap.why, items: cards.slice(-SUMMARY_ITEMS).map(toView) } : null;
-    return { mode: snap.mode, current: null, prev: [], why: null, warning: null, thinking, summary, budgetLeft, elapsed };
+  const base = { mode: snap.mode, elapsed, budgetLeft };
+  if (thinking) {
+    return { ...base, state: "thinking", stage: "Thinking", sentence: "Claude is thinking through your request.", warning: null, hint: null };
   }
-  const { current, prev, isLatest } = schedule(cards, now, cardDwell);
-  const heldWhy = scheduleWhy(whys, now) ?? snap.why;
+  if (done) {
+    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : DONE_SENTENCE;
+    return { ...base, state: "done", stage: "Done", sentence: recap, warning: null, hint: SEE_MORE };
+  }
+  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+  const chunks = chunkEvents(events.filter((e) => e.timestamp >= turnStart));
+  if (chunks.length === 0) {
+    return { ...base, state: "idle", stage: "Idle", sentence: "Waiting for Claude.", warning: snap.warning, hint: null };
+  }
+  const current = chunks[chunks.length - 1];
+  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(whys, now) ?? snap.why;
+  const caption = buildCaption(current, snap.mode, ai);
+  const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
   return {
-    mode: snap.mode,
-    current: current ? toView(current) : null,
-    prev: prev.map(toView),
-    // why precedence: the ask hint, then a budget-paused notice, then the real why.
-    why: snap.mode === "ask" ? ASK_HINT : paused ?? (isLatest ? heldWhy : null),
-    warning: isLatest ? snap.warning : null,
-    thinking: false,
-    summary: null,
-    budgetLeft,
-    elapsed
+    ...base,
+    state: "live",
+    stage: stageChip(caption.stage),
+    sentence: pickSentence(caption, snap.mode),
+    warning: snap.warning,
+    hint
   };
 }
 
@@ -4065,169 +4300,64 @@ function composeView(events, snap, now, whys = [], budget = null) {
 var RESET = "\x1B[0m";
 var BOLD = "\x1B[1m";
 var BRAND = "\x1B[38;5;75m";
-var GOLD = "\x1B[38;5;214m";
-var LAV = "\x1B[38;5;147m";
-var GRAY = "\x1B[38;5;250m";
+var DIM = "\x1B[38;5;244m";
 var TEXT = "\x1B[38;5;253m";
-var LABEL = "\x1B[38;5;110m";
-var DOT = "\x1B[38;5;248m";
 var GREEN = "\x1B[38;5;114m";
-var NUM = "\x1B[1m\x1B[38;5;220m";
 var RED = "\x1B[38;5;203m";
 var MODE_COLOR = {
   simple: "\x1B[38;5;75m",
   deep: "\x1B[38;5;141m",
   teach: "\x1B[38;5;150m",
   ask: "\x1B[38;5;180m"
-  // warm sand, distinct from the narration styles
 };
 var WRAP = 120;
-var MAX_WHY_LINES = 5;
-var COL = 5;
-var RULE = 26;
-var RAW_MAX = 64;
-function clampRaw(raw) {
-  const line = raw.split("\n")[0].trim();
-  return line.length > RAW_MAX ? line.slice(0, RAW_MAX - 1) + "\u2026" : line;
-}
-function visLen(s) {
-  return s.replace(/\x1b\[[0-9;]*m/g, "").length;
+function stageColor(state, mode) {
+  if (state === "done") return GREEN;
+  if (state === "idle") return DIM;
+  return MODE_COLOR[mode] ?? MODE_COLOR.simple;
 }
 function modeLabel(mode) {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
-function frame(rail) {
-  const edge = (ch) => `${rail}${ch}${RESET} `;
-  return {
-    header(mode, budgetLeft, elapsed) {
-      const m = MODE_COLOR[mode] ?? MODE_COLOR.simple;
-      const time = elapsed ? ` ${DOT}\xB7${RESET} ${GRAY}\u23F1 ${elapsed}${RESET}` : "";
-      const suffix = budgetLeft ? ` ${DOT}\xB7${RESET} ${GRAY}${budgetLeft}${RESET}` : "";
-      const title = `${BOLD}${BRAND}Codey${RESET} ${DOT}\xB7${RESET} ${BOLD}${m}${modeLabel(mode)}${RESET}${time}${suffix}`;
-      return `${edge("\u256D")}${title} ${rail}${"\u2500".repeat(8)}${RESET}`;
-    },
-    row(label, labelStyle, body) {
-      return `${edge("\u2502")}${labelStyle}${label.padEnd(COL)}${RESET}  ${body}`;
-    },
-    cont(body) {
-      return `${edge("\u2502")}${" ".repeat(COL)}  ${body}`;
-    },
-    // A flush list line for the finished-turn recap: sits tight to the bar so the
-    // sentence and the done-steps read as a clean column, not floating mid-box.
-    item(body) {
-      return `${edge("\u2502")}${body}`;
-    },
-    // An indented list line for the named-section layout, so rows sit a step in from
-    // the bar instead of hugging it.
-    listItem(body) {
-      return `${edge("\u2502")}  ${body}`;
-    },
-    // A centered recap line: the summary sentence and completed-task rows sit in the
-    // middle of the box rather than hugging the left bar, so the finished turn reads
-    // as its own balanced panel.
-    centered(body, width) {
-      const pad = Math.max(0, Math.floor((width - visLen(body)) / 2) - 2);
-      return `${edge("\u2502")}${" ".repeat(pad)}${body}`;
-    },
-    // A plain rule, or one carrying a small section label so the parts read as
-    // distinct sections rather than one long block.
-    divider(label) {
-      if (!label) return `${rail}\u251C${"\u2500".repeat(RULE)}${RESET}`;
-      const right = Math.max(2, RULE - label.length - 3);
-      return `${rail}\u251C\u2500 ${LABEL}${label}${RESET}${rail} ${"\u2500".repeat(right)}${RESET}`;
-    },
-    bottom() {
-      return `${rail}\u2570${RESET}`;
-    }
-  };
+var SEP = `${DIM}\u2502${RESET}`;
+function visLen(s) {
+  return s.replace(/\x1b\[[0-9;]*m/g, "").length;
 }
-function wrapWhy(text, width, maxLines) {
+function wrap(text, width) {
   const words = text.split(/\s+/).filter(Boolean);
   const lines = [];
   let cur = "";
-  let i = 0;
-  for (; i < words.length; i++) {
-    const next = cur ? `${cur} ${words[i]}` : words[i];
-    if (next.length > width && cur) {
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (visLen(next) > width && cur) {
       lines.push(cur);
-      cur = words[i];
-      if (lines.length === maxLines) break;
+      cur = w;
     } else {
       cur = next;
     }
   }
-  if (i >= words.length) {
-    if (cur) lines.push(cur);
-    return lines;
-  }
-  let last = lines[lines.length - 1];
-  while (last.length > Math.max(1, width - 1)) last = last.replace(/\s*\S+$/, "");
-  lines[lines.length - 1] = last.replace(/[ .,;:]+$/, "") + "\u2026";
-  return lines;
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [""];
 }
-function tasknum(c) {
-  return c.endSeq && c.endSeq !== c.seq ? `#${c.seq}-${c.endSeq}` : `#${c.seq}`;
+function statusBar(view) {
+  const accent = stageColor(view.state, view.mode);
+  const parts = [`${BOLD}${BRAND}Codey${RESET}`];
+  if (view.state !== "done") parts.push(`${MODE_COLOR[view.mode] ?? MODE_COLOR.simple}${modeLabel(view.mode)}${RESET}`);
+  parts.push(`${BOLD}${accent}${view.stage}${RESET}`);
+  if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
+  const budget = view.budgetLeft ? ` ${DIM}\xB7 ${view.budgetLeft}${RESET}` : "";
+  return parts.join(` ${SEP} `) + budget;
 }
 function renderStatus(view, width = WRAP) {
-  const accent = MODE_COLOR[view.mode] ?? MODE_COLOR.simple;
-  const f = frame(accent);
-  const out = [f.header(view.mode, view.budgetLeft, view.elapsed)];
-  if (view.thinking) {
-    out.push(f.row("task", `${BOLD}${GOLD}`, `${LAV}Claude is thinking through your request\u2026${RESET}`));
-    out.push(f.bottom());
-    return out.join("\n");
-  }
-  if (view.summary) {
-    const s = view.summary;
-    if (s.sentence) {
-      out.push(f.divider("summary"));
-      wrapWhy(s.sentence, width, MAX_WHY_LINES).forEach((ln) => out.push(f.centered(`${BOLD}${TEXT}${ln}${RESET}`, width)));
-    }
-    if (s.items.length) {
-      out.push(f.divider("completed tasks"));
-      for (const it of s.items) {
-        out.push(f.centered(`${GREEN}\u2713${RESET} ${NUM}${tasknum(it)}${RESET} ${GRAY}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET}`, width));
-      }
-    }
-    out.push(f.divider("more"));
-    out.push(f.centered(`${LABEL}See more:${RESET} ${GRAY}/codey:timeline${RESET} ${DOT}\xB7${RESET} ${GRAY}/codey:costs${RESET}`, width));
-    out.push(f.bottom());
-    return out.join("\n");
-  }
-  if (!view.current) {
-    out.push(f.divider("Current task"));
-    out.push(f.listItem(`${GRAY}waiting for Claude${RESET}`));
-    out.push(f.bottom());
-    return out.join("\n");
-  }
-  if (view.prev.length) {
-    out.push(f.divider("Previous tasks"));
-    for (const p of view.prev) {
-      out.push(
-        f.listItem(`${GREEN}\u2713${RESET} ${NUM}${tasknum(p)}${RESET} ${GRAY}${pastTense(p.tag)} ${shortTarget(p.target)}${RESET}`)
-      );
-    }
-  }
-  out.push(f.divider("Current task"));
-  out.push(
-    f.listItem(
-      `${BOLD}${accent}\u25B8${RESET} ${NUM}${tasknum(view.current)}${RESET} ${GRAY}Claude is ${view.current.tag}${RESET} ${TEXT}${view.current.target}${RESET}`
-    )
-  );
-  if (view.current.raw) {
-    out.push(f.cont(`     \u21B3 ${LABEL}running${RESET}  ${TEXT}${clampRaw(view.current.raw)}${RESET}`));
-  }
+  const out = [statusBar(view)];
   if (view.warning) {
-    out.push(f.divider("Stuck"));
-    out.push(f.listItem(`${BOLD}${RED}${view.warning}${RESET}`));
-    out.push(f.bottom());
+    out.push(`${BOLD}${RED}${view.warning}${RESET}`);
     return out.join("\n");
   }
-  if (view.why) {
-    out.push(f.divider("Explanation"));
-    wrapWhy(view.why, width, MAX_WHY_LINES).forEach((ln) => out.push(f.listItem(`${BOLD}${TEXT}${ln}${RESET}`)));
-  }
-  out.push(f.bottom());
+  const body = view.state === "done" ? GREEN : TEXT;
+  const lines = wrap(view.sentence, width);
+  lines.forEach((ln) => out.push(`${body}${ln}${RESET}`));
+  if (view.hint) out.push(`${DIM}${view.hint}${RESET}`);
   return out.join("\n");
 }
 
@@ -4240,15 +4370,14 @@ import { writeFileSync as writeFileSync4, readFileSync as readFileSync9, existsS
 import { join as join6 } from "node:path";
 
 // src/timeline/segment.ts
-var GAP_MS = 6e4;
 function naiveSegment(events) {
   if (events.length === 0) return [];
-  const chunks = [{ startIndex: 0, name: "Working", narration: "Working through the session." }];
-  for (let i = 1; i < events.length; i++) {
-    if (events[i].timestamp - events[i - 1].timestamp > GAP_MS) {
-      chunks.push({ startIndex: i, name: `Task ${chunks.length + 1}`, narration: "Continued working." });
-    }
-  }
+  const chunks = chunkEvents(events).map((c) => {
+    const caption = buildCaption(c, "simple");
+    return { startIndex: c.startIndex, name: caption.title, narration: caption.simple };
+  });
+  if (chunks.length === 0) return [{ startIndex: 0, name: "Getting started", narration: "Claude is getting started." }];
+  chunks[0] = { ...chunks[0], startIndex: 0 };
   return chunks;
 }
 function buildSegmentationPrompt(events) {
@@ -5645,26 +5774,14 @@ import { join as join19 } from "node:path";
 // src/feed/render.ts
 var RESET2 = "\x1B[0m";
 var BOLD2 = "\x1B[1m";
-var DIM = "\x1B[2m";
+var DIM2 = "\x1B[2m";
 var BRAND2 = "\x1B[38;5;75m";
-var GOLD2 = "\x1B[38;5;214m";
-var LAV2 = "\x1B[38;5;147m";
-var TEXT2 = "\x1B[38;5;253m";
-var GREEN2 = "\x1B[38;5;114m";
-var RULE2 = "\x1B[38;5;240m";
-function feedItems(cards, whys) {
-  return cards.map((c, i) => {
-    const next = cards[i + 1]?.ts ?? Infinity;
-    const inWindow = whys.filter((w) => w.ts >= c.ts && w.ts < next);
-    return {
-      seq: c.seq,
-      ts: c.ts,
-      tag: c.action.tag,
-      target: c.action.target,
-      why: inWindow.length ? inWindow[inWindow.length - 1].why : null
-    };
-  });
-}
+var NUM = "\x1B[38;5;220m";
+var TITLE = "\x1B[38;5;253m";
+var BODY = "\x1B[38;5;250m";
+var LAV = "\x1B[38;5;147m";
+var RED2 = "\x1B[38;5;203m";
+var RULE = "\x1B[38;5;240m";
 function turnOf(ts, prompts) {
   let t = 0;
   for (const p of prompts) {
@@ -5673,64 +5790,78 @@ function turnOf(ts, prompts) {
   }
   return t;
 }
+function whyFor(start, end, whys) {
+  const inWindow = whys.filter((w) => w.ts >= start && w.ts < end);
+  return inWindow.length ? inWindow[inWindow.length - 1].why : null;
+}
+function feedChunks(events, prompts, whys, mode) {
+  const byTurn = /* @__PURE__ */ new Map();
+  for (const e of events) {
+    const t = turnOf(e.timestamp, prompts);
+    (byTurn.get(t) ?? byTurn.set(t, []).get(t)).push(e);
+  }
+  const out = [];
+  for (const turn of [...byTurn.keys()].sort((a, b) => a - b)) {
+    const chunks = chunkEvents(byTurn.get(turn));
+    chunks.forEach((chunk, i) => {
+      const end = chunks[i + 1]?.startTs ?? Infinity;
+      const why = whyFor(chunk.startTs, end, whys);
+      out.push({ key: `${turn}:${chunk.index}`, turn, step: chunk.index, ts: chunk.startTs, caption: buildCaption(chunk, mode, why) });
+    });
+  }
+  return out;
+}
 function turnHeader(turn, prompts) {
   const ts = prompts[turn - 1];
   const when = ts ? new Date(ts).toTimeString().slice(0, 5) : "";
-  const label = when ? `Turn ${turn} \xB7 ${when}` : `Turn ${turn}`;
+  const label = when ? `Prompt ${turn} \xB7 ${when}` : `Before the first prompt`;
   return `
 ${BOLD2}${BRAND2}\u2550\u2550 ${label} \u2550\u2550${RESET2}`;
 }
-function cardBlock(it) {
-  const lines = [`${RULE2}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500${RESET2}`, `${BOLD2}${GOLD2}#${it.seq}${RESET2} ${TEXT2}${it.tag} ${it.target}${RESET2}`];
-  if (it.why) lines.push(whyLine(it.why));
-  return lines.join("\n");
-}
-function whyLine(why) {
-  return `  ${LAV2}\u2514 why${RESET2}  ${TEXT2}${why}${RESET2}`;
-}
-function summaryBlock(items) {
-  const lines = [`${DIM}\u2500\u2500 summary \u2500\u2500${RESET2}`];
-  const last = [...items].reverse().find((it) => it.why);
-  if (last?.why) lines.push(`  ${TEXT2}${last.why}${RESET2}`);
-  for (const it of items) lines.push(`  ${GREEN2}\u2713${RESET2} ${GOLD2}#${it.seq}${RESET2} ${TEXT2}${pastTense(it.tag)} ${shortTarget(it.target)}${RESET2}`);
+function chunkBlock(c) {
+  const cap2 = c.caption;
+  const sentence = cap2.teach ?? cap2.deep ?? cap2.simple;
+  const lines = [
+    `${RULE}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500${RESET2}`,
+    `${BOLD2}${NUM}${c.step}.${RESET2} ${TITLE}${cap2.title}${RESET2}`,
+    `   ${BODY}${sentence}${RESET2}`
+  ];
+  if (cap2.outcome) {
+    const tone = cap2.stage === "debugging" && !/recover/i.test(cap2.outcome) ? RED2 : LAV;
+    lines.push(`   ${tone}${cap2.outcome}${RESET2}`);
+  }
   return lines.join("\n");
 }
 function renderFeedHeader() {
-  return `${BOLD2}${BRAND2}codey${RESET2} ${DIM}\xB7 session feed${RESET2}`;
+  return `${BOLD2}${BRAND2}codey${RESET2} ${DIM2}\xB7 session work log${RESET2}`;
 }
-function advanceFeed(items, cursor, prompts) {
+function advanceFeed(chunks, cursor, sealAll = false) {
   const parts = [];
-  const whysShownFor = new Set(cursor.whysShownFor);
+  const printedChunks = new Set(cursor.printedChunks);
   const turnsHeadered = new Set(cursor.turnsHeadered);
-  const turnsSummarized = new Set(cursor.turnsSummarized);
-  let lastSeq = cursor.lastSeq;
-  for (const it of items) {
-    if (it.seq <= cursor.lastSeq && it.why && !whysShownFor.has(it.seq)) {
-      parts.push(whyLine(it.why));
-      whysShownFor.add(it.seq);
+  const lastKey = chunks[chunks.length - 1]?.key;
+  const prompts = promptTimes(chunks);
+  for (const c of chunks) {
+    const sealed = sealAll || c.key !== lastKey;
+    if (!sealed || printedChunks.has(c.key)) continue;
+    if (!turnsHeadered.has(c.turn)) {
+      parts.push(turnHeader(c.turn, prompts));
+      turnsHeadered.add(c.turn);
     }
+    parts.push(chunkBlock(c));
+    printedChunks.add(c.key);
   }
-  for (const it of items) {
-    if (it.seq <= cursor.lastSeq) continue;
-    const turn = turnOf(it.ts, prompts);
-    if (!turnsHeadered.has(turn)) {
-      parts.push(turnHeader(turn, prompts));
-      turnsHeadered.add(turn);
-    }
-    parts.push(cardBlock(it));
-    if (it.why) whysShownFor.add(it.seq);
-    lastSeq = Math.max(lastSeq, it.seq);
+  return { text: parts.join("\n"), cursor: { printedChunks, turnsHeadered } };
+}
+function promptTimes(chunks) {
+  const firstOfTurn = /* @__PURE__ */ new Map();
+  for (const c of chunks) {
+    if (c.turn >= 1 && !firstOfTurn.has(c.turn)) firstOfTurn.set(c.turn, c.ts);
   }
-  const maxTurn = items.reduce((m, it) => Math.max(m, turnOf(it.ts, prompts)), 0);
-  for (let turn = 0; turn <= maxTurn; turn++) {
-    if (turn >= maxTurn) continue;
-    if (turnsSummarized.has(turn)) continue;
-    const turnItems = items.filter((it) => turnOf(it.ts, prompts) === turn);
-    if (turnItems.length === 0) continue;
-    parts.push(summaryBlock(turnItems));
-    turnsSummarized.add(turn);
-  }
-  return { text: parts.join("\n"), cursor: { lastSeq, whysShownFor, turnsHeadered, turnsSummarized } };
+  const max = Math.max(0, ...firstOfTurn.keys());
+  const out = [];
+  for (let t = 1; t <= max; t++) out.push(firstOfTurn.get(t) ?? 0);
+  return out;
 }
 
 // src/cli/feed.ts
@@ -5738,11 +5869,14 @@ function runFeed(sessionId) {
   const store = new SessionStore(sessionId);
   const narrationPath = join19(store.dir, "narration.jsonl");
   const promptsPath = join19(store.dir, "prompts.jsonl");
-  let cursor = { lastSeq: 0, whysShownFor: /* @__PURE__ */ new Set(), turnsHeadered: /* @__PURE__ */ new Set(), turnsSummarized: /* @__PURE__ */ new Set() };
-  const build = () => feedItems(cardsFromEvents(store.readAll()), readWhys(store.dir));
+  let cursor = { printedChunks: /* @__PURE__ */ new Set(), turnsHeadered: /* @__PURE__ */ new Set() };
+  const build = () => {
+    const mode = readSessionMode(store.dir) ?? "simple";
+    return feedChunks(store.readAll(), readPrompts(store.dir), readWhys(store.dir), mode);
+  };
   const flush = () => {
     if (!existsSync19(store.path)) return;
-    const r = advanceFeed(build(), cursor, readPrompts(store.dir));
+    const r = advanceFeed(build(), cursor);
     cursor = r.cursor;
     if (r.text) process.stdout.write(r.text + "\n");
   };

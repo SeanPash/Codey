@@ -1,4 +1,6 @@
 import type { ToolEvent } from "../types.js";
+import { chunkEvents } from "../caption/chunks.js";
+import { buildCaption } from "../caption/caption.js";
 
 export interface RawChunk {
   startIndex: number;
@@ -6,17 +8,19 @@ export interface RawChunk {
   narration: string;
 }
 
-const GAP_MS = 60_000;
-
-// Deterministic fallback: one chunk, split only on long idle gaps. Always covers the events.
+// Deterministic fallback, used until the headless segmentation pass returns and any time it is
+// unavailable. It reuses the shared caption model, so the timeline reads in the same plain
+// English as the status line and feed: one task per work phase, named by what Claude was doing.
 export function naiveSegment(events: ToolEvent[]): RawChunk[] {
   if (events.length === 0) return [];
-  const chunks: RawChunk[] = [{ startIndex: 0, name: "Working", narration: "Working through the session." }];
-  for (let i = 1; i < events.length; i++) {
-    if (events[i].timestamp - events[i - 1].timestamp > GAP_MS) {
-      chunks.push({ startIndex: i, name: `Task ${chunks.length + 1}`, narration: "Continued working." });
-    }
-  }
+  const chunks = chunkEvents(events).map((c) => {
+    const caption = buildCaption(c, "simple");
+    return { startIndex: c.startIndex, name: caption.title, narration: caption.simple };
+  });
+  // chunkEvents starts at the first pre event; the timeline expects the first task to cover
+  // everything from index 0, so anchor it there.
+  if (chunks.length === 0) return [{ startIndex: 0, name: "Getting started", narration: "Claude is getting started." }];
+  chunks[0] = { ...chunks[0], startIndex: 0 };
   return chunks;
 }
 
