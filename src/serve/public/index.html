@@ -154,7 +154,7 @@
 
     /* pill warning badge on a task row */
     .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
-    .pill.amber { background:#2a2113; color:var(--amber); }
+    .pill.amber { background:rgba(224,162,58,.12); color:var(--amber); }
     /* tasks inside split panes need no bottom margin (pane uses flex gap) */
     .pbody .task { margin-bottom:0; }
 
@@ -162,8 +162,8 @@
     .grp { position:relative; margin-bottom:28px; }
     /* .grp.live and .grp.following kept as JS hooks - no border/box styling here */
     /* keep neutral hover inside followed groups */
-    .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:#161b24; }
-    .grp.following .rcpt .rhead:hover { background:#141923; }
+    .grp.following .rline.can:hover, .grp.following .rline.brow:hover { background:var(--surf-h); }
+    .grp.following .rcpt .rhead:hover { background:var(--surf-h); }
     /* eyebrow kept for split-pane prompt strip (geyebrow.glive / geyebrow.gcancel) */
     .geyebrow { display:inline-flex; align-items:center; gap:7px; font-size:9px; letter-spacing:.15em;
       text-transform:uppercase; color:var(--accent); margin-bottom:6px; font-weight:700; }
@@ -179,8 +179,8 @@
     /* echo: first sentence of the recap, for scanning a completed prompt */
     .gecho { font-size:12px; color:var(--body); line-height:1.5; margin-top:9px; padding:1px 0 1px 10px; border-left:2px solid var(--line); }
     /* the session timer in the sidebar still uses .running for its green ticking elapsed */
-    .running { color:var(--accent); font-weight:600; }
-    .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
+    .running { color:var(--live); font-weight:600; }
+    .rdot { display:inline-block; width:6px;height:6px;border-radius:50%;background:var(--live);margin-right:4px;animation:pp 1.6s infinite;vertical-align:middle; }
     .timer { font-variant-numeric:tabular-nums; }
 
     /* receipt */
@@ -277,7 +277,7 @@
     .prog { margin-top:11px; }
     .prog .pl { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-bottom:5px; }
     .prog .pl b { color:var(--body); font-weight:600; }
-    .prog .bar { height:4px; border-radius:2px; background:#19202b; overflow:hidden; }
+    .prog .bar { height:4px; border-radius:2px; background:var(--inset); overflow:hidden; }
     .prog .bar i { display:block; height:4px; border-radius:2px; background:var(--live-dim); }
 
     /* "This session" stat pairs */
@@ -293,7 +293,7 @@
     .brkrow .bn { font-size:11px; color:var(--body); }
     .brkrow .bv { font-size:11px; color:var(--ink2); }
     .brkrow .bv .pct { color:var(--muted); margin-left:5px; }
-    .brkrow .tr { height:4px; border-radius:2px; background:#19202b; overflow:hidden; }
+    .brkrow .tr { height:4px; border-radius:2px; background:var(--inset); overflow:hidden; }
     /* neutral fill for breakdown bars - these are historical data, not the live action */
     .brkrow .tr i { display:block; height:4px; border-radius:2px; background:var(--body); }
 
@@ -365,24 +365,26 @@
     .recap .pend { font-size:12px; color:var(--muted); }
     .recap .pend.warn { color:var(--warn); }
 
-    /* intervention bar (Plan 3, preserved) */
-    .intervene { margin:12px 0 2px; border:1px solid #3a3324; background:#191510; border-radius:10px; padding:12px 14px; }
-    .intervene-head { display:flex; align-items:center; gap:8px; font-size:13px; color:#e8d9b8; margin-bottom:10px; }
-    .intervene-head .ico { color:var(--amber); }
-    .intervene .mono { font-family:ui-monospace,monospace; font-size:12px; color:#b9c0cc; }
+    /* intervention bar (Plan 3): a warning surface - amber frame, amber CTA, neutral body */
+    .intervene { margin:12px 0 2px; border:1px solid rgba(224,162,58,.4); background:var(--surf); border-radius:10px; padding:12px 14px; }
+    .intervene-head { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--warn-ink); margin-bottom:10px; }
+    .intervene-head .ico { color:var(--warn); }
+    .intervene .mono { font-family:ui-monospace,monospace; font-size:12px; color:var(--body); }
     .intervene-btns { display:flex; gap:8px; flex-wrap:wrap; }
-    .ibtn { border:1px solid #39414f; background:transparent; color:#d7dce4; border-radius:8px; padding:8px 14px; font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
-    .ibtn.primary { background:var(--accent); color:var(--bg); border:none; font-weight:700; }
-    .ibtn.ghost { border-color:#2a313d; color:#9aa3b2; }
-    .ibtn:not(.primary):hover { border-color:#4a3f25; }
+    .ibtn { border:1px solid var(--line); background:var(--surf-h); color:var(--ink2); border-radius:8px; padding:8px 14px; font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
+    /* primary CTA: readable amber on dark */
+    .ibtn.primary { background:var(--warn); color:var(--bg); border:none; font-weight:700; }
+    .ibtn.ghost { border-color:var(--line); color:var(--muted); }
+    .ibtn:not(.primary):hover { border-color:var(--muted); }
     .ibtn:disabled { opacity:.5; cursor:default; }
-    .intervene-note { font-size:11.5px; color:#6b7280; margin-top:9px; }
-    .intervene-after .sent { color:var(--green); font-weight:600; font-size:13px; }
+    .intervene-note { font-size:11.5px; color:var(--muted); margin-top:9px; }
+    /* confirmation, not a live state - neutral ink, no green */
+    .intervene-after .sent { color:var(--ink2); font-weight:600; font-size:13px; }
     .intervene-after .do { color:var(--muted); font-size:12.5px; margin:8px 0; }
-    .intervene-after .copy { display:flex; align-items:center; gap:8px; background:var(--inset); border:1px solid #20283a; border-radius:8px; padding:8px 10px; }
-    .intervene-after .copy code { flex:1; font-family:ui-monospace,monospace; font-size:12.5px; color:#cdd3de; word-break:break-word; }
-    .copybtn { flex:none; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
-    .copybtn:hover { border-color:var(--accent); }
+    .intervene-after .copy { display:flex; align-items:center; gap:8px; background:var(--inset); border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+    .intervene-after .copy code { flex:1; font-family:ui-monospace,monospace; font-size:12.5px; color:var(--ink2); word-break:break-word; }
+    .copybtn { flex:none; background:var(--surf); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
+    .copybtn:hover { border-color:var(--muted); }
 
     .empty { color:var(--muted); padding:48px 0; text-align:center; }
 
@@ -536,7 +538,7 @@
     @media (prefers-reduced-motion: reduce) {
       * { animation:none !important; }
       .task, .task .go, .summary, .statsbody, .tact, .toggle button, .seg button,
-      .drawer, .drawer > .inner, .rline.cur, .nowstrip .ndot { transition:none !important; }
+      .rline.cur, .nowstrip .ndot { transition:none !important; }
       /* keep these selectors for clarity even though * covers them */
       .eq i, .sdot, .cdot.run, .pane.run::before, .prun .pip { animation:none; transition:none; }
       .geye .geye-dot, .feed .pmark.live::before, .feed .task.live::before { animation:none; }
