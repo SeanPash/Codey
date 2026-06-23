@@ -47,7 +47,7 @@
     body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink);
       margin:0; line-height:1.45; -webkit-font-smoothing:antialiased; letter-spacing:-0.005em; }
     .disp { font-family:'W95FA','Inter',sans-serif; letter-spacing:.02em; }
-    .tok, .num, .big, .tot, .pwork b { font-variant-numeric:tabular-nums; }
+    .tok, .num, .tot, .pwork b { font-variant-numeric:tabular-nums; }
 
     /* top bar */
     .topbar { display:flex; align-items:center; gap:12px; padding:13px 20px; border-bottom:1px solid var(--line);
@@ -150,7 +150,7 @@
     @keyframes pp { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.35)} 70%{box-shadow:0 0 0 3px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
 
     .center { flex:1; min-width:0; padding:16px 20px; }
-    .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:var(--head); align-self:stretch; }
+    .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:var(--head); align-self:stretch; transition:width var(--t-drawer) var(--ease); }
 
     /* pill warning badge on a task row */
     .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
@@ -246,36 +246,56 @@
     .ctxsum .ctot { margin-left:auto; color:var(--muted); font-size:11px; }
     .ctx .note { padding:2px 14px 11px 32px; font-size:10.5px; color:var(--body); line-height:1.55; max-width:640px; }
 
-    /* summary panel: each card carries one accent (a left rail + matching figure) so the panel
-       reads as distinct stats, not one block of blue. Tokens=violet, Time=teal, Overview=sky,
-       Status=its live/idle/stuck state. */
-    .scard { position:relative; background:#12151d; border:1px solid #1e2636; border-radius:11px;
-      padding:12px 13px 12px 15px; margin-bottom:10px; overflow:hidden; --srail:#2c3444; }
-    .scard::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--srail); }
-    .scard.tokens { --srail:var(--violet); } .scard.time { --srail:var(--teal); }
-    .scard.over { --srail:var(--info); } .scard.status { --srail:var(--green); }
-    .scard.status.live { --srail:var(--live); } .scard.status.stuck { --srail:var(--warn); }
-    .scard .k { font-size:8.5px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-weight:700; margin-bottom:6px; }
-    .scard.tokens .k { color:#a99cf2; } .scard.time .k { color:#5fe3cf; } .scard.over .k { color:#a8d4ff; }
-    .big { font-weight:700; font-size:21px; color:var(--srail); line-height:1; font-variant-numeric:tabular-nums; }
-    .big .u { font-size:9px; font-weight:400; color:var(--muted); margin-left:3px; }
-    .subline { font-size:9.5px; color:var(--muted); margin-top:7px; }
-    .pair { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; gap:10px; }
-    .pair span { font-size:11px; color:var(--body); }
-    .pair b { font-size:12px; color:var(--ink2); text-align:right; font-weight:600; }
-    /* Priciest gets its own stacked block, divided off the counts, so a long task name has room
-       to wrap instead of being crushed against the value column. */
-    .ovdiv { height:1px; background:#1e2636; margin:8px 0; }
-    .ovwrap { padding-top:2px; }
-    .ovwrap .ovk { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600; }
-    .ovwrap .ovv { font-size:12.5px; color:var(--ink2); font-weight:600; line-height:1.35; margin-top:3px; }
-    .status-line { font-weight:600; font-size:13px; display:flex; align-items:center; gap:8px; }
-    .status-done { color:var(--green); } .status-live { color:var(--live); } .status-stuck { color:var(--amber); font-size:12px; }
-    .status-line .sp { width:8px; height:8px; border-radius:50%; background:currentColor; flex:none; }
-    .status-line.live .sp { animation:ppl 1.6s infinite; }
-    .status-sub { font-size:9.5px; color:var(--muted); margin-top:6px; }
-    .expl { font-size:9.5px; color:var(--body); line-height:1.55; }
-    .expl .t { color:var(--violet-ink); font-weight:600; text-transform:uppercase; letter-spacing:.08em; font-size:8px; display:block; margin-bottom:5px; }
+    /* ===== V9 companion sidebar ===== */
+    .summary.collapsed { width:44px; }
+
+    .sidehd { display:flex; align-items:center; gap:8px; margin-bottom:13px; }
+    .sidehd .t { flex:1; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink2); font-weight:700; white-space:nowrap; overflow:hidden; }
+    .sidehd .tog { flex:none; width:26px; height:26px; border-radius:var(--r-sm); border:1px solid var(--line); background:var(--surf); color:var(--muted);
+      display:flex; align-items:center; justify-content:center; font-size:12px; cursor:pointer;
+      transition:color var(--t-hover), border-color var(--t-hover); font:inherit; }
+    .sidehd .tog:hover { color:var(--ink2); border-color:var(--muted); }
+
+    /* collapse: hide body, stack header vertically showing only the toggle */
+    .summary.collapsed .statsbody { opacity:0; pointer-events:none; height:0; overflow:hidden; }
+    .summary.collapsed .sidehd { flex-direction:column; }
+    .summary.collapsed .sidehd .t { display:none; }
+    .statsbody { transition:opacity var(--t-hover) var(--ease); }
+
+    /* V9 scard: flat surface, single border, consistent radius */
+    .scard { background:var(--surf); border:1px solid var(--line); border-radius:var(--r-card); padding:12px 13px; margin-bottom:10px; }
+    .scard .k { font-size:8.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:10px; }
+
+    /* "Right now" card: live-deep border when live */
+    .nowcard { border-color:var(--live-deep); }
+    .nowcard .stat { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:var(--live); }
+    .nowcard .stat .d { width:8px; height:8px; border-radius:50%; background:var(--live); box-shadow:0 0 6px rgba(52,211,153,.5); animation:softpulse 2.8s ease-in-out infinite; flex:none; }
+    .nowcard .doing { font-size:12.5px; color:var(--ink); font-weight:600; margin-top:9px; line-height:1.35; }
+    .nowcard .el { font-size:10.5px; color:var(--muted); margin-top:4px; }
+
+    /* session progress bar inside the now card */
+    .prog { margin-top:11px; }
+    .prog .pl { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-bottom:5px; }
+    .prog .pl b { color:var(--body); font-weight:600; }
+    .prog .bar { height:4px; border-radius:2px; background:#19202b; overflow:hidden; }
+    .prog .bar i { display:block; height:4px; border-radius:2px; background:var(--live-dim); }
+
+    /* "This session" stat pairs */
+    .pair { display:flex; align-items:baseline; justify-content:space-between; padding:6px 0; font-size:11.5px; }
+    .pair + .pair { border-top:1px solid var(--hair); }
+    .pair .l { color:var(--body); }
+    .pair .v { color:var(--ink2); font-weight:600; }
+    .pair .v .dim { color:var(--muted); font-weight:500; }
+
+    /* token breakdown rows */
+    .brk { margin-top:13px; display:flex; flex-direction:column; gap:9px; }
+    .brkrow .top { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:5px; }
+    .brkrow .bn { font-size:11px; color:var(--body); }
+    .brkrow .bv { font-size:11px; color:var(--ink2); }
+    .brkrow .bv .pct { color:var(--muted); margin-left:5px; }
+    .brkrow .tr { height:4px; border-radius:2px; background:#19202b; overflow:hidden; }
+    /* neutral fill for breakdown bars - these are historical data, not the live action */
+    .brkrow .tr i { display:block; height:4px; border-radius:2px; background:var(--body); }
 
     /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
        in green with a soft glow - unmistakably the live element on the page. */
@@ -591,6 +611,7 @@
     let dateTo = "";               // sidebar date filter, upper bound (YYYY-MM-DD, "" = open)
     let railWired = false;         // the rail shell (search + date inputs) is built once, then reused
     let renamingId = null;         // session id being renamed inline (pauses rail refresh)
+    let statsCollapsed = localStorage.getItem("codey-stats-collapsed") === "1"; // sidebar collapse state
 
     // ---- Explanations: generated why/how and per-prompt summaries ----
     const explCache = new Map();   // "scope|id|depth" -> generated text (survives the live refresh)
@@ -991,38 +1012,110 @@
         + `</section>`;
     }
 
-    function renderSummary(snap) {
-      const stuck = snap.activeWarning;
-      // An honest state, not a verdict: stuck warns, live says it is working, otherwise we report
-      // when it was last active. Nothing here pretends to grade Claude against a goal.
-      let statusCls, statusHtml;
-      if (stuck) {
-        statusCls = " stuck";
-        statusHtml = `<div class="status-line stuck"><span>&#9888;</span>${esc(stuckPhrase(snap.activeWarning))}</div>`;
-      } else if (snap.live) {
-        statusCls = " live";
-        statusHtml = `<div class="status-line live"><span class="sp"></span>Working now</div>`
-          + `<div class="status-sub">Claude is actively running</div>`;
-      } else {
-        statusCls = "";
-        const last = snap.lastActivityAt ? ago(snap.lastActivityAt) : "";
-        statusHtml = `<div class="status-line done"><span class="sp"></span>Idle</div>`
-          + `<div class="status-sub">${last ? "last active " + esc(last) : "not running"}</div>`;
+    // Walks all receipt work lines and groups tokens into honest categories.
+    // Returns { total, rows: [{label, tokens, pct}] } sorted by tokens descending.
+    function tokenBreakdown(snap) {
+      const buckets = { Reasoning: 0, "File work": 0, Searches: 0, Commands: 0, Other: 0 };
+      for (const c of (snap.chunks || [])) {
+        for (const line of (c.receipt && c.receipt.workLines || [])) {
+          const t = line.tool || "";
+          const tok = line.tokens || 0;
+          if (t === "thinking") buckets.Reasoning += tok;
+          else if (["Read", "Write", "Edit", "MultiEdit"].includes(t)) buckets["File work"] += tok;
+          else if (["Grep", "Glob"].includes(t)) buckets.Searches += tok;
+          else if (["Bash", "PowerShell"].includes(t)) buckets.Commands += tok;
+          else buckets.Other += tok;
+        }
       }
+      const total = Object.values(buckets).reduce((a, b) => a + b, 0);
+      const rows = Object.entries(buckets)
+        .filter(([, v]) => v > 0)
+        .sort(([, a], [, b]) => b - a)
+        .map(([label, tokens]) => ({ label, tokens, pct: Math.round(tokens / total * 100) }));
+      return { total, rows };
+    }
+
+    function renderSummary(snap) {
+      // Derive the live task here so we don't depend on liveOpenId being set before this runs.
+      const liveGroup = (snap.groups || []).find(g => g.live);
+      const liveChunk = liveGroup && liveGroup.chunks.length
+        ? liveGroup.chunks[liveGroup.chunks.length - 1] : null;
+
+      const total = snap.taskCount || 0;
+      const glyph = statsCollapsed ? "&laquo;" : "&raquo;";
+      const expanded = !statsCollapsed;
+
+      // --- Card 1: Right now ---
+      // The green nowcard border is live-only: idle and warn states stay neutral (no green).
+      const nowLive = snap.live && liveChunk && !snap.activeWarning;
+      let nowCardInner;
+      if (snap.activeWarning) {
+        // Warn state: amber dot + stuck phrase
+        nowCardInner =
+          `<div class="stat" style="color:var(--warn)"><span class="d" style="background:var(--warn);box-shadow:0 0 6px rgba(224,162,58,.5);animation:none"></span>Needs a look</div>`
+          + `<div class="doing" style="color:var(--body);font-weight:400">${esc(stuckPhrase(snap.activeWarning))}</div>`;
+      } else if (snap.live && liveChunk) {
+        const done = Math.max(0, total - 1);
+        const pct = total ? Math.round(done / total * 100) : 0;
+        nowCardInner =
+          `<div class="stat"><span class="d"></span>Working</div>`
+          + `<div class="doing">${esc(liveChunk.name)}</div>`
+          + `<div class="el">on this task ${liveTimer(liveChunk.startTs)} &bull; session ${snap.startedAt ? liveTimer(snap.startedAt) : "running"}</div>`
+          + `<div class="prog"><div class="pl">Session progress <b class="num">${done} / ${total} tasks</b></div>`
+          + `<div class="bar"><i style="width:${pct}%"></i></div></div>`;
+      } else {
+        // Idle: calm non-green state, full progress bar
+        const pct = total ? 100 : 0;
+        const lastActive = snap.lastActivityAt
+          ? "last active " + esc(ago(snap.lastActivityAt)) : "not running";
+        nowCardInner =
+          `<div class="doing">Idle</div>`
+          + `<div class="el">${lastActive}</div>`
+          + `<div class="prog"><div class="pl">Session progress <b class="num">${total} / ${total} tasks</b></div>`
+          + `<div class="bar"><i style="width:${pct}%"></i></div></div>`;
+      }
+
+      // --- Card 2: This session ---
       const sessDur = snap.live
-        ? `<span class="running"><span class="rdot"></span>${liveTimer(snap.startedAt)}</span>`
-        : fmtDur((snap.lastActivityAt || snap.startedAt) - snap.startedAt);
+        ? (snap.startedAt ? `${liveTimer(snap.startedAt)} <span class="dim">&bull; running</span>` : `<span class="dim">running</span>`)
+        : fmtDur((snap.lastActivityAt || snap.startedAt || 0) - (snap.startedAt || 0));
       const prompts = (snap.groups || []).length;
+      const bd = tokenBreakdown(snap);
+      const brkRows = bd.rows.length
+        ? bd.rows.map(r =>
+            `<div class="brkrow"><div class="top"><span class="bn">${esc(r.label)}</span>`
+            + `<span class="bv num">${fmt(r.tokens)} <span class="pct">${r.pct}%</span></span></div>`
+            + `<div class="tr"><i style="width:${r.pct}%"></i></div></div>`).join("")
+        : `<div style="font-size:11px;color:var(--muted)">No token activity yet.</div>`;
+
       document.getElementById("summary").innerHTML =
-        `<p class="rh">This session</p>`
-        + `<div class="scard tokens"><div class="k">Tokens used</div><div class="big">${fmt(snap.workTotal)} <span class="u">tokens</span></div><div class="subline">what Claude generated this session</div></div>`
-        + `<div class="scard time"><div class="k">Time</div><div class="big" style="font-size:18px">${sessDur}</div><div class="subline">${snap.live ? "running now" : "total session time"}</div></div>`
-        + `<div class="scard over"><div class="k">Overview</div>`
-        + `<div class="pair"><span>Tasks</span><b>${snap.taskCount}</b></div>`
-        + `<div class="pair"><span>Prompts</span><b>${prompts}</b></div>`
-        + `<div class="ovdiv"></div>`
-        + `<div class="ovwrap"><div class="ovk">Priciest task</div><div class="ovv">${esc(snap.priciestTaskName || "none yet")}</div></div></div>`
-        + `<div class="scard status${statusCls}"><div class="k">Status</div>${statusHtml}</div>`;
+        `<div class="sidehd"><span class="t">Session stats</span>`
+        + `<button class="tog" id="stats-tog" type="button" aria-label="${expanded ? "Collapse" : "Expand"} stats" aria-expanded="${expanded}">${glyph}</button></div>`
+        + `<div class="statsbody">`
+        + `<div class="scard${nowLive ? " nowcard" : ""}" aria-live="polite"><div class="k">Right now</div>${nowCardInner}</div>`
+        + `<div class="scard"><div class="k">This session</div>`
+        + `<div class="pair"><span class="l">Duration</span><span class="v num">${sessDur}</span></div>`
+        + `<div class="pair"><span class="l">Prompts</span><span class="v num">${prompts}</span></div>`
+        + `<div class="pair"><span class="l">Priciest task</span><span class="v">${esc(snap.priciestTaskName || "none yet")}</span></div>`
+        + `<div style="height:13px"></div>`
+        + `<div class="k">Tokens &middot; ${fmt(bd.total)}</div>`
+        + `<div class="brk">${brkRows}</div>`
+        + `</div></div>`;
+
+      // Apply collapse class and wire the toggle (survives per-tick re-render via JS state var).
+      const aside = document.getElementById("summary");
+      aside.classList.toggle("collapsed", statsCollapsed);
+      const tog = document.getElementById("stats-tog");
+      if (tog) {
+        tog.onclick = () => {
+          statsCollapsed = !statsCollapsed;
+          localStorage.setItem("codey-stats-collapsed", statsCollapsed ? "1" : "0");
+          aside.classList.toggle("collapsed", statsCollapsed);
+          tog.innerHTML = statsCollapsed ? "&laquo;" : "&raquo;";
+          tog.setAttribute("aria-expanded", String(!statsCollapsed));
+          tog.setAttribute("aria-label", (statsCollapsed ? "Expand" : "Collapse") + " stats");
+        };
+      }
     }
 
     function renderHeader(snap) {
