@@ -785,7 +785,7 @@
 
     function lineDetail(c, l, idx) {
       const parts = [];
-      if (l.thoughtFirst) parts.push(`<div class="ld"><span class="lk">first</span><span class="lv">Thought it through, then did this.</span></div>`);
+      if (l.thoughtFirst) parts.push(`<div class="ld"><span class="lk">first</span><span class="lv">Claude paused to think before this step.</span></div>`);
       if (l.ts) parts.push(`<div class="ld"><span class="lk">at</span><span class="lv">${fmtClockSec(l.ts)}</span></div>`);
       if (l.raw) parts.push(`<div class="ld"><span class="lk">ran</span><code>${esc(l.raw)}</code></div>`);
       if (l.why) parts.push(`<div class="ld"><span class="lk">Claude's note</span><span class="lv">${esc(l.why)}</span></div>`);

@@ -13,8 +13,13 @@ describe("describeAction", () => {
     expect(describeAction("Edit", { file_path: "/p/a.cs" })).toBe("Editing a.cs");
     expect(describeAction("Read", { file_path: "/p/b.cs" })).toBe("Reading b.cs");
   });
-  it("keeps the bash label plain; the command goes to raw", () => {
+  it("uses the command's own description as the label when present", () => {
+    expect(describeAction("Bash", { command: "dotnet build MyGame.sln", description: "Build the game" })).toBe("Build the game");
+    expect(describeAction("PowerShell", { command: "git status", description: "Show working tree status" })).toBe("Show working tree status");
+  });
+  it("falls back to a plain label when a command has no description", () => {
     expect(describeAction("Bash", { command: "dotnet build MyGame.sln" })).toBe("Ran a command");
+    expect(describeAction("PowerShell", { command: "git status" })).toBe("Ran a command");
   });
   it("names an mcp action by action + server", () => {
     expect(describeAction("mcp__unity__execute_menu_item", { menu: "x" })).toBe("Execute menu item via unity");
@@ -26,9 +31,10 @@ describe("describeAction", () => {
 });
 
 describe("rawDetail", () => {
-  it("returns the full untruncated command for bash", () => {
+  it("returns the full untruncated command for bash and powershell", () => {
     const cmd = "git log --oneline -10 && echo done";
     expect(rawDetail("Bash", { command: cmd })).toBe(cmd);
+    expect(rawDetail("PowerShell", { command: cmd })).toBe(cmd);
   });
   it("returns the full path for file tools", () => {
     expect(rawDetail("Read", { file_path: "/a/b/c.ts" })).toBe("/a/b/c.ts");

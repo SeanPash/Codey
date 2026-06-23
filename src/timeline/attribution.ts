@@ -23,6 +23,17 @@ function fullCommand(input: unknown): string | null {
   return null;
 }
 
+// Bash and PowerShell calls carry a `description`: Claude's own one-line summary of what the
+// command does, in plain active voice ("Show working tree status"). That is exactly the
+// readable label we want, so we use it instead of a generic "Ran a command".
+function descFrom(input: unknown): string | null {
+  if (input && typeof input === "object") {
+    const d = (input as Record<string, unknown>).description;
+    if (typeof d === "string" && d.trim()) return d.trim();
+  }
+  return null;
+}
+
 function fullPath(input: unknown): string | null {
   if (input && typeof input === "object") {
     const r = input as Record<string, unknown>;
@@ -47,7 +58,8 @@ export function describeAction(tool: string | null, input: unknown): string {
     case "Edit":
     case "MultiEdit": return file ? `Editing ${file}` : "Editing a file";
     case "Read": return file ? `Reading ${file}` : "Reading a file";
-    case "Bash": return "Ran a command";
+    case "Bash":
+    case "PowerShell": return descFrom(input) ?? "Ran a command";
     case "Grep":
     case "Glob": return "Searched the code";
   }
@@ -60,7 +72,7 @@ export function describeAction(tool: string | null, input: unknown): string {
 // file tools. Null when there is nothing useful to show.
 export function rawDetail(tool: string | null, input: unknown): string | null {
   if (!tool) return null;
-  if (tool === "Bash") return fullCommand(input);
+  if (tool === "Bash" || tool === "PowerShell") return fullCommand(input);
   return fullPath(input);
 }
 
@@ -68,7 +80,7 @@ export function rawDetail(tool: string | null, input: unknown): string | null {
 // surface an exit code when the error text carries one, otherwise stay generic.
 export function failSummaryFrom(tool: string | null, errorText: string | null): string {
   const m = errorText ? /exit code\s+(\d+)/i.exec(errorText) : null;
-  const what = tool === "Bash" ? "command" : tool ? "step" : "step";
+  const what = tool === "Bash" || tool === "PowerShell" ? "command" : tool ? "step" : "step";
   if (m) return `This ${what} failed (exit code ${m[1]}).`;
   return `This ${what} didn't succeed.`;
 }

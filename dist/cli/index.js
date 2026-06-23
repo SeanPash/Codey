@@ -4739,6 +4739,13 @@ function fullCommand(input) {
   }
   return null;
 }
+function descFrom(input) {
+  if (input && typeof input === "object") {
+    const d = input.description;
+    if (typeof d === "string" && d.trim()) return d.trim();
+  }
+  return null;
+}
 function fullPath(input) {
   if (input && typeof input === "object") {
     const r = input;
@@ -4763,7 +4770,8 @@ function describeAction(tool, input) {
     case "Read":
       return file7 ? `Reading ${file7}` : "Reading a file";
     case "Bash":
-      return "Ran a command";
+    case "PowerShell":
+      return descFrom(input) ?? "Ran a command";
     case "Grep":
     case "Glob":
       return "Searched the code";
@@ -4774,12 +4782,12 @@ function describeAction(tool, input) {
 }
 function rawDetail(tool, input) {
   if (!tool) return null;
-  if (tool === "Bash") return fullCommand(input);
+  if (tool === "Bash" || tool === "PowerShell") return fullCommand(input);
   return fullPath(input);
 }
 function failSummaryFrom(tool, errorText) {
   const m = errorText ? /exit code\s+(\d+)/i.exec(errorText) : null;
-  const what = tool === "Bash" ? "command" : tool ? "step" : "step";
+  const what = tool === "Bash" || tool === "PowerShell" ? "command" : tool ? "step" : "step";
   if (m) return `This ${what} failed (exit code ${m[1]}).`;
   return `This ${what} didn't succeed.`;
 }
