@@ -12,14 +12,11 @@
 
     :root {
       --bg:#0b0d11; --card:#14171f; --line:#222a37; --inset:#0a0d14;
-      /* Accent family. Each hue carries one meaning so the page reads in zones instead of one
-         flat blue: sky = structure/navigation, violet = tokens & spend, teal = time, green =
-         success, coral = failure. */
-      /* Structure is neutral, not blue: rails, hairlines and inactive nav carry no hue, so the
-         page stops reading as one flat blue and the semantic accents actually get to mean
-         something. Blue is demoted to info/links only. Each accent is tuned to roughly equal
-         perceived brightness on this near-black base (Radix dark step 9-11) so many hues can
-         coexist without clashing. */
+      /* Accent family. Each hue carries one meaning so the page reads in zones, not one flat blue:
+         violet = tokens & spend, teal = time, green = success, coral = failure, info = links.
+         Structure (rails, hairlines, inactive nav) is now the neutral grey below, never a hue, so
+         the accents actually get to mean something. Each accent is tuned to roughly equal perceived
+         brightness on this near-black base (Radix dark step 9-11) so the hues coexist cleanly. */
       --structure:#8b94a7; --structure-ink:#cad1de;
       --info:#5fb0ff; --info-ink:#a8d4ff;
       --sky:#5fb0ff; --sky-dim:#3d7fc4; --sky-ink:#bfe0ff;
