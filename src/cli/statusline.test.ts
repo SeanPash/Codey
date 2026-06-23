@@ -25,11 +25,11 @@ function seed(): string {
 }
 
 describe("statusLineFor", () => {
-  it("renders the current task and why from events plus the snapshot", () => {
+  it("renders the live phase and why from events plus the snapshot", () => {
     const out = plain(statusLineFor(seed(), 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("#1 Claude is editing the file auth.ts");
-    expect(out).toContain("adding validation");
+    expect(out).toContain("Editing"); // the stage chip, deep mode
+    expect(out).toContain("adding validation"); // the live why is the deep sentence
   });
 
   it("renders nothing when there is no session dir", () => {
@@ -50,7 +50,7 @@ describe("lineForSession", () => {
     writeSessionMode("simple", dir);
     const out = plain(lineForSession("s1", root, 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("#1 Claude is editing the file auth.ts");
+    expect(out).toContain("Editing"); // the stage chip
   });
 
   it("renders blank when no session is given (no payload session id)", () => {

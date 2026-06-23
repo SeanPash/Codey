@@ -1,26 +1,16 @@
 import type { Mode } from "../types.js";
 
-export interface CardView {
-  seq: number;
-  endSeq?: number; // present when the row covers a grouped burst, e.g. #3-7
-  tag: string;
-  target: string;
-  raw: string | null;
-}
-
-export interface SummaryView {
-  sentence: string | null; // the narrator's plain-English recap of the finished turn
-  items: CardView[]; // the last few completed steps, as a done checklist
-}
+// What the status line is showing right now. A compact HUD, not a framed log: one state,
+// one phase chip, one sentence. The render layer turns this into at most two lines.
+export type StatusState = "live" | "thinking" | "done" | "idle";
 
 export interface StatusView {
   mode: Mode;
-  current: CardView | null;
-  prev: CardView[]; // task-only rows, oldest first
-  why: string | null;
-  warning: string | null;
-  thinking: boolean; // true between a prompt and Claude's first tool call
-  summary: SummaryView | null; // present once Claude has finished a turn
-  budgetLeft: string | null; // e.g. "3.8k left" when a budget cap is armed, else null
-  elapsed: string | null; // time on the current turn (live), or its final length when done
+  state: StatusState;
+  stage: string;             // the phase chip for line one: "Editing", "Thinking", "Done"
+  sentence: string;          // the plain-English line two
+  elapsed: string | null;    // time on the current turn, or its final length when done
+  warning: string | null;    // a "stuck" alert that takes over line two, or null
+  budgetLeft: string | null; // a small "3.8k left" cue for line one, or null when uncapped
+  hint: string | null;       // a dim pointer (explain hint, paused notice, see-more), or null
 }

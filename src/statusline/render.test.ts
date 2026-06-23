@@ -6,182 +6,87 @@ const plain = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const base: StatusView = {
   mode: "deep",
-  current: { seq: 15, tag: "removing", target: "the file temp-demo.txt", raw: "C:\\proj\\temp-demo.txt" },
-  prev: [],
-  why: null,
+  state: "live",
+  stage: "Editing",
+  sentence: "Claude is editing the statusline so live actions read like plain English.",
+  elapsed: "42s",
   warning: null,
-  thinking: false,
-  summary: null,
   budgetLeft: null,
-  elapsed: null,
+  hint: null,
 };
 
 describe("renderStatus", () => {
-  it("shows a title-cased name and mode in the header", () => {
+  it("renders a two-line HUD: a status bar then the sentence", () => {
+    const lines = plain(renderStatus(base)).split("\n");
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain("Codey");
+    expect(lines[0]).toContain("Deep");
+    expect(lines[0]).toContain("Editing");
+    expect(lines[0]).toContain("42s");
+    expect(lines[1]).toContain("Claude is editing the statusline");
+  });
+
+  it("uses a calm Title Case name and mode, not shouting", () => {
     const out = plain(renderStatus(base));
-    expect(out).toContain("Codey");
-    expect(out).toContain("Deep");
-    expect(out).not.toContain("CODEY"); // not shouting
+    expect(out).not.toContain("CODEY");
     expect(out).not.toContain("DEEP");
   });
 
-  it("shows the current task with its raw command as an indented sub-line", () => {
-    const out = plain(renderStatus(base));
-    expect(out).toContain("Current task");
-    expect(out).toContain("#15 Claude is removing the file temp-demo.txt");
-    const taskIdx = out.indexOf("#15 Claude is removing the file temp-demo.txt");
-    const rawIdx = out.indexOf("running  C:\\proj\\temp-demo.txt");
-    expect(rawIdx).toBeGreaterThan(taskIdx); // raw sits UNDER the task now
+  it("never shows a token count on the status line", () => {
+    const out = plain(renderStatus({ ...base, budgetLeft: "3.8k left", sentence: "Claude is checking the build." }));
+    expect(out).not.toMatch(/\b\d+\s*tokens?\b/i);
+    expect(out).not.toMatch(/\btok\b/i);
   });
 
-  it("lists previous tasks in past tense under their own section", () => {
+  it("aligns the done state cleanly: name, Done, final time, then a recap", () => {
     const out = plain(renderStatus({
       ...base,
-      prev: [
-        { seq: 13, tag: "reading", target: "the file rules.md", raw: "rules.md" },
-        { seq: 14, tag: "writing", target: "the file temp-demo.txt", raw: "temp-demo.txt" },
-      ],
+      state: "done",
+      stage: "Done",
+      sentence: "Finished this prompt. Open the timeline for the full breakdown.",
+      elapsed: "2m 14s",
+      hint: "/codey:timeline · /codey:costs",
     }));
-    expect(out).toContain("Previous tasks");
-    expect(out).toContain("✓ #13 read rules.md");
-    expect(out).toContain("✓ #14 wrote temp-demo.txt");
-  });
-
-  it("points at the live task and shows finished ones in past tense", () => {
-    const out = plain(renderStatus({
-      ...base,
-      prev: [{ seq: 14, tag: "reading", target: "the file rules.md", raw: "rules.md" }],
-    }));
-    expect(out).toContain("✓ #14 read rules.md");
-    expect(out).toContain("▸ #15 Claude is removing the file temp-demo.txt");
-  });
-
-  it("shows the why under an Explanation section when present", () => {
-    const out = plain(renderStatus({ ...base, why: "cleaning up the demo file" }));
-    expect(out).toContain("Explanation");
-    expect(out).toContain("cleaning up the demo file");
-  });
-
-  it("shows a Stuck section in place of the Explanation when warned", () => {
-    const out = plain(renderStatus({ ...base, why: "suppressed-why-body", warning: "stuck: same edit x3" }));
-    expect(out).toContain("Stuck");
-    expect(out).toContain("stuck: same edit x3");
-    expect(out).not.toContain("Explanation");
-    expect(out).not.toContain("suppressed-why-body");
-  });
-
-  it("renders a waiting placeholder when there is no current card", () => {
-    const out = plain(renderStatus({ mode: "simple", current: null, prev: [], why: null, warning: null, thinking: false, summary: null, budgetLeft: null, elapsed: null }));
-    expect(out).toContain("Codey");
-    expect(out).toContain("waiting for Claude");
-  });
-
-  it("shows the turn timer in the header when elapsed is set", () => {
-    const out = plain(renderStatus({ ...base, elapsed: "2m 10s" }));
-    expect(out).toContain("2m 10s");
+    const lines = out.split("\n");
+    expect(lines[0]).toContain("Codey");
+    expect(lines[0]).toContain("Done");
+    expect(lines[0]).toContain("2m 14s");
+    expect(lines[0]).not.toContain("Deep"); // the mode drops away on the close
+    expect(lines[1]).toContain("Finished this prompt.");
+    expect(out).toContain("/codey:timeline");
   });
 
   it("shows a thinking line between a prompt and the first tool", () => {
-    const out = plain(renderStatus({ ...base, thinking: true }));
+    const out = plain(renderStatus({ ...base, state: "thinking", stage: "Thinking", sentence: "Claude is thinking through your request." }));
+    expect(out).toContain("Thinking");
     expect(out).toContain("thinking through your request");
-    expect(out).not.toContain("removing"); // the live task is replaced by the thinking line
   });
 
-  it("shows a range on the number when a card stands for a grouped burst", () => {
-    const out = plain(renderStatus({
-      ...base,
-      current: { seq: 3, endSeq: 7, tag: "reading", target: "5 files (a.ts, b.ts, +3)", raw: null },
-    }));
-    expect(out).toContain("#3-7 Claude is reading 5 files (a.ts, b.ts, +3)");
+  it("lets a stuck warning take over the second line", () => {
+    const out = plain(renderStatus({ ...base, warning: "stuck: same edit x3" }));
+    const lines = out.split("\n");
+    expect(lines[1]).toContain("stuck: same edit x3");
+    expect(lines[1]).not.toContain("editing the statusline");
   });
 
-  it("clamps a very long raw command to a single line with an ellipsis", () => {
-    const longCmd = "gh pr create --base main --title " + "x".repeat(300);
-    const out = plain(renderStatus({ ...base, current: { ...base.current!, raw: longCmd } }));
-    const rawLine = out.split("\n").find((l) => l.includes("running") && l.includes("gh pr create"))!;
-    expect(rawLine).toBeDefined();
-    expect(rawLine.length).toBeLessThan(100);
-    expect(rawLine).toContain("…");
-  });
-
-  it("omits the raw sub-line when the current card has no raw", () => {
-    const out = plain(renderStatus({ ...base, current: { ...base.current!, raw: null } }));
-    expect(out).toContain("#15 Claude is removing the file temp-demo.txt");
-    expect(out).not.toContain("↳ running");
-  });
-
-  it("renders a finished-turn recap with a sentence and a completed-tasks checklist", () => {
-    const out = plain(renderStatus({
-      ...base,
-      summary: {
-        sentence: "Opened PR #18 with the per-session fixes.",
-        items: [
-          { seq: 1, tag: "asking", target: "you a question", raw: null },
-          { seq: 2, tag: "pushing", target: "the branch", raw: null },
-        ],
-      },
-    }));
-    expect(out).toContain("summary"); // the recap section rule
-    expect(out).toContain("completed tasks"); // the checklist section rule
-    expect(out).toContain("Opened PR #18 with the per-session fixes.");
-    expect(out).toContain("✓ #1 asked you a question");
-    expect(out).toContain("✓ #2 pushing the branch");
-    expect(out).not.toContain("Claude is removing"); // the live task is replaced by the summary
-  });
-
-  it("centers the recap sentence and the completed-task rows in the box", () => {
-    const lines = plain(renderStatus({
-      ...base,
-      summary: {
-        sentence: "Opened PR #18 with the per-session fixes.",
-        items: [{ seq: 1, tag: "asking", target: "you a question", raw: null }],
-      },
-    })).split("\n");
-    const sentenceLine = lines.find((l) => l.includes("Opened PR #18"))!;
-    const taskLine = lines.find((l) => l.includes("asked you a question"))!;
-    // centered lines carry leading padding past the bar, not flush like the live rows
-    expect(sentenceLine).toMatch(/│\s{3,}Opened/);
-    expect(taskLine).toMatch(/│\s{3,}✓/);
-  });
-
-  it("frames the card and closes the corner", () => {
-    const out = plain(renderStatus(base));
-    expect(out.startsWith("╭")).toBe(true);
-    expect(out.trimEnd().endsWith("╰")).toBe(true);
-  });
-
-  it("colors the frame differently per mode", () => {
-    const simple = renderStatus({ ...base, mode: "simple" });
-    const deep = renderStatus({ ...base, mode: "deep" });
-    expect(simple).not.toEqual(deep);
-  });
-
-  it("renders the Ask banner for ask mode", () => {
-    const out = plain(renderStatus({ ...base, mode: "ask" }));
-    expect(out).toContain("Ask");
-  });
-
-  it("shows the budget-left suffix in the header", () => {
+  it("shows the budget-left cue on the status bar", () => {
     const out = plain(renderStatus({ ...base, budgetLeft: "3.8k left" }));
-    expect(out).toContain("3.8k left");
+    expect(out.split("\n")[0]).toContain("3.8k left");
   });
 
-  it("omits the empty summary rule when the finished turn has no sentence", () => {
-    const out = plain(renderStatus({
-      ...base,
-      summary: { sentence: null, items: [{ seq: 1, tag: "reading", target: "the file a.ts", raw: null }] },
-    }));
-    expect(out).not.toContain("summary"); // no bare header with nothing under it
-    expect(out).toContain("completed tasks"); // the done steps still show
-    expect(out).toContain("✓ #1 read a.ts");
+  it("shows a dim hint line for ask mode", () => {
+    const out = plain(renderStatus({ ...base, mode: "ask", hint: "/codey:explain for the why" }));
+    expect(out).toContain("/codey:explain for the why");
   });
 
-  it("shows the timeline and costs affordances on the finished-turn summary", () => {
-    const out = plain(renderStatus({
-      ...base,
-      summary: { sentence: "Refactored the parser.", items: [] },
-    }));
-    expect(out).toContain("/codey:timeline");
-    expect(out).toContain("/codey:costs");
+  it("colors the bar differently per mode", () => {
+    expect(renderStatus({ ...base, mode: "simple" })).not.toEqual(renderStatus({ ...base, mode: "deep" }));
+  });
+
+  it("wraps a long sentence instead of spilling past the width", () => {
+    const long = "Claude is working through " + "several connected files ".repeat(8) + "to finish the change.";
+    const lines = plain(renderStatus({ ...base, sentence: long }, 60)).split("\n");
+    expect(lines.length).toBeGreaterThan(2);
+    for (const ln of lines) expect(ln.length).toBeLessThanOrEqual(60);
   });
 });

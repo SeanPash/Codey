@@ -18,10 +18,24 @@ describe("naiveSegment", () => {
     expect(chunks[0].startIndex).toBe(0);
   });
 
+  it("names a chunk in plain English instead of 'Working'", () => {
+    const chunks = naiveSegment([ev({ tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 })]);
+    expect(chunks[0].name).not.toBe("Working");
+    expect(chunks[0].narration).toMatch(/Claude is/);
+  });
+
+  it("splits when the work phase changes", () => {
+    const chunks = naiveSegment([
+      ev({ tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 }),
+      ev({ tool: "Edit", input: { file_path: "a.ts" }, timestamp: 2000 }),
+    ]);
+    expect(chunks.map((c) => c.startIndex)).toEqual([0, 1]);
+  });
+
   it("splits on a long idle gap", () => {
     const chunks = naiveSegment([
       ev({ timestamp: 1000 }), ev({ timestamp: 2000 }),
-      ev({ timestamp: 200000 }), // > 60s gap
+      ev({ timestamp: 200000 }), // a long pause, a fresh task
     ]);
     expect(chunks.map((c) => c.startIndex)).toEqual([0, 2]);
   });

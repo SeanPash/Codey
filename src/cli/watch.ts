@@ -10,21 +10,22 @@ import { reconcileErrors } from "../warnings/reconcile.js";
 import { formatWarning } from "../warnings/format.js";
 import { NarrationEngine, type NarrateFn } from "../narration/engine.js";
 import { runClaude } from "../narration/claude-headless.js";
-import { renderNarration, renderHeader, renderAction } from "../terminal/render.js";
-import { actionFromEvent } from "../statusline/from-event.js";
-import type { ActionLabel } from "../statusline/labels.js";
+import { renderNarration, renderHeader, renderCaption } from "../terminal/render.js";
+import { chunkEvents } from "../caption/chunks.js";
+import { buildCaption } from "../caption/caption.js";
 
 const LOOP_THRESHOLD = 5;
 const REPEAT_ERROR_THRESHOLD = 3;
 
 export interface WatchState {
   engine: NarrationEngine;
+  mode: Mode;
   lastWarningKey: string | null;
   lastActionKey: string | null;
 }
 
 export function createWatchState(mode: Mode, narrate: NarrateFn): WatchState {
-  return { engine: new NarrationEngine(mode, narrate), lastWarningKey: null, lastActionKey: null };
+  return { engine: new NarrationEngine(mode, narrate), mode, lastWarningKey: null, lastActionKey: null };
 }
 
 export function activeWarning(events: ToolEvent[], now: number): Warning | null {
@@ -45,15 +46,15 @@ export interface TickResult { lines: string[]; }
 export async function processTick(events: ToolEvent[], state: WatchState, now: number): Promise<TickResult> {
   const lines: string[] = [];
 
-  let action: ActionLabel | null = null;
-  for (let i = events.length - 1; i >= 0; i--) {
-    const a = actionFromEvent(events[i]);
-    if (a) { action = a; break; }
-  }
-  if (action) {
-    const key = `${action.tag}|${action.target}`;
+  // The live phase is the latest stage chunk. It only reprints when the phase actually
+  // changes, so a burst of reads is one "inspecting" line, not ten tool calls.
+  const chunks = chunkEvents(events);
+  const current = chunks[chunks.length - 1];
+  if (current) {
+    const caption = buildCaption(current, state.mode, null);
+    const key = `${caption.stage}|${caption.title}`;
     if (key !== state.lastActionKey) {
-      lines.push(renderAction(action));
+      lines.push(renderCaption(caption));
       state.lastActionKey = key;
     }
   }

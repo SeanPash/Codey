@@ -1,67 +1,74 @@
 import { describe, it, expect } from "vitest";
-import { feedItems, advanceFeed, renderFeedHeader } from "./render.js";
-import type { Card } from "../statusline/schedule.js";
+import { feedChunks, advanceFeed, renderFeedHeader, type FeedCursor } from "./render.js";
+import type { ToolEvent } from "../types.js";
 
 const plain = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
-const fresh = () => ({ lastSeq: 0, whysShownFor: new Set<number>(), turnsHeadered: new Set<number>(), turnsSummarized: new Set<number>() });
+const fresh = (): FeedCursor => ({ printedChunks: new Set(), turnsHeadered: new Set() });
 
-const card = (seq: number, ts: number): Card => ({
-  seq, action: { tag: "writing", target: `the file f${seq}.ts` }, raw: `f${seq}.ts`, ts,
+let auto = 0;
+const pre = (tool: string, input: unknown, ts: number): ToolEvent => ({
+  id: `e${auto++}`, phase: "pre", tool, server: null, input, inputHash: "h",
+  isError: false, errorText: null, timestamp: ts, sessionId: "s1",
 });
 
-describe("feedItems", () => {
-  it("attaches each why to the card whose window it falls in and keeps the ts", () => {
-    const cards = [card(1, 0), card(2, 100)];
-    const items = feedItems(cards, [{ ts: 50, why: "first why" }, { ts: 150, why: "second why" }]);
-    expect(items).toEqual([
-      { seq: 1, ts: 0, tag: "writing", target: "the file f1.ts", why: "first why" },
-      { seq: 2, ts: 100, tag: "writing", target: "the file f2.ts", why: "second why" },
-    ]);
+describe("feedChunks", () => {
+  it("groups a turn's events into stage chunks and captions them", () => {
+    const events = [
+      pre("Read", { file_path: "a.ts" }, 10),
+      pre("Read", { file_path: "b.ts" }, 20),
+      pre("Edit", { file_path: "a.ts" }, 30),
+    ];
+    const chunks = feedChunks(events, [5], [], "simple");
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0].caption.stage).toBe("inspecting");
+    expect(chunks[1].caption.stage).toBe("editing");
+    expect(chunks[0].step).toBe(1);
+    expect(chunks[1].step).toBe(2);
   });
 
-  it("leaves why null when none falls in the window", () => {
-    const items = feedItems([card(1, 0)], []);
-    expect(items[0].why).toBeNull();
+  it("separates chunks by the prompt they belong to", () => {
+    const chunks = feedChunks([pre("Read", { file_path: "a.ts" }, 10), pre("Read", { file_path: "b.ts" }, 200)], [5, 150], [], "simple");
+    expect(chunks.map((c) => c.turn)).toEqual([1, 2]);
+  });
+
+  it("attaches the in-window why and grows the caption with the mode", () => {
+    const chunks = feedChunks([pre("Edit", { file_path: "a.ts" }, 10)], [5], [{ ts: 12, why: "Real reason here." }], "deep");
+    expect(chunks[0].caption.deep).toBe("Real reason here.");
   });
 });
 
-describe("advanceFeed turns", () => {
-  it("prints a turn header before the first card of a turn", () => {
-    const items = feedItems([card(1, 10)], []);
-    const out = plain(advanceFeed(items, fresh(), [10]).text);
-    expect(out).toContain("Turn 1");
-    expect(out).toContain("#1");
+describe("advanceFeed", () => {
+  it("prints a sealed chunk under its prompt header", () => {
+    const chunks = feedChunks([
+      pre("Read", { file_path: "a.ts" }, 10),
+      pre("Edit", { file_path: "a.ts" }, 20),
+    ], [5], [], "simple");
+    const out = plain(advanceFeed(chunks, fresh()).text);
+    expect(out).toContain("Prompt 1");
+    expect(out).toContain("1."); // the inspecting chunk is sealed by the editing chunk
+    expect(out).toContain("Reading");
   });
 
-  it("starts a new turn header when a later prompt boundary is crossed", () => {
-    const items = feedItems([card(1, 10), card(2, 200)], []);
-    const out = plain(advanceFeed(items, fresh(), [10, 150]).text);
-    expect(out).toContain("Turn 1");
-    expect(out).toContain("Turn 2");
+  it("holds the live tail chunk until a later chunk seals it", () => {
+    const chunks = feedChunks([pre("Read", { file_path: "a.ts" }, 10)], [5], [], "simple");
+    const out = plain(advanceFeed(chunks, fresh()).text);
+    expect(out).toBe(""); // the only chunk is still the live tail, nothing sealed yet
   });
 
-  it("indents each why under its own card", () => {
-    const items = feedItems([card(1, 10)], [{ ts: 12, why: "scratch file" }]);
-    const out = plain(advanceFeed(items, fresh(), [10]).text);
-    const lines = out.split("\n");
-    const cardIdx = lines.findIndex((l) => l.includes("#1"));
-    const whyIdx = lines.findIndex((l) => l.includes("scratch file"));
-    expect(whyIdx).toBe(cardIdx + 1); // why sits directly under its card
+  it("flushes everything, including the tail, when sealAll is set", () => {
+    const chunks = feedChunks([pre("Read", { file_path: "a.ts" }, 10)], [5], [], "simple");
+    const out = plain(advanceFeed(chunks, fresh(), true).text);
+    expect(out).toContain("Reading");
   });
 
-  it("appends a summary once a turn is closed by a later turn", () => {
-    const items = feedItems([card(1, 10), card(2, 200)], [{ ts: 12, why: "did the thing" }]);
-    const out = plain(advanceFeed(items, fresh(), [10, 150]).text);
-    expect(out).toContain("summary");
-    expect(out).toContain("✓ #1");
-    expect(out).toContain("✓ #1 wrote f1.ts");
-  });
-
-  it("does not repeat a header or summary across calls", () => {
-    const items = feedItems([card(1, 10), card(2, 200)], []);
-    const first = advanceFeed(items, fresh(), [10, 150]);
-    const second = advanceFeed(items, first.cursor, [10, 150]);
-    expect(second.text).toBe(""); // nothing new to print
+  it("does not reprint a chunk or header across calls", () => {
+    const chunks = feedChunks([
+      pre("Read", { file_path: "a.ts" }, 10),
+      pre("Edit", { file_path: "a.ts" }, 20),
+    ], [5], [], "simple");
+    const first = advanceFeed(chunks, fresh());
+    const second = advanceFeed(chunks, first.cursor);
+    expect(second.text).toBe("");
   });
 });
 
