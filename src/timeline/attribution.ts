@@ -1,9 +1,20 @@
 import type { ReceiptLine, TokenBreakdown } from "../types.js";
 import type { AssistantTurn } from "./transcript.js";
+import { classifyStage } from "../caption/stage.js";
+import { humanFile, phrasePattern, purposeTitle, purposeSentence } from "../caption/subject.js";
+import { actionLabel, shortTarget } from "../statusline/labels.js";
 
 function basename(p: string): string {
   const parts = p.split(/[\\/]/);
   return parts[parts.length - 1] || p;
+}
+
+function patternFrom(input: unknown): string | null {
+  if (input && typeof input === "object") {
+    const p = (input as Record<string, unknown>).pattern;
+    if (typeof p === "string") return p;
+  }
+  return null;
 }
 
 function fileFrom(input: unknown): string | null {
@@ -61,11 +72,38 @@ export function describeAction(tool: string | null, input: unknown): string {
     case "Bash":
     case "PowerShell": return descFrom(input) ?? "Ran a command";
     case "Grep":
-    case "Glob": return "Searched the code";
+    case "Glob": {
+      const p = patternFrom(input);
+      return p ? `Searched for ${phrasePattern(p)}` : "Searched the code";
+    }
   }
   const m = /^mcp__([^_]+)__(.+)$/.exec(tool);
   if (m) return `${prettify(m[2])} via ${m[1]}`;
   return tool;
+}
+
+// The subject one action is about: a search pattern phrased plainly, a file as a readable
+// noun, otherwise the friendly target of the action ("the tests", "git status").
+function actionSubject(tool: string, input: unknown): string {
+  if (tool === "Grep" || tool === "Glob") return phrasePattern(patternFrom(input) ?? "");
+  const file = fileFrom(input);
+  if (file) return humanFile(file);
+  return humanFile(shortTarget(actionLabel(tool, input).target)) || "the code";
+}
+
+// The collapsed-card headline for one action: a stable purpose label, never the raw tool.
+export function actionTitle(tool: string | null, input: unknown): string {
+  if (!tool || tool === "thinking") return "Thinking it through";
+  return purposeTitle(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
+}
+
+// One plain sentence under the title. A shell command carries Claude's own description, the
+// best sentence available; everything else gets a purpose sentence built from the subject.
+export function actionSubtitle(tool: string | null, input: unknown): string {
+  if (!tool || tool === "thinking") return "Working through the approach before acting.";
+  const desc = descFrom(input);
+  if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
+  return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 
 // The full detail behind an action, revealed on expand: the command for Bash, the path for
@@ -112,6 +150,8 @@ export function attributeChunk(turns: AssistantTurn[], startTs: number, endTs: n
     const isFail = !!(t.tool && t.tool !== "thinking" && t.isError);
     workLines.push({
       label: describeAction(t.tool, t.input),
+      title: actionTitle(t.tool, t.input),
+      subtitle: actionSubtitle(t.tool, t.input),
       tool: t.tool ?? "thinking",
       tokens: t.outputTokens,
       status: t.tool && t.tool !== "thinking" ? (t.isError ? "fail" : "ok") : "none",

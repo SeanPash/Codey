@@ -12,10 +12,10 @@ describe("processTick caption line", () => {
     const state = createWatchState("simple", async () => null);
     const a = ev({ id: "0", tool: "Edit", input: { file_path: "/x/auth.ts" }, inputHash: "h0" });
     const first = await processTick([a], state, 100);
-    expect(first.lines.some((l) => l.includes("Editing") && l.includes("auth.ts"))).toBe(true);
+    expect(first.lines.some((l) => l.includes("Updating") && l.includes("auth.ts"))).toBe(true);
 
     const second = await processTick([a], state, 200);
-    expect(second.lines.some((l) => l.includes("Editing"))).toBe(false); // same phase, deduped
+    expect(second.lines.some((l) => l.includes("Updating"))).toBe(false); // same phase, deduped
   });
 });
 

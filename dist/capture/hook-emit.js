@@ -124,6 +124,29 @@ function readStatus(dir) {
   }
 }
 
+// src/caption/subject.ts
+function joinNames(names, max = 4) {
+  const list = names.filter(Boolean);
+  if (list.length === 0) return "";
+  if (list.length === 1) return list[0];
+  if (list.length === 2) return `${list[0]} and ${list[1]}`;
+  if (list.length <= max) return `${list.slice(0, -1).join(", ")}, and ${list[list.length - 1]}`;
+  const shown = list.slice(0, max - 1);
+  return `${shown.join(", ")}, and ${list.length - shown.length} more`;
+}
+function patternTokens(pattern) {
+  return pattern.replace(/\\[a-z]/gi, " ").split(/[^A-Za-z0-9_]+/).filter((t) => t.length >= 2);
+}
+var EXT_NOISE = /* @__PURE__ */ new Set(["js", "ts", "jsx", "tsx", "mjs", "cjs", "json", "md", "css", "html"]);
+function phrasePattern(pattern) {
+  const raw = (pattern ?? "").trim();
+  if (!raw) return "the code";
+  if (/[\\()\[\]+?^$]/.test(raw)) return "the code";
+  const tokens = patternTokens(raw).filter((t) => !EXT_NOISE.has(t.toLowerCase()));
+  if (tokens.length === 0 || tokens.length > 4) return "the code";
+  return joinNames(tokens);
+}
+
 // src/statusline/labels.ts
 function basename(p) {
   const parts = p.replace(/["']/g, "").split(/[\\/]/);
@@ -239,7 +262,8 @@ function actionLabel(tool, input) {
     case "Grep":
     case "Glob": {
       const p = str(input, "pattern");
-      if (p && /^[\w.\-/ ]+$/.test(p) && p.length <= 40) return { tag: "searching for", target: p };
+      const phrased = phrasePattern(p ?? "");
+      if (phrased !== "the code") return { tag: "searching for", target: phrased };
       return tool === "Glob" ? { tag: "looking for", target: "files" } : { tag: "searching", target: "the code" };
     }
   }

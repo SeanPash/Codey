@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { describeAction, rawDetail, failSummaryFrom, attributeChunk } from "./attribution.js";
+import { describeAction, actionTitle, actionSubtitle, rawDetail, failSummaryFrom, attributeChunk } from "./attribution.js";
 import type { AssistantTurn } from "./transcript.js";
 
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
@@ -27,6 +27,36 @@ describe("describeAction", () => {
   it("labels a non-tool / thinking turn", () => {
     expect(describeAction(null, null)).toBe("Thinking it through");
     expect(describeAction("thinking", null)).toBe("Thinking it through");
+  });
+  it("phrases a search pattern instead of a flat 'searched the code'", () => {
+    expect(describeAction("Grep", { pattern: "validateUser" })).toBe("Searched for validateUser");
+    expect(describeAction("Glob", { pattern: "**/watch*" })).toBe("Searched for watch");
+  });
+});
+
+describe("actionTitle", () => {
+  it("frames file work as a purpose, not the tool", () => {
+    expect(actionTitle("Write", { file_path: "/p/math.js" })).toBe("Adding math.js");
+    expect(actionTitle("Edit", { file_path: "/p/math.test.js" })).toBe("Updating math tests");
+    expect(actionTitle("Read", { file_path: "/p/render.ts" })).toBe("Checking render.ts");
+  });
+  it("frames a search by what it looks for", () => {
+    expect(actionTitle("Grep", { pattern: "validateUser" })).toBe("Checking validateUser");
+  });
+  it("calls a thinking turn what it is", () => {
+    expect(actionTitle("thinking", null)).toBe("Thinking it through");
+    expect(actionTitle(null, null)).toBe("Thinking it through");
+  });
+});
+
+describe("actionSubtitle", () => {
+  it("uses the command's own description when present", () => {
+    expect(actionSubtitle("Bash", { command: "node test.js", description: "Run the demo math tests" }))
+      .toBe("Run the demo math tests.");
+  });
+  it("names the real subject for a file or search", () => {
+    expect(actionSubtitle("Read", { file_path: "/p/render.ts" })).toMatch(/render\.ts/);
+    expect(actionSubtitle("Grep", { pattern: "validateUser" })).toMatch(/validateUser/);
   });
 });
 

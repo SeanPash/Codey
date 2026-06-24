@@ -3,7 +3,8 @@ import { groupThinking } from "./grouping.js";
 import type { ReceiptLine } from "../types.js";
 
 function line(p: Partial<ReceiptLine>): ReceiptLine {
-  return { label: "", tool: "thinking", tokens: 0, status: "none", errorText: null, resolved: false,
+  return { label: "", title: "Thinking it through", subtitle: "Working through the approach before acting.",
+    tool: "thinking", tokens: 0, status: "none", errorText: null, resolved: false,
     raw: null, why: null, failSummary: null, ts: 0, thoughtFirst: false, ...p };
 }
 

@@ -1,3 +1,5 @@
+import { phrasePattern } from "../caption/subject.js";
+
 export interface ActionLabel {
   tag: string; // a verb phrase: reading, editing, removing, searching for, ...
   target: string; // the thing being acted on, phrased as plain English
@@ -150,9 +152,10 @@ export function actionLabel(tool: string, input: unknown): ActionLabel {
     case "Grep":
     case "Glob": {
       const p = str(input, "pattern");
-      // A plain word or path reads fine ("searching for validateUser"); a regex or glob
-      // full of metacharacters does not, so fall back to a generic phrase for those.
-      if (p && /^[\w.\-/ ]+$/.test(p) && p.length <= 40) return { tag: "searching for", target: p };
+      // Phrase the pattern into a readable subject ("watch, render, and web"); a dense regex
+      // or extension-only glob has no readable subject, so fall back to a generic phrase.
+      const phrased = phrasePattern(p ?? "");
+      if (phrased !== "the code") return { tag: "searching for", target: phrased };
       return tool === "Glob"
         ? { tag: "looking for", target: "files" }
         : { tag: "searching", target: "the code" };

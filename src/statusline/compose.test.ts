@@ -119,14 +119,14 @@ describe("composeView done", () => {
 });
 
 describe("composeView live phase", () => {
-  it("reports the current stage from the latest chunk", () => {
+  it("leads the chip with the current purpose from the latest chunk", () => {
     const events = [
       pre("a", "Read", { file_path: "a.ts" }, 0),
       pre("b", "Edit", { file_path: "b.ts" }, 100),
     ];
     const view = composeView(events, snap(), 1000);
     expect(view.state).toBe("live");
-    expect(view.stage).toBe("Editing");
+    expect(view.stage).toBe("Updating b.ts");
   });
 
   it("scopes the live phase to the current turn", () => {
@@ -135,7 +135,7 @@ describe("composeView live phase", () => {
       pre("b", "Read", { file_path: "b.ts" }, 200), // this turn
     ];
     const view = composeView(events, snap({ promptAt: 150 }), 60000);
-    expect(view.stage).toBe("Inspecting");
+    expect(view.stage).toBe("Checking b.ts");
   });
 
   it("is idle with no events to show", () => {

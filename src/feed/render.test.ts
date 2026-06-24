@@ -46,7 +46,7 @@ describe("advanceFeed", () => {
     const out = plain(advanceFeed(chunks, fresh()).text);
     expect(out).toContain("Prompt 1");
     expect(out).toContain("1."); // the inspecting chunk is sealed by the editing chunk
-    expect(out).toContain("Reading");
+    expect(out).toContain("Checking");
   });
 
   it("holds the live tail chunk until a later chunk seals it", () => {
@@ -58,7 +58,7 @@ describe("advanceFeed", () => {
   it("flushes everything, including the tail, when sealAll is set", () => {
     const chunks = feedChunks([pre("Read", { file_path: "a.ts" }, 10)], [5], [], "simple");
     const out = plain(advanceFeed(chunks, fresh(), true).text);
-    expect(out).toContain("Reading");
+    expect(out).toContain("Checking");
   });
 
   it("does not reprint a chunk or header across calls", () => {

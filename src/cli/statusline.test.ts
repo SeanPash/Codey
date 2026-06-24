@@ -28,7 +28,7 @@ describe("statusLineFor", () => {
   it("renders the live phase and why from events plus the snapshot", () => {
     const out = plain(statusLineFor(seed(), 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("Editing"); // the stage chip, deep mode
+    expect(out).toContain("Updating"); // the purpose chip, deep mode
     expect(out).toContain("adding validation"); // the live why is the deep sentence
   });
 
@@ -50,7 +50,7 @@ describe("lineForSession", () => {
     writeSessionMode("simple", dir);
     const out = plain(lineForSession("s1", root, 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("Editing"); // the stage chip
+    expect(out).toContain("Updating"); // the purpose chip
   });
 
   it("renders blank when no session is given (no payload session id)", () => {

@@ -29,9 +29,9 @@ function actionInstruction(depth: ExplainDepth): string {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this single step and why.";
     case "teach":
-      return "In a few plain English sentences for someone learning to code, explain what Claude did in this single step and why, then briefly teach the key concept involved (define any technical term you use).";
+      return "Explain this single step for someone learning to code, in three labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why Claude did it. Start the next line with 'How Claude did it:' then one or two sentences on how the step works. Start a final line with 'Concept:' then briefly teach the key concept involved and define any technical term you use.";
     default:
-      return "In a few plain English sentences for a non-technical person, explain what Claude did in this single step, why it matters, and how it works.";
+      return "Explain this single step for a non-technical person, in two labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why this step matters. Start the next line with 'How Claude did it:' then one or two sentences on how the step works.";
   }
 }
 

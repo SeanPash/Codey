@@ -192,7 +192,9 @@
     .rhead .ttl { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink2); font-weight:600; }
     .rhead .colh { margin-left:auto; font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
     .rhead .tot { color:var(--ink2); font-weight:600; font-size:12px; margin-left:14px; }
-    .rline { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid var(--hair); transition:background .15s; }
+    .rline { display:flex; align-items:flex-start; gap:10px; padding:9px 14px; border-bottom:1px solid var(--hair); transition:background .15s; }
+    .rline > .lchev, .rline > .sw { margin-top:3px; }
+    .rline > .tag, .rline > .num, .rline > .st { margin-top:1px; }
     .rline.can, .rline.brow { cursor:pointer; }
     .rline.can:hover, .rline.brow:hover, .rline.lo { background:var(--surf-h); }
     /* a burst: one row standing in for a run of same-kind steps, expanding to the real rows */
@@ -207,7 +209,12 @@
     .sw { width:6px;height:6px;border-radius:2px;background:var(--faint);flex:none; }
     .sw.think { background:var(--muted); }
     .sw.fail { background:var(--coral); box-shadow:0 0 7px rgba(240,101,79,.5); }
-    .lbl { flex:1; font-size:12.5px; color:var(--ink2); }
+    /* a work line is a compact stack: purpose title, plain sentence, then small file/tool/time */
+    .lmain { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+    .lbl { font-size:12.5px; color:var(--ink); font-weight:600; line-height:1.3; }
+    .lsub { font-size:11.5px; color:var(--body); line-height:1.45; }
+    .lmeta { font-size:10px; color:var(--muted); letter-spacing:.02em; }
+    .lmeta .f { font-family:ui-monospace,monospace; color:var(--ink2); }
     .tag { font-size:10px; font-family:ui-monospace,monospace; padding:2px 7px; border-radius:5px; flex:none; }
     .tag.tool { background:var(--surf-h); color:var(--ink2); border:1px solid var(--line); }
     .tag.think { background:var(--surf-h); color:var(--muted); border:1px solid var(--line); }
@@ -352,10 +359,27 @@
     .gpaused { margin-top:13px; font-size:12px; color:var(--body); background:var(--surf); border:1px solid var(--line); border-radius:9px; padding:10px 12px; line-height:1.55; }
     .gpaused b { color:var(--warn); }
 
-    /* per-action explain control, inside the expanded line detail */
-    .whybtn { font:inherit; font-size:11px; font-weight:600; color:var(--ink2); background:var(--surf-h); border:1px solid var(--line); border-radius:7px; padding:4px 11px; cursor:pointer; }
+    /* per-action explain controls, inside the expanded line detail */
+    .lacts { display:flex; gap:8px; flex-wrap:wrap; }
+    .whybtn { font:inherit; font-size:11px; font-weight:600; color:var(--ink2); background:var(--surf-h); border:1px solid var(--line); border-radius:7px; padding:5px 12px; cursor:pointer; }
     .whybtn:hover { background:var(--inset); border-color:var(--muted); }
-    .ld .lv.gen { color:var(--ink2); }
+    .whybtn.primary { color:var(--ink); border-color:var(--muted); }
+    /* "show raw details" is the secondary action: quieter than explain */
+    .rawbtn { font:inherit; font-size:11px; font-weight:500; color:var(--muted); background:transparent; border:1px solid var(--line); border-radius:7px; padding:5px 12px; cursor:pointer; }
+    .rawbtn:hover { color:var(--ink2); border-color:var(--muted); }
+    /* the generated explanation, organized into labeled sections */
+    .expls { margin-top:10px; display:flex; flex-direction:column; gap:11px; }
+    .expls.paused { font-size:12px; color:var(--body); line-height:1.55; }
+    .expls.paused b { color:var(--warn); }
+    .exs .exh { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:4px; }
+    .exs .ext { font-size:12.5px; color:var(--ink2); line-height:1.6; white-space:pre-wrap; }
+    /* raw command/path/error, tucked behind "show raw details" so it never dominates */
+    .rawbox { margin-top:10px; display:flex; flex-direction:column; gap:7px; }
+    .rd { display:flex; gap:9px; align-items:baseline; }
+    .rd .rk { flex:none; width:72px; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding-top:2px; }
+    .rd .rv { font-size:12px; color:var(--body); line-height:1.5; flex:1; }
+    .rd code { font-family:ui-monospace,monospace; font-size:11.5px; color:var(--ink2); background:var(--inset); border:1px solid var(--line); border-radius:6px; padding:5px 8px; white-space:pre-wrap; word-break:break-word; flex:1; }
+    .rd.err code { color:var(--coral); border-color:rgba(240,101,79,.28); background:rgba(240,101,79,.05); }
 
     /* closing recap on a prompt group */
     .recap { margin-top:13px; background:var(--inset); border:1px solid var(--line); border-radius:var(--r-card); padding:11px 13px; }
@@ -616,6 +640,7 @@
     const closedByUser = new Set();// live chunk ids the user manually collapsed (overrides auto-open)
     let liveOpenId = null;         // the running task, auto-opened so its current step shows
     const lineOpen = new Set();    // expanded work lines, key "chunkId:idx"
+    const rawOpen = new Set();     // work lines showing raw command/path/error, key "chunkId:idx"
     const burstOpen = new Set();   // expanded bursts (runs of same-activity steps), key "chunkId|bStart"
     const workCollapsed = new Set();// folded work lists, by chunk id (default expanded)
     const confirmed = new Map();   // chunk id -> intervention action (survives the live re-render)
@@ -712,7 +737,7 @@
       if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(curDepth())}</span></div><div class="etext">${esc(cached)}</div></div>`;
       if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(curDepth())} depth…</span></div>`;
       if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining. Raise it with <b>/codey:budget &lt;n&gt;</b> in your terminal, then try again.</div>`;
-      return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}"><span class="ic">&#9670;</span> Explain why &amp; how</button>`
+      return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}"><span class="ic">&#9670;</span> Explain this task</button>`
         + `<div class="genhint">Generates a ${esc(curDepth())} explanation. Uses your Codey tokens.</div></div>`;
     }
 
@@ -846,27 +871,83 @@
     // ---- Receipt ----
     function actionCount(receipt) { return receipt.workLines.filter((l) => l.status !== "none").length; }
 
-    // The per-action why/how line: cached text, a spinner, a budget notice, or the button.
-    function actionWhy(c, idx) {
-      if (view !== "single") return "";
-      const id = c.id + "#" + idx;
-      const key = ekey("action", id);
-      const cached = explCache.get(key);
-      if (cached) return `<div class="ld"><span class="lk">why &amp; how</span><span class="lv gen">${esc(cached)}</span></div>`;
-      if (explLoading.has(key)) return `<div class="ld"><span class="lk">why &amp; how</span><span class="lv"><span class="gening"><span class="spin"></span>Explaining…</span></span></div>`;
-      if (budgetPaused) return `<div class="ld"><span class="lk">why &amp; how</span><span class="lv" style="color:var(--amber)">Budget reached. Raise it with /codey:budget.</span></div>`;
-      return `<div class="ld"><span class="lk"></span><span class="lv"><button class="whybtn" type="button" data-gen-scope="action" data-gen-id="${esc(id)}">Explain this step</button></span></div>`;
+    function baseName(p) {
+      const a = String(p).replace(/["']/g, "").split(/[\\/]/);
+      return a[a.length - 1] || String(p);
     }
 
+    // The compact metadata under a row's title: the real file or command, the tool, the time.
+    function metaSubject(l) {
+      if (!l.raw) return "";
+      if (["Read", "Edit", "MultiEdit", "Write", "NotebookEdit"].includes(l.tool)) return baseName(l.raw);
+      const one = String(l.raw).split("\n")[0];
+      return one.length > 44 ? one.slice(0, 43) + "…" : one;
+    }
+    function lineMeta(l) {
+      const bits = [];
+      const s = metaSubject(l);
+      if (s) bits.push(`<span class="f">${esc(s)}</span>`);
+      if (l.tool && l.tool !== "thinking") bits.push(esc(l.tool));
+      if (l.ts) bits.push(esc(fmtClockSec(l.ts)));
+      return bits.join(" · ");
+    }
+
+    // Split a generated step explanation into its labeled parts (Why this mattered / How Claude
+    // did it / Concept). The model is asked for those labels; if they are missing we show the
+    // whole text under one heading, so the panel always reads cleanly.
+    function explainSections(text) {
+      const t = String(text).trim();
+      const re = /(why this mattered|how claude did it|concept)\s*:/ig;
+      const hits = [];
+      let m;
+      while ((m = re.exec(t))) hits.push({ label: m[1].toLowerCase(), at: m.index, end: re.lastIndex });
+      const heading = { "why this mattered": "Why this mattered", "how claude did it": "How Claude did it", "concept": "Concept used" };
+      if (!hits.length) return `<div class="exs"><div class="exh">Why this mattered</div><div class="ext">${esc(t)}</div></div>`;
+      let html = "";
+      for (let i = 0; i < hits.length; i++) {
+        const seg = t.slice(hits[i].end, i + 1 < hits.length ? hits[i + 1].at : undefined).trim();
+        if (seg) html += `<div class="exs"><div class="exh">${esc(heading[hits[i].label])}</div><div class="ext">${esc(seg)}</div></div>`;
+      }
+      return html;
+    }
+
+    // The "Explain this step" button, shown until an explanation is generated or loading.
+    function actionWhyBtn(c, idx) {
+      if (view !== "single") return "";
+      const key = ekey("action", c.id + "#" + idx);
+      if (explCache.has(key) || explLoading.has(key) || budgetPaused) return "";
+      return `<button class="whybtn primary" type="button" data-gen-scope="action" data-gen-id="${esc(c.id + "#" + idx)}">Explain this step</button>`;
+    }
+    // The generated why/how panel for a step: cached sections, a spinner, or a budget notice.
+    function actionWhyOut(c, idx) {
+      if (view !== "single") return "";
+      const key = ekey("action", c.id + "#" + idx);
+      const cached = explCache.get(key);
+      if (cached) return `<div class="expls">${explainSections(cached)}</div>`;
+      if (explLoading.has(key)) return `<div class="expls"><span class="gening"><span class="spin"></span>Explaining at ${esc(curDepth())} depth…</span></div>`;
+      if (budgetPaused) return `<div class="expls paused">Budget reached, so Codey paused explaining. Raise it with <b>/codey:budget</b>, then try again.</div>`;
+      return "";
+    }
+
+    // The expanded panel under a row: the explain/raw buttons first, then the generated
+    // explanation, then the raw command/path/error tucked behind "Show raw details".
     function lineDetail(c, l, idx) {
-      const parts = [];
-      if (l.thoughtFirst) parts.push(`<div class="ld"><span class="lk">first</span><span class="lv">Claude paused to think before this step.</span></div>`);
-      if (l.ts) parts.push(`<div class="ld"><span class="lk">at</span><span class="lv">${fmtClockSec(l.ts)}</span></div>`);
-      if (l.raw) parts.push(`<div class="ld"><span class="lk">ran</span><code>${esc(l.raw)}</code></div>`);
-      if (l.why) parts.push(`<div class="ld"><span class="lk">Claude's note</span><span class="lv">${esc(l.why)}</span></div>`);
-      if (l.status === "fail" && l.errorText) parts.push(`<div class="ld err"><span class="lk">error</span><code>${esc(l.errorText)}</code></div>`);
-      parts.push(actionWhy(c, idx));
-      return `<div class="ldetail">${parts.join("")}</div>`;
+      const key = c.id + ":" + idx;
+      const rawShown = rawOpen.has(key);
+      const hasRaw = !!(l.raw || l.why || l.thoughtFirst || (l.status === "fail" && l.errorText));
+      const rawBtn = hasRaw
+        ? `<button class="rawbtn" type="button" data-raw="${esc(key)}">${rawShown ? "Hide raw details" : "Show raw details"}</button>` : "";
+      const acts = `<div class="lacts">${actionWhyBtn(c, idx)}${rawBtn}</div>`;
+
+      const raw = [];
+      if (rawShown) {
+        if (l.thoughtFirst) raw.push(`<div class="rd"><span class="rk">first</span><span class="rv">Claude paused to think before this step.</span></div>`);
+        if (l.raw) raw.push(`<div class="rd"><span class="rk">ran</span><code>${esc(l.raw)}</code></div>`);
+        if (l.why) raw.push(`<div class="rd"><span class="rk">Claude's note</span><span class="rv">${esc(l.why)}</span></div>`);
+        if (l.status === "fail" && l.errorText) raw.push(`<div class="rd err"><span class="rk">error</span><code>${esc(l.errorText)}</code></div>`);
+      }
+      const rawBox = raw.length ? `<div class="rawbox">${raw.join("")}</div>` : "";
+      return `<div class="ldetail">${acts}${actionWhyOut(c, idx)}${rawBox}</div>`;
     }
 
     function workLineHtml(c, l, idx, isCur) {
@@ -884,8 +965,15 @@
       const chev = canExpand ? `<span class="lchev">${lo ? "&#9662;" : "&#9656;"}</span>` : `<span class="lchev sp"></span>`;
       const fail = l.status === "fail" && l.failSummary
         ? `<div class="failnote">${esc(l.failSummary)}${l.resolved ? ' <span class="note">&middot; recovered on the next try</span>' : ""}</div>` : "";
+      const meta = lineMeta(l);
+      // The collapsed row reads top to bottom: purpose title, the plain sentence, then the small
+      // file/tool/time line. It is understandable without expanding; expanding only adds depth.
+      const main = `<div class="lmain"><span class="lbl">${esc(l.title)}</span>`
+        + `<span class="lsub">${esc(l.subtitle)}</span>`
+        + (meta ? `<span class="lmeta">${meta}</span>` : "")
+        + `</div>`;
       return `<div class="rline${canExpand ? " can" : ""}${lo ? " lo" : ""}${isCur ? " cur" : ""}" data-line="${esc(key)}">`
-        + `${chev}<span class="${sw}"></span><span class="lbl">${esc(l.label)}</span>${tag}<span class="num">${fmt(l.tokens)}</span>${st}</div>`
+        + `${chev}<span class="${sw}"></span>${main}${tag}<span class="num">${fmt(l.tokens)}</span>${st}</div>`
         + fail + (lo ? lineDetail(c, l, idx) : "");
     }
 
@@ -920,11 +1008,22 @@
       return out;
     }
 
-    // A human summary for a folded run of same-tool steps, e.g. "Read 3 files", "Ran 3 commands".
+    // A purpose summary for a folded run of same-tool steps, framed by intent rather than tool:
+    // "Creating 4 files", "Checking 3 files", "Running 3 commands".
     function burstSummary(tool, n) {
-      const m = { Read: "Read " + n + " files", Edit: "Edited " + n + " files", Write: "Wrote " + n + " files",
-        Bash: "Ran " + n + " commands", Grep: "Ran " + n + " searches", Glob: "Ran " + n + " searches" };
-      return m[tool] || (n + " " + tool + " steps");
+      const m = { Read: "Checking " + n + " files", Edit: "Updating " + n + " files", Write: "Creating " + n + " files",
+        NotebookEdit: "Updating " + n + " files",
+        Bash: "Running " + n + " commands", Grep: "Searching " + n + " times", Glob: "Searching " + n + " times" };
+      return m[tool] || ("Working through " + n + " " + tool + " steps");
+    }
+
+    // The list of names a burst touched, for its subtitle ("math.js, string.js, and 2 more").
+    function burstSubtitle(items) {
+      const names = items.map((it) => metaSubject(it.l)).filter(Boolean);
+      if (!names.length) return "A run of related steps, folded together.";
+      const head = names.slice(0, 3).join(", ");
+      const extra = names.length > 3 ? `, and ${names.length - 3} more` : "";
+      return `Worked on ${head}${extra}.`;
     }
 
     // One collapsed burst: a parent row that summarizes the run, expanding to the real child rows.
@@ -942,8 +1041,11 @@
       const st = anyFail ? '<span class="st fail">fail</span>' : '<span class="st ok">&#10003;</span>';
       const children = isOpen
         ? `<div class="bchildren">${g.items.map((it) => workLineHtml(c, it.l, it.idx, it.idx === curIdx)).join("")}</div>` : "";
+      const main = `<div class="lmain"><span class="lbl">${esc(burstSummary(head.tool, g.items.length))}</span>`
+        + `<span class="lsub">${esc(burstSubtitle(g.items))}</span>`
+        + `<span class="lmeta">${g.items.length} ${head.tool === "thinking" ? "steps" : "items"} · ${esc(head.tool)}</span></div>`;
       return `<div class="rline brow${isOpen ? " lo" : ""}" data-burst="${esc(key)}">`
-        + `${chev}<span class="${sw}"></span><span class="lbl">${esc(burstSummary(head.tool, g.items.length))}</span>`
+        + `${chev}<span class="${sw}"></span>${main}`
         + `<span class="tag steps">${g.items.length} steps</span><span class="num">${fmt(tokens)}</span>${st}</div>`
         + children;
     }
@@ -1349,6 +1451,7 @@
       wire(".js-work", (el) => { const id = el.dataset.id; workCollapsed.has(id) ? workCollapsed.delete(id) : workCollapsed.add(id); });
       wire(".rline.can", (el) => { const k = el.dataset.line; lineOpen.has(k) ? lineOpen.delete(k) : lineOpen.add(k); });
       wire(".rline.brow", (el) => { const k = el.dataset.burst; burstOpen.has(k) ? burstOpen.delete(k) : burstOpen.add(k); });
+      wire(".rawbtn", (el) => { const k = el.dataset.raw; rawOpen.has(k) ? rawOpen.delete(k) : rawOpen.add(k); });
     }
 
     function wireIntervention(scope) {
