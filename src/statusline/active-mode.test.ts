@@ -79,6 +79,16 @@ describe("inheritedMode", () => {
     expect(inheritedMode(null, "new", root)).toBeNull();
   });
 
+  it("does not inherit from a prior session that has been idle past the window", () => {
+    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
+    writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/proj" }, root);
+    writeSessionMode("deep", join(root, "old"));
+    // Pretend we are asking far in the future: the prior session is stale, so a fresh terminal
+    // starts off and the user must opt in again rather than silently resuming deep.
+    const farFuture = Date.now() + 60 * 60_000;
+    expect(inheritedMode("/proj", "new", root, farFuture)).toBeNull();
+  });
+
   it("picks the most recently active session when several share the cwd", () => {
     const root = mkdtempSync(join(tmpdir(), "codey-root-"));
     writeMetaIfAbsent({ sessionId: "older", transcriptPath: null, cwd: "/proj" }, root);

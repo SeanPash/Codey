@@ -63,7 +63,9 @@ export function turnOn(mode: Mode, session: string): void {
   mkdirSync(dir, { recursive: true });
   stopNarrator(pidPath(dir));
   writeSessionMode(mode, dir); // marks this session on, and stores its mode for the status line
-  patchStatus(dir, { mode }); // also seed the snapshot for an instant render
+  // Switching modes starts clean: seed the new mode and drop the previous turn's recap, explanation,
+  // action, and done-stamp so the line reads as the new mode at once instead of carrying old text over.
+  patchStatus(dir, { mode, why: null, action: null, warning: null, doneAt: null });
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   // detached lets the narrator outlive the slash command's process tree (Claude Code kills
   // that tree when the command returns). stdio "ignore" means no console handles, and

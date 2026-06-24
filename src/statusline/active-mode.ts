@@ -37,11 +37,18 @@ function lastActive(dir: string): number {
   return t;
 }
 
+// Only carry a mode forward from a session that was active this recently. This is the line
+// between a real continuation (a /clear or resume, where the prior session was active seconds
+// ago) and just opening a fresh terminal in a project where Codey happened to be on once. The
+// latter should start OFF, so viewing the timeline or typing any command never lights up
+// narration on its own; the user opts in explicitly with /codey:simple|deep|teach.
+const INHERIT_WINDOW_MS = 10 * 60_000;
+
 // Carry Codey's mode across a /clear or resume, which start a new session id in the same
 // directory. Returns the mode of the most recently active prior session sharing this cwd that
-// still has Codey on, or null when there is none. The caller only applies this on a session's
-// first prompt, so turning Codey off later is never undone.
-export function inheritedMode(cwd: string | null, excludeId: string, root: string): Mode | null {
+// still has Codey on AND was active within INHERIT_WINDOW_MS, or null otherwise. The caller only
+// applies this on a session's first prompt, so turning Codey off later is never undone.
+export function inheritedMode(cwd: string | null, excludeId: string, root: string, now: number = Date.now()): Mode | null {
   if (!cwd || !existsSync(root)) return null;
   let best: { mode: Mode; at: number } | null = null;
   for (const name of readdirSync(root)) {
@@ -53,7 +60,11 @@ export function inheritedMode(cwd: string | null, excludeId: string, root: strin
     const at = lastActive(dir);
     if (!best || at > best.at) best = { mode, at };
   }
-  return best?.mode ?? null;
+  if (!best) return null;
+  // A prior session that has been idle past the window is treated as stale: start off and wait
+  // for an explicit opt-in rather than resurrecting an old mode in a brand-new terminal.
+  if (now - best.at > INHERIT_WINDOW_MS) return null;
+  return best.mode;
 }
 
 // True when any session still has Codey on. Used so turning off the last session can
