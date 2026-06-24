@@ -23,7 +23,7 @@
       --sel:#5fa8e0; --sel-dim:#2c4d63;
       /* token-category hues: live ONLY inside the stats card, never on timeline rows. Restrained
          so the breakdown reads like a colored receipt, not a rainbow chart. */
-      --tok-read:#6aa3c4; --tok-edit:#7a86c9; --tok-search:#c39a59; --tok-cmd:#c2807a; --tok-reason:#a98ec9; --tok-other:#6e7785;
+      --tok-read:#6aa3c4; --tok-edit:#4db6c4; --tok-search:#cda35f; --tok-cmd:#8b86d6; --tok-reason:#b08ed6; --tok-other:#6e7785;
       /* ---- radius ---- */
       --r-sm:6px; --r-task:8px; --r-card:10px;
       /* ---- motion ---- */
@@ -326,27 +326,29 @@
     .tokhd .k { margin-bottom:0; }
     .tokhd .toktot { font-size:17px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
     .tokhd .toktot small { font-size:9px; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); margin-left:5px; }
+    /* one quiet line under the header that says, in plain words, what the card is for */
+    .toksub { font-size:10.5px; color:var(--muted); margin-top:3px; }
     /* the hero: one stacked bar showing every category's share at a glance. Thin seams between
        segments (matched to the card surface) keep neighbours readable without loud borders. */
     .tokbar { display:flex; height:10px; border-radius:5px; overflow:hidden; margin-top:12px;
       background:var(--inset); box-shadow:inset 0 0 0 1px var(--hair); }
     .tokbar i { display:block; height:10px; min-width:4px; }
     .tokbar i + i { border-left:1.5px solid var(--surf); }
-    /* receipt rows: swatch + label on the left, count then percent right-aligned in fixed
-       columns so every number lines up, mini bar beneath. The rows are the legend. */
-    .brk { margin-top:16px; display:flex; flex-direction:column; gap:13px; }
-    .brkrow .top { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
-    .brkrow .bn { flex:1; min-width:0; font-size:12px; color:var(--ink); font-weight:600; display:inline-flex; align-items:center; gap:8px;
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    /* receipt rows: the category label sits on its own line so it always reads in full, then the
+       mini bar fills the row beneath it with the count and percent right-aligned in fixed columns
+       so every number lines up. The labelled rows are the legend. */
+    .brk { margin-top:16px; display:flex; flex-direction:column; gap:14px; }
+    .brkrow .bn { font-size:12px; color:var(--ink); font-weight:600; display:flex; align-items:center; gap:8px;
+      margin-bottom:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .brkrow .bn .sw { width:10px; height:10px; border-radius:3px; flex:none; }
-    .brkrow .bv { flex:none; display:inline-flex; align-items:baseline; gap:7px; font-variant-numeric:tabular-nums; }
+    .brkrow .meter { display:flex; align-items:center; gap:9px; font-variant-numeric:tabular-nums; }
+    .brkrow .tr { flex:1; min-width:0; height:5px; border-radius:3px; background:var(--inset); overflow:hidden; }
+    .brkrow .tr i { display:block; height:5px; border-radius:3px; min-width:3px; opacity:.9; }
     /* the token count is the answer to "how much went here", so it is the bold, legible number;
        the percent trails it as a quiet secondary. */
-    .brkrow .bv .bc { font-size:13.5px; color:var(--ink); font-weight:700; text-align:right; min-width:46px; letter-spacing:-0.01em; }
-    .brkrow .bv .bc small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:3px; }
-    .brkrow .bv .pct { color:var(--muted); font-weight:500; font-size:11px; min-width:32px; text-align:right; }
-    .brkrow .tr { height:4px; border-radius:3px; background:var(--inset); overflow:hidden; }
-    .brkrow .tr i { display:block; height:4px; border-radius:3px; min-width:3px; opacity:.85; }
+    .brkrow .bc { flex:none; font-size:13px; color:var(--ink); font-weight:700; text-align:right; min-width:46px; letter-spacing:-0.01em; }
+    .brkrow .bc small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:3px; }
+    .brkrow .pct { flex:none; color:var(--muted); font-weight:500; font-size:11px; min-width:30px; text-align:right; }
     .tokempty { font-size:11px; color:var(--muted); margin-top:12px; }
     /* priciest-task footer: its own labelled row below the breakdown, name on the left (truncated),
        spend on the right, so it reads as a separate receipt line and not part of the chart. */
@@ -1242,16 +1244,16 @@
       // Plain-language categories so a row reads as what Claude actually did, not a tool name.
       // Reading and editing are split out on purpose: "did it just look, or did it change files?"
       // is the first thing anyone wants to know from the breakdown.
-      const buckets = { "Reading files": 0, "Editing files": 0, "Searching": 0, "Running commands": 0, "Thinking": 0, "Other": 0 };
+      const buckets = { "Reading files": 0, "Writing files": 0, "Searching": 0, "Commands": 0, "Thinking": 0, "Other": 0 };
       for (const c of (snap.chunks || [])) {
         for (const line of (c.receipt && c.receipt.workLines || [])) {
           const t = line.tool || "";
           const tok = line.tokens || 0;
           if (t === "thinking") buckets["Thinking"] += tok;
           else if (t === "Read") buckets["Reading files"] += tok;
-          else if (["Write", "Edit", "MultiEdit"].includes(t)) buckets["Editing files"] += tok;
+          else if (["Write", "Edit", "MultiEdit"].includes(t)) buckets["Writing files"] += tok;
           else if (["Grep", "Glob"].includes(t)) buckets["Searching"] += tok;
-          else if (["Bash", "PowerShell"].includes(t)) buckets["Running commands"] += tok;
+          else if (["Bash", "PowerShell"].includes(t)) buckets["Commands"] += tok;
           else buckets["Other"] += tok;
         }
       }
@@ -1312,8 +1314,8 @@
       // One steady hue per category, reused across the stacked bar, legend swatch, and row bar so
       // the eye links them. Deliberately non-green: green is reserved for the single live thing.
       const colorFor = (label) => ({
-        "Reading files": "var(--tok-read)", "Editing files": "var(--tok-edit)",
-        "Searching": "var(--tok-search)", "Running commands": "var(--tok-cmd)",
+        "Reading files": "var(--tok-read)", "Writing files": "var(--tok-edit)",
+        "Searching": "var(--tok-search)", "Commands": "var(--tok-cmd)",
         "Thinking": "var(--tok-reason)", "Other": "var(--tok-other)",
       }[label] || "var(--tok-other)");
       // A category with real tokens but a sub-1% share shows "<1%" rather than a bare "0%", and
@@ -1327,11 +1329,14 @@
       const brkRows = bd.rows.length
         ? bd.rows.map(r => {
             const c = colorFor(r.label);
-            // Compact counts (2.5k) keep the amount and percent columns aligned in the narrow rail.
-            return `<div class="brkrow"><div class="top">`
-              + `<span class="bn"><span class="sw" style="background:${c}"></span>${esc(r.label)}</span>`
-              + `<span class="bv"><span class="bc num">${kfmt(r.tokens)}<small>tok</small></span><span class="pct num">${pctText(r.pct)}</span></span></div>`
-              + `<div class="tr"><i style="width:${barW(r.pct)}%;background:${c}"></i></div></div>`;
+            // The label gets its own line so it always reads in full ("Reading files" never clips
+            // in the narrow rail). The mini bar then fills the row beneath it, with the count and
+            // percent right-aligned in fixed columns so every number lines up.
+            return `<div class="brkrow">`
+              + `<div class="bn"><span class="sw" style="background:${c}"></span>${esc(r.label)}</div>`
+              + `<div class="meter"><div class="tr"><i style="width:${barW(r.pct)}%;background:${c}"></i></div>`
+              + `<span class="bc num">${kfmt(r.tokens)}<small>tok</small></span><span class="pct num">${pctText(r.pct)}</span></div>`
+              + `</div>`;
           }).join("")
         : `<div class="tokempty">No token activity yet.</div>`;
 
@@ -1355,6 +1360,7 @@
         + `</div>`
         + `<div class="scard tokcard"><div class="tokhd"><span class="k">Token breakdown</span>`
         + `<span class="toktot">${kfmt(bd.total)}<small>tok</small></span></div>`
+        + `<div class="toksub">Where your tokens went</div>`
         + stackBar
         + `<div class="brk">${brkRows}</div>`
         + priciest
