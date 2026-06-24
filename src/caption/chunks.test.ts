@@ -35,6 +35,15 @@ describe("chunkEvents", () => {
     expect(chunks[0].targets).toContain("a.ts");
   });
 
+  it("names a shell chunk by its real purpose, not a generic shell phrase", () => {
+    const chunks = chunkEvents([
+      pre("Bash", { command: "grep -i codey installed_plugins.json" }, 0),
+      pre("Bash", { command: "cat README.md | head" }, 100),
+    ]);
+    expect(chunks[0].targets[0]).toMatch(/plugin/i);
+    expect(chunks[0].targets.join(" ")).not.toMatch(/a few shell commands/i);
+  });
+
   it("starts a new chunk when the stage changes", () => {
     const chunks = chunkEvents([
       pre("Read", { file_path: "a.ts" }, 0),

@@ -1,6 +1,7 @@
 import type { ToolEvent } from "../types.js";
 import { actionLabel, rawTarget, shortTarget } from "../statusline/labels.js";
 import { classifyStage, type Stage } from "./stage.js";
+import { describeShellIntent } from "./shell.js";
 
 // One meaningful run of work: a stretch of tool calls that all belong to the same stage,
 // summarized once. This is the unit every surface renders, instead of a row per tool call.
@@ -55,7 +56,20 @@ function outcomes(events: ToolEvent[]): Map<ToolEvent, boolean> {
   return out;
 }
 
+function shellFields(input: unknown): { command: string | null; description: string | null } {
+  const o = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
+  const command = typeof o.command === "string" ? o.command : null;
+  const description = typeof o.description === "string" ? o.description : null;
+  return { command, description };
+}
+
+// The short subject a chunk names. A shell command resolves to its real purpose ("the
+// installed plugin config") instead of a tool-shaped phrase ("a few shell commands").
 function shortName(tool: string, input: unknown): string {
+  if (tool === "Bash" || tool === "PowerShell") {
+    const { command, description } = shellFields(input);
+    if (command) return describeShellIntent(command, description).subject;
+  }
   return shortTarget(actionLabel(tool, input).target);
 }
 

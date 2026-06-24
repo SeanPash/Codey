@@ -47,6 +47,20 @@ describe("buildSegmentationPrompt", () => {
     expect(p).toContain("0: pre Write");
     expect(p).toContain("JSON array");
   });
+
+  it("feeds Claude's description and the command's real purpose for shell events", () => {
+    const p = buildSegmentationPrompt([
+      ev({ tool: "Bash", input: { command: "npm run build", description: "Rebuild the plugin" } }),
+    ]);
+    expect(p).toMatch(/Rebuild the plugin/);
+    expect(p).toMatch(/build|rebuild/i);
+  });
+
+  it("tells the model to name purposes, not tools, with no em dashes", () => {
+    const p = buildSegmentationPrompt([ev({ tool: "Read", input: { file_path: "a.ts" } })]);
+    expect(p).toMatch(/purpose/i);
+    expect(p).not.toContain("—");
+  });
 });
 
 describe("parseSegmentation", () => {

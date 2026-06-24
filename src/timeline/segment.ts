@@ -1,6 +1,7 @@
 import type { ToolEvent } from "../types.js";
 import { chunkEvents } from "../caption/chunks.js";
 import { buildCaption } from "../caption/caption.js";
+import { describeShellIntent } from "../caption/shell.js";
 
 export interface RawChunk {
   startIndex: number;
@@ -24,17 +25,54 @@ export function naiveSegment(events: ToolEvent[]): RawChunk[] {
   return chunks;
 }
 
+function field(input: unknown, key: string): string | null {
+  if (input && typeof input === "object") {
+    const v = (input as Record<string, unknown>)[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+function basename(p: string): string {
+  return p.split(/[\\/]/).pop() || p;
+}
+
+// A short readable summary of one event, so the model groups by what Claude was accomplishing
+// rather than by raw tool JSON. Shell events carry Claude's own description and their command
+// intent; file events name the file; searches name what they looked for.
+function eventSummary(e: ToolEvent): string {
+  if (e.tool === "Bash" || e.tool === "PowerShell") {
+    const command = field(e.input, "command");
+    const desc = field(e.input, "description");
+    if (command) {
+      const intent = describeShellIntent(command, desc);
+      const note = desc && desc !== intent.title ? ` (${desc})` : "";
+      return `${intent.title}${note}`;
+    }
+    return desc ?? "ran a command";
+  }
+  const file = field(e.input, "file_path") ?? field(e.input, "path") ?? field(e.input, "notebook_path");
+  if (file) return `${e.tool} ${basename(file)}`;
+  const pattern = field(e.input, "pattern");
+  if (pattern) return `${e.tool} for ${pattern}`;
+  return e.tool;
+}
+
 // Build the headless segmentation prompt. One pass over the whole event list.
 export function buildSegmentationPrompt(events: ToolEvent[]): string {
   const lines = events
-    .map((e, i) => `${i}: ${e.phase} ${e.tool} ${JSON.stringify(e.input ?? null).slice(0, 120)}`)
+    .map((e, i) => `${i}: ${e.phase} ${eventSummary(e)}`)
     .join("\n");
   return [
     "You are grouping a coding agent's tool calls into a few named tasks for a non-technical viewer.",
+    "Each event below is already summarized by what it was trying to accomplish.",
     "Here are the events, numbered in order:",
     lines,
     "",
     'Return ONLY a JSON array of {"startIndex": <int>, "name": "<3-6 word task name>", "narration": "<one plain sentence>"}.',
+    "Name each task by its PURPOSE (what Claude was trying to do), never by the tool or command it used.",
+    'Good: "Verifying the install". Bad: "Running shell commands" or "Bash calls".',
+    "Ground the names in the real files, commands, and intent shown above. Do not use em dashes.",
     "The first chunk must start at index 0. Chunks must be in ascending startIndex order.",
     "Aim for 2-6 tasks total. No prose outside the JSON.",
   ].join("\n");

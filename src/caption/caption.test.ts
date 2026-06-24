@@ -26,6 +26,13 @@ describe("buildCaption", () => {
     expect(c.simple).not.toMatch(/npm|npx|vitest/);
   });
 
+  it("uses the shell command's real purpose for a single shell action", () => {
+    const c = buildCaption(chunk({ stage: "inspecting", tool: "Bash", count: 1, raw: "git status", targets: ["the local changes"] }), "deep");
+    expect(c.title).toBe("Checking local changes");
+    expect(c.simple).toBe("Claude is checking the local changes in the repository.");
+    expect(c.deep).not.toMatch(/before changing anything/);
+  });
+
   it("describes a run of reads as one inspection sentence", () => {
     const c = buildCaption(chunk({ stage: "inspecting", count: 4, targets: ["a.ts", "b.ts", "c.ts", "d.ts"] }), "simple");
     expect(c.simple).toMatch(/checking several/i);

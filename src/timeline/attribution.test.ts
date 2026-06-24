@@ -43,6 +43,11 @@ describe("actionTitle", () => {
   it("frames a search by what it looks for", () => {
     expect(actionTitle("Grep", { pattern: "validateUser" })).toBe("Checking validateUser");
   });
+  it("frames a shell command by its real purpose, not the tool", () => {
+    expect(actionTitle("Bash", { command: "npm run build" })).toMatch(/build/i);
+    expect(actionTitle("Bash", { command: "git status" })).toMatch(/change/i);
+    expect(actionTitle("Bash", { command: "git status" })).not.toMatch(/ran a command|a command/i);
+  });
   it("calls a thinking turn what it is", () => {
     expect(actionTitle("thinking", null)).toBe("Thinking it through");
     expect(actionTitle(null, null)).toBe("Thinking it through");

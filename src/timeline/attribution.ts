@@ -2,6 +2,7 @@ import type { ReceiptLine, TokenBreakdown } from "../types.js";
 import type { AssistantTurn } from "./transcript.js";
 import { classifyStage } from "../caption/stage.js";
 import { humanFile, phrasePattern, purposeTitle, purposeSentence } from "../caption/subject.js";
+import { describeShellIntent } from "../caption/shell.js";
 import { actionLabel, shortTarget } from "../statusline/labels.js";
 
 function basename(p: string): string {
@@ -94,6 +95,10 @@ function actionSubject(tool: string, input: unknown): string {
 // The collapsed-card headline for one action: a stable purpose label, never the raw tool.
 export function actionTitle(tool: string | null, input: unknown): string {
   if (!tool || tool === "thinking") return "Thinking it through";
+  if (tool === "Bash" || tool === "PowerShell") {
+    const cmd = fullCommand(input);
+    if (cmd) return describeShellIntent(cmd, descFrom(input)).title;
+  }
   return purposeTitle(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 
@@ -103,6 +108,10 @@ export function actionSubtitle(tool: string | null, input: unknown): string {
   if (!tool || tool === "thinking") return "Working through the approach before acting.";
   const desc = descFrom(input);
   if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
+  if (tool === "Bash" || tool === "PowerShell") {
+    const cmd = fullCommand(input);
+    if (cmd) return describeShellIntent(cmd).sentence;
+  }
   return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 
