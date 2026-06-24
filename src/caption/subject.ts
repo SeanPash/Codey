@@ -8,7 +8,9 @@ import type { Stage } from "./stage.js";
 // Join a few names the way a person would say them, with an Oxford comma. A long list is
 // trimmed to the first few plus a count so the line never sprawls.
 export function joinNames(names: string[], max = 4): string {
-  const list = names.filter(Boolean);
+  // Drop blanks and repeats, so a folded run never reads "the config and the config".
+  const seen = new Set<string>();
+  const list = names.filter((n) => n && !seen.has(n) && (seen.add(n), true));
   if (list.length === 0) return "";
   if (list.length === 1) return list[0];
   if (list.length === 2) return `${list[0]} and ${list[1]}`;

@@ -3,6 +3,7 @@ import { stripDashes } from "../util/text.js";
 import type { WorkChunk } from "./chunks.js";
 import type { Stage } from "./stage.js";
 import { humanFile, phrasePattern, purposeTitle, joinNames } from "./subject.js";
+import { describeShellIntent } from "./shell.js";
 
 // The one caption shape every surface renders from. `simple` is always a complete sentence;
 // `deep` and `teach` layer on more only when the mode asks for them. The optional fields are
@@ -32,6 +33,14 @@ function subjectOf(chunk: WorkChunk): string {
 }
 
 function describe(chunk: WorkChunk): Described {
+  // A single shell command knows its own purpose better than any stage template can phrase it,
+  // so use the shell intent's title and sentence directly instead of "reading X to understand
+  // the code". The teach line adds why the step matters for that stage.
+  if ((chunk.tool === "Bash" || chunk.tool === "PowerShell") && chunk.count === 1 && chunk.raw) {
+    const intent = describeShellIntent(chunk.raw);
+    return { title: intent.title, simple: intent.sentence, deep: intent.sentence, teach: intent.sentence };
+  }
+
   const subject = subjectOf(chunk);
   const title = purposeTitle(chunk.tool, chunk.stage, subject, chunk.count);
   // A few named files read better than a vague "several files"; past a handful we summarize.

@@ -3500,7 +3500,8 @@ function renderCaption(caption) {
 
 // src/caption/subject.ts
 function joinNames(names, max = 4) {
-  const list = names.filter(Boolean);
+  const seen = /* @__PURE__ */ new Set();
+  const list = names.filter((n) => n && !seen.has(n) && (seen.add(n), true));
   if (list.length === 0) return "";
   if (list.length === 1) return list[0];
   if (list.length === 2) return `${list[0]} and ${list[1]}`;
@@ -3647,11 +3648,11 @@ function describeBash(cmd) {
     case "pnpm":
     case "yarn":
     case "npx": {
-      const rest = cmd.replace(/^\s*\S+\s*/, "");
-      if (/\b(test|vitest|jest)\b/.test(rest)) return { tag: "running", target: "the tests" };
-      if (/\b(install|ci)\b|^\s*i\b/.test(rest)) return { tag: "installing", target: "dependencies" };
-      if (/\bbuild\b/.test(rest)) return { tag: "running", target: "the build" };
-      const run = rest.match(/run\s+(\S+)/);
+      const rest2 = cmd.replace(/^\s*\S+\s*/, "");
+      if (/\b(test|vitest|jest)\b/.test(rest2)) return { tag: "running", target: "the tests" };
+      if (/\b(install|ci)\b|^\s*i\b/.test(rest2)) return { tag: "installing", target: "dependencies" };
+      if (/\bbuild\b/.test(rest2)) return { tag: "running", target: "the build" };
+      const run = rest2.match(/run\s+(\S+)/);
       if (run) return { tag: "running", target: `the ${run[1]} script` };
       return { tag: "running", target: `the command ${shorten(cmd)}` };
     }
@@ -3786,16 +3787,16 @@ function firstWord(cmd) {
 }
 function stageForBash(cmd) {
   const word = firstWord(cmd);
-  const rest = cmd.replace(/^\s*\S+\s*/, "");
+  const rest2 = cmd.replace(/^\s*\S+\s*/, "");
   if (/\b(test|vitest|jest|mocha|pytest)\b/.test(cmd)) return "testing";
   if (word === "npm" || word === "pnpm" || word === "yarn" || word === "npx") {
-    if (/\b(build|typecheck|tsc|lint|eslint)\b/.test(rest)) return "testing";
-    if (/\b(install|ci)\b|^\s*i\b/.test(rest)) return "editing";
+    if (/\b(build|typecheck|tsc|lint|eslint)\b/.test(rest2)) return "testing";
+    if (/\b(install|ci)\b|^\s*i\b/.test(rest2)) return "editing";
     return "inspecting";
   }
   if (word === "tsc" || word === "eslint" || word === "prettier") return "testing";
   if (word === "git") {
-    const sub = (rest.trim().split(/\s+/)[0] || "").toLowerCase();
+    const sub = (rest2.trim().split(/\s+/)[0] || "").toLowerCase();
     return GIT_WRITE.has(sub) ? "editing" : "inspecting";
   }
   if (WRITE_CMDS.has(word)) return "editing";
@@ -3825,6 +3826,169 @@ function classifyStage(tool, input, isError = false) {
   return "inspecting";
 }
 
+// src/caption/shell.ts
+function intent(subject, title, sentence) {
+  return { subject, title, sentence };
+}
+function firstWord2(cmd) {
+  return (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
+}
+function rest(cmd) {
+  return cmd.replace(/^\s*\S+\s*/, "");
+}
+var TEMP_HINT = /\b(tmp|temp|scratch|demo|sample|example|fixture)s?\b/i;
+var GIT_READ = /* @__PURE__ */ new Set(["status", "diff", "log", "show", "branch", "remote", "describe", "rev-parse"]);
+function commandIntent(cmd) {
+  const word = firstWord2(cmd);
+  const tail = rest(cmd);
+  if (/\b(vitest|jest|mocha|pytest|phpunit)\b/.test(cmd)) {
+    return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
+  }
+  if (word === "npm" || word === "pnpm" || word === "yarn" || word === "npx") {
+    if (/\btest\b/.test(tail)) {
+      return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
+    }
+    if (/\bbuild\b/.test(tail)) {
+      return intent("the build", "Rebuilding the project", "Claude is rebuilding the project so the latest code takes effect.");
+    }
+    if (/\b(install|ci)\b|^\s*i\b/.test(tail)) {
+      return intent("the dependencies", "Installing dependencies", "Claude is installing the project's dependencies.");
+    }
+    if (/\b(typecheck|tsc|lint|eslint)\b/.test(tail)) {
+      return intent("the code", "Checking the code", "Claude is checking the code for type and lint problems.");
+    }
+    const run = tail.match(/run\s+(\S+)/);
+    if (run) return intent(`the ${run[1]} script`, `Running the ${run[1]} script`, `Claude is running the ${run[1]} script.`);
+    return intent("the project tasks", "Running a project task", "Claude is running a project task.");
+  }
+  if (word === "tsc" || word === "eslint" || word === "prettier") {
+    return intent("the code", "Checking the code", "Claude is checking the code for problems.");
+  }
+  if (word === "git") {
+    const sub = (tail.trim().split(/\s+/)[0] || "").toLowerCase();
+    if (GIT_READ.has(sub)) {
+      return intent("the local changes", "Checking local changes", "Claude is checking the local changes in the repository.");
+    }
+    if (sub === "commit") return intent("the changes", "Committing the changes", "Claude is committing the changes.");
+    if (sub === "push") return intent("the changes", "Pushing the changes", "Claude is pushing the changes to the remote.");
+    if (sub === "add") return intent("the changes", "Staging the changes", "Claude is staging the changes for a commit.");
+    if (sub === "checkout" || sub === "switch") return intent("a branch", "Switching branches", "Claude is switching to another branch.");
+    if (sub) return intent(`the ${sub} step`, `Running git ${sub}`, `Claude is running git ${sub}.`);
+  }
+  if (word === "grep" || word === "rg" || word === "ag" || word === "ack" || word === "find") {
+    if (/installed_plugins|plugins[\\/]?config|config\.json|settings\.json/i.test(cmd)) {
+      return intent(
+        "the installed plugin config",
+        "Checking installed plugin config",
+        "Claude is checking the installed plugin config."
+      );
+    }
+    return intent("the project", "Searching the project", "Claude is searching the project for something.");
+  }
+  if (word === "cd") {
+    if (/\.claude[\\/]+plugins/i.test(cmd)) {
+      return intent(
+        "the Claude plugin cache",
+        "Inspecting plugin cache",
+        "Claude is looking inside the Claude plugin cache."
+      );
+    }
+    return intent("another folder", "Switching folders", "Claude is moving to another folder.");
+  }
+  if (word === "ls" || word === "dir") {
+    const srcDirs = (tail.match(/(?:^|\s)src[\\/]\S+/g) || []).length;
+    if (srcDirs >= 2 || /\b(caption|serve|narration|capture|warnings)\b/.test(tail)) {
+      return intent(
+        "the source folders",
+        "Checking the source areas",
+        "Claude is checking the project's source folders to confirm the layout."
+      );
+    }
+    return intent("the files here", "Listing the files", "Claude is listing the files in this folder.");
+  }
+  if (word === "rm" || word === "del" || word === "unlink" || word === "rmdir") {
+    if (TEMP_HINT.test(cmd)) {
+      return intent("the temporary files", "Cleaning up temporary files", "Claude is cleaning up temporary files.");
+    }
+    return intent("some files", "Removing files", "Claude is removing files that are no longer needed.");
+  }
+  if (word === "mkdir" || word === "touch") {
+    if (TEMP_HINT.test(cmd)) {
+      return intent("the demo files", "Creating demo files", "Claude is creating demo files to work with.");
+    }
+    if (word === "mkdir") return intent("a folder", "Creating a folder", "Claude is creating a folder.");
+    return intent("a file", "Creating a file", "Claude is creating a file.");
+  }
+  if (word === "cat" || word === "less" || word === "more" || word === "head" || word === "tail") {
+    return intent("a file", "Reading a file", "Claude is reading a file's contents.");
+  }
+  if (["node", "python", "python3", "tsx", "ts-node", "deno", "bun"].includes(word)) {
+    if (/\btest\b/.test(tail)) {
+      return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
+    }
+    const file7 = (tail.trim().split(/\s+/).find((t) => !t.startsWith("-")) || "").split(/[\\/]/).pop();
+    if (file7) return intent(`the ${file7} script`, `Running ${file7}`, `Claude is running ${file7}.`);
+    return intent("a script", "Running a script", "Claude is running a script.");
+  }
+  if (word === "curl" || word === "wget") {
+    return intent("something from the web", "Fetching from the web", "Claude is fetching something from the web.");
+  }
+  return null;
+}
+var GERUND = {
+  show: "checking",
+  display: "checking",
+  find: "checking",
+  check: "checking",
+  verify: "verifying",
+  list: "listing",
+  run: "running",
+  build: "building",
+  rebuild: "rebuilding",
+  create: "creating",
+  add: "adding",
+  remove: "removing",
+  delete: "removing",
+  update: "updating",
+  read: "reading",
+  search: "searching",
+  install: "installing",
+  compare: "comparing",
+  inspect: "inspecting",
+  start: "starting",
+  stop: "stopping",
+  open: "opening",
+  count: "counting",
+  print: "printing"
+};
+function descriptionIsVague(desc) {
+  const d = desc.trim().toLowerCase();
+  return d.length < 6 || /^(run|running)\s+(a\s+)?(command|script)\b/.test(d) || d === "command";
+}
+function descriptionIntent(desc) {
+  const clean = desc.trim().replace(/[.]+$/, "");
+  const title = clean.charAt(0).toUpperCase() + clean.slice(1);
+  const m = /^([A-Za-z]+)\b\s*(.*)$/.exec(clean);
+  if (m && GERUND[m[1].toLowerCase()]) {
+    const verb = GERUND[m[1].toLowerCase()];
+    const tail = m[2].trim();
+    const sentence = tail ? `Claude is ${verb} ${tail}.` : `Claude is ${verb} something.`;
+    return intent(tail || clean, title, sentence);
+  }
+  return intent(clean, title, `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`);
+}
+function describeShellIntent(command, description) {
+  const cmd = (command ?? "").trim();
+  const desc = (description ?? "").trim();
+  if (desc && !descriptionIsVague(desc)) return descriptionIntent(desc);
+  const matched = commandIntent(cmd);
+  if (matched) return matched;
+  if (desc) return descriptionIntent(desc);
+  const word = firstWord2(cmd);
+  if (word) return intent(`the ${word} step`, `Running ${word}`, `Claude is running ${word}.`);
+  return intent("a shell command", "Running a command", "Claude is running a shell command.");
+}
+
 // src/caption/chunks.ts
 var IDLE_SPLIT_MS = 9e4;
 function outcomes(events) {
@@ -3852,7 +4016,17 @@ function outcomes(events) {
   }
   return out;
 }
+function shellFields(input) {
+  const o = input && typeof input === "object" ? input : {};
+  const command = typeof o.command === "string" ? o.command : null;
+  const description = typeof o.description === "string" ? o.description : null;
+  return { command, description };
+}
 function shortName(tool, input) {
+  if (tool === "Bash" || tool === "PowerShell") {
+    const { command, description } = shellFields(input);
+    if (command) return describeShellIntent(command, description).subject;
+  }
   return shortTarget(actionLabel(tool, input).target);
 }
 function chunkEvents(events) {
@@ -3909,6 +4083,10 @@ function subjectOf(chunk) {
   return humanFile(chunk.targets[0] ?? "") || "the code";
 }
 function describe(chunk) {
+  if ((chunk.tool === "Bash" || chunk.tool === "PowerShell") && chunk.count === 1 && chunk.raw) {
+    const intent2 = describeShellIntent(chunk.raw);
+    return { title: intent2.title, simple: intent2.sentence, deep: intent2.sentence, teach: intent2.sentence };
+  }
   const subject = subjectOf(chunk);
   const title = purposeTitle(chunk.tool, chunk.stage, subject, chunk.count);
   const few = chunk.targets.length <= 3 && chunk.count <= 3;
@@ -4471,14 +4649,45 @@ function naiveSegment(events) {
   chunks[0] = { ...chunks[0], startIndex: 0 };
   return chunks;
 }
+function field(input, key2) {
+  if (input && typeof input === "object") {
+    const v = input[key2];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+function basename2(p) {
+  return p.split(/[\\/]/).pop() || p;
+}
+function eventSummary(e) {
+  if (e.tool === "Bash" || e.tool === "PowerShell") {
+    const command = field(e.input, "command");
+    const desc = field(e.input, "description");
+    if (command) {
+      const intent2 = describeShellIntent(command, desc);
+      const note = desc && desc !== intent2.title ? ` (${desc})` : "";
+      return `${intent2.title}${note}`;
+    }
+    return desc ?? "ran a command";
+  }
+  const file7 = field(e.input, "file_path") ?? field(e.input, "path") ?? field(e.input, "notebook_path");
+  if (file7) return `${e.tool} ${basename2(file7)}`;
+  const pattern = field(e.input, "pattern");
+  if (pattern) return `${e.tool} for ${pattern}`;
+  return e.tool;
+}
 function buildSegmentationPrompt(events) {
-  const lines = events.map((e, i) => `${i}: ${e.phase} ${e.tool} ${JSON.stringify(e.input ?? null).slice(0, 120)}`).join("\n");
+  const lines = events.map((e, i) => `${i}: ${e.phase} ${eventSummary(e)}`).join("\n");
   return [
     "You are grouping a coding agent's tool calls into a few named tasks for a non-technical viewer.",
+    "Each event below is already summarized by what it was trying to accomplish.",
     "Here are the events, numbered in order:",
     lines,
     "",
     'Return ONLY a JSON array of {"startIndex": <int>, "name": "<3-6 word task name>", "narration": "<one plain sentence>"}.',
+    "Name each task by its PURPOSE (what Claude was trying to do), never by the tool or command it used.",
+    'Good: "Verifying the install". Bad: "Running shell commands" or "Bash calls".',
+    "Ground the names in the real files, commands, and intent shown above. Do not use em dashes.",
     "The first chunk must start at index 0. Chunks must be in ascending startIndex order.",
     "Aim for 2-6 tasks total. No prose outside the JSON."
   ].join("\n");
@@ -4940,7 +5149,7 @@ import { statSync as statSync3 } from "node:fs";
 import { join as join15 } from "node:path";
 
 // src/timeline/attribution.ts
-function basename2(p) {
+function basename3(p) {
   const parts = p.split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
@@ -4955,7 +5164,7 @@ function fileFrom(input) {
   if (input && typeof input === "object") {
     const r = input;
     const p = r.file_path ?? r.path ?? r.notebook_path;
-    if (typeof p === "string") return basename2(p);
+    if (typeof p === "string") return basename3(p);
   }
   return null;
 }
@@ -5017,12 +5226,20 @@ function actionSubject(tool, input) {
 }
 function actionTitle(tool, input) {
   if (!tool || tool === "thinking") return "Thinking it through";
+  if (tool === "Bash" || tool === "PowerShell") {
+    const cmd = fullCommand(input);
+    if (cmd) return describeShellIntent(cmd, descFrom(input)).title;
+  }
   return purposeTitle(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 function actionSubtitle(tool, input) {
   if (!tool || tool === "thinking") return "Working through the approach before acting.";
   const desc = descFrom(input);
   if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
+  if (tool === "Bash" || tool === "PowerShell") {
+    const cmd = fullCommand(input);
+    if (cmd) return describeShellIntent(cmd).sentence;
+  }
   return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 function rawDetail(tool, input) {

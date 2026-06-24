@@ -22,6 +22,13 @@ describe("humanFile", () => {
   });
 });
 
+describe("joinNames", () => {
+  it("drops repeats so a list never says the same thing twice", () => {
+    expect(joinNames(["the plugin config", "the plugin config"])).toBe("the plugin config");
+    expect(joinNames(["a.ts", "a.ts", "b.ts"])).toBe("a.ts and b.ts");
+  });
+});
+
 describe("phrasePattern", () => {
   it("keeps a plain identifier as the search subject", () => {
     expect(phrasePattern("validateUser")).toBe("validateUser");

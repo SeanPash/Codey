@@ -126,7 +126,8 @@ function readStatus(dir) {
 
 // src/caption/subject.ts
 function joinNames(names, max = 4) {
-  const list = names.filter(Boolean);
+  const seen = /* @__PURE__ */ new Set();
+  const list = names.filter((n) => n && !seen.has(n) && (seen.add(n), true));
   if (list.length === 0) return "";
   if (list.length === 1) return list[0];
   if (list.length === 2) return `${list[0]} and ${list[1]}`;
