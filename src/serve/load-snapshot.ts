@@ -169,6 +169,9 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
     const lastGroup = snap.groups[snap.groups.length - 1];
     const prompt = s.lastPromptTs > 0 && lastGroup ? lastGroup.prompt : "";
     const cancelled = lastGroup?.cancelled ?? false;
+    // The current turn's group id, so a pane can offer "Summarize this prompt" the same way the
+    // single view does. Null when there is no real prompt group yet.
+    const groupId = s.lastPromptTs > 0 && lastGroup ? lastGroup.id : null;
     return {
       sessionId: s.id,
       name: s.name,
@@ -185,6 +188,7 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
       thinking: running && !runningTool,
       prompt,
       cancelled,
+      groupId,
     };
   });
   // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".

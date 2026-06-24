@@ -689,23 +689,29 @@
     const ekey = (scope, id) => scope + "|" + id + "|" + curDepth();
     const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
 
-    async function generate(scope, id) {
-      if (!currentId) return;
+    async function generate(scope, id, rerender) {
+      // Active Terminals namespaces ids as "<sessionId>~<chunkId>" so a button knows its own
+      // session; the single view uses a bare id and the current session. Split on the first ~.
+      let sessionId = currentId, serverId = id;
+      const tilde = id.indexOf("~");
+      if (tilde !== -1) { sessionId = id.slice(0, tilde); serverId = id.slice(tilde + 1); }
+      if (!sessionId) return;
+      const redraw = rerender || (() => { if (lastSnap) renderSingle(lastSnap); });
       const key = ekey(scope, id);
       if (explCache.has(key) || explLoading.has(key)) return;
       explLoading.add(key);
-      if (lastSnap) renderSingle(lastSnap);
+      redraw();
       try {
-        const res = await fetch("/api/session/" + encodeURIComponent(currentId) + "/explain", {
+        const res = await fetch("/api/session/" + encodeURIComponent(sessionId) + "/explain", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ scope, id, depth: curDepth() }),
+          body: JSON.stringify({ scope, id: serverId, depth: curDepth() }),
         });
         const data = await res.json();
         if (data && data.paused) budgetPaused = true;
         else if (data && data.text) { explCache.set(key, data.text); budgetPaused = false; }
       } catch { /* leave the button so the user can retry */ }
       explLoading.delete(key);
-      if (lastSnap) renderSingle(lastSnap);
+      redraw();
     }
 
     // Pre-load any explanations the snapshot already carries (cached at the seed depth), so a
@@ -743,10 +749,9 @@
       }));
     }
 
-    // The generated why/how panel for an open task. Only in single view, where currentId is the
-    // session these ids belong to.
+    // The generated why/how panel for an open task. Works in both the single view and the
+    // Active Terminals panes; panes pass a session-namespaced id so generate hits the right one.
     function explainBlock(scope, id) {
-      if (view !== "single") return "";
       const key = ekey(scope, id);
       const cached = explCache.get(key);
       if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(curDepth())}</span></div><div class="etext">${esc(cached)}</div></div>`;
@@ -758,7 +763,6 @@
 
     // The closing recap card for a prompt group.
     function summaryBlock(g) {
-      if (view !== "single") return "";
       const key = ekey("summary", g.id);
       const cached = explCache.get(key);
       if (cached) return `<div class="recap"><div class="rt"><span class="ic">&#9670;</span> What Claude got done</div><div class="rx">${esc(cached)}</div></div>`;
@@ -928,14 +932,12 @@
 
     // The "Explain this step" button, shown until an explanation is generated or loading.
     function actionWhyBtn(c, idx) {
-      if (view !== "single") return "";
       const key = ekey("action", c.id + "#" + idx);
       if (explCache.has(key) || explLoading.has(key) || budgetPaused) return "";
       return `<button class="whybtn primary" type="button" data-gen-scope="action" data-gen-id="${esc(c.id + "#" + idx)}">Explain this step</button>`;
     }
     // The generated why/how panel for a step: cached sections, a spinner, or a budget notice.
     function actionWhyOut(c, idx) {
-      if (view !== "single") return "";
       const key = ekey("action", c.id + "#" + idx);
       const cached = explCache.get(key);
       if (cached) return `<div class="expls">${explainSections(cached)}</div>`;
@@ -975,8 +977,9 @@
         : l.status === "ok" ? '<span class="st ok">&#10003;</span>' : '<span class="st">&middot;</span>';
       const key = c.id + ":" + idx;
       const lo = lineOpen.has(key);
-      // In single view every line expands, since even a bare step offers an "explain this step" button.
-      const canExpand = view === "single" || !!(l.raw || l.why || l.ts || (l.status === "fail" && l.errorText));
+      // Both timeline views let every line expand, since even a bare step offers an "explain this
+      // step" button (panes wire it per session, like the single view).
+      const canExpand = view === "single" || view === "split" || !!(l.raw || l.why || l.ts || (l.status === "fail" && l.errorText));
       const chev = canExpand ? `<span class="lchev">${lo ? "&#9662;" : "&#9656;"}</span>` : `<span class="lchev sp"></span>`;
       const fail = l.status === "fail" && l.failSummary
         ? `<div class="failnote">${esc(l.failSummary)}${l.resolved ? ' <span class="note">&middot; recovered on the next try</span>' : ""}</div>` : "";
@@ -1438,15 +1441,15 @@
 
       wireCards(main, () => renderSingle(snap));
       wireIntervention(main);
-      wireGenerate(main);
+      wireGenerate(main, () => renderSingle(snap));
       maybeAutoSummary(snap);
     }
 
     // Wire every "Explain"/"Why"/"Summarize" button to its generation request.
-    function wireGenerate(scope) {
+    function wireGenerate(scope, rerender) {
       scope.querySelectorAll("[data-gen-scope]").forEach((b) => b.addEventListener("click", (e) => {
         e.stopPropagation();
-        generate(b.dataset.genScope, b.dataset.genId);
+        generate(b.dataset.genScope, b.dataset.genId, rerender);
       }));
     }
 
@@ -1617,8 +1620,11 @@
       const runl = s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
       // Mirror the single view's end-of-turn note when the user pressed Esc mid-prompt.
       const cancelNote = s.cancelled ? `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>` : "";
+      // The same "Summarize this prompt" recap the single view offers, keyed by this pane's own
+      // session so the button hits the right terminal. Namespaced id lets generate() route it.
+      const recap = s.groupId ? summaryBlock({ id: s.sessionId + "~" + s.groupId, live: s.running }) : "";
       let body;
-      if (chunks.length) body = `${think}${cards}${runl}${cancelNote}`;
+      if (chunks.length) body = `${think}${cards}${runl}${cancelNote}${recap}`;
       else if (s.thinking) body = think;
       else if (s.cancelled) body = cancelNote;
       else body = `<div class="pnote"><span class="pn1">Answered directly</span>No tools used for this prompt.</div>`;
@@ -1674,6 +1680,7 @@
       if (next) next.addEventListener("click", () => { splitPinned = true; splitPage++; renderSplit(lastLive); });
       wireSplitControls(main);
       wireCards(main, () => renderSplit(lastLive));
+      wireGenerate(main, () => renderSplit(lastLive));
     }
 
     // Wire the dismiss (X) buttons and the hidden-tray restore buttons.
