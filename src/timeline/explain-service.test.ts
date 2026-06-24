@@ -108,9 +108,8 @@ describe("timelineDefaults", () => {
     expect(timelineDefaults("deep")).toEqual({ seedDepth: "deep", genAuto: true });
     expect(timelineDefaults("teach")).toEqual({ seedDepth: "teach", genAuto: true });
   });
-  it("keeps simple, ask, and off sessions frugal", () => {
+  it("keeps simple and off sessions frugal", () => {
     expect(timelineDefaults("simple")).toEqual({ seedDepth: "simple", genAuto: false });
-    expect(timelineDefaults("ask")).toEqual({ seedDepth: "deep", genAuto: false });
     expect(timelineDefaults(null)).toEqual({ seedDepth: "deep", genAuto: false });
   });
 });

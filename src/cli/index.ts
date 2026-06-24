@@ -7,9 +7,6 @@ import { runServe } from "./serve.js";
 import { runFeed } from "./feed.js";
 import { latestSessionId } from "./sessions.js";
 import { turnOn, turnOff } from "./toggle.js";
-import { runBudget } from "./budget.js";
-import { runExplain } from "./explain.js";
-import { runCosts } from "./costs.js";
 import { runTimeline } from "./timeline.js";
 import { readStatus } from "../statusline/state.js";
 import { defaultRoot } from "../store/session-store.js";
@@ -17,7 +14,7 @@ import { join } from "node:path";
 import type { Mode } from "../types.js";
 
 function parseMode(m: string): Mode {
-  return (["simple", "deep", "teach", "ask"].includes(m) ? m : "simple") as Mode;
+  return (["simple", "deep", "teach"].includes(m) ? m : "simple") as Mode;
 }
 
 // Use the depth the session was turned on with, unless the user passed --mode.
@@ -33,7 +30,7 @@ program.name("codey").description("Live legibility for Claude Code");
 program
   .command("watch")
   .description("Watch the current Claude Code session and narrate what it's doing")
-  .option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask (defaults to the session's mode)")
+  .option("-m, --mode <mode>", "narration depth: simple | deep | teach (defaults to the session's mode)")
   .option("-s, --session <id>", "session id to watch (defaults to most recent)")
   .action((opts: { mode?: string; session?: string }) => {
     const session = opts.session ?? latestSessionId();
@@ -66,7 +63,7 @@ program
 program
   .command("narrate")
   .description("Background narrator that feeds the status line")
-  .option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask", "simple")
+  .option("-m, --mode <mode>", "narration depth: simple | deep | teach", "simple")
   .option("-s, --session <id>", "session id (defaults to most recent)")
   .action((opts: { mode: string; session?: string }) => {
     const mode = parseMode(opts.mode);
@@ -83,7 +80,7 @@ program
 program
   .command("on")
   .description("Turn narration on in the status line")
-  .option("-m, --mode <mode>", "simple | deep | teach | ask", "simple")
+  .option("-m, --mode <mode>", "simple | deep | teach", "simple")
   .action((opts: { mode: string }) => {
     const mode = parseMode(opts.mode);
     const session = latestSessionId();
@@ -95,23 +92,6 @@ program
     console.log("For the full scrollable task history, run this in a new terminal:");
     console.log(`  node "${process.argv[1]}" feed`);
   });
-
-program
-  .command("explain")
-  .description("Explain the most recent task in depth; run again to go deeper")
-  .argument("[args...]", "optional depth (simple | deep | teach) and/or a task number")
-  .action((args: string[]) => { void runExplain(args); });
-
-program
-  .command("budget")
-  .description("Set or report the token budget for automatic narration")
-  .argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report")
-  .action((amount: string | undefined) => runBudget(amount));
-
-program
-  .command("costs")
-  .description("Show the token cost of each task in this session")
-  .action(() => runCosts());
 
 program
   .command("timeline")

@@ -45,7 +45,7 @@ describe("renderStatus", () => {
       stage: "Done",
       sentence: "Finished this prompt. Run /codey:timeline for the full breakdown.",
       elapsed: "2m 14s",
-      hint: "/codey:timeline · /codey:costs",
+      hint: "/codey:timeline",
     }));
     const lines = out.split("\n");
     expect(lines[0]).toContain("Codey");
@@ -76,9 +76,9 @@ describe("renderStatus", () => {
     expect(out.split("\n")[0]).toContain("3.8k left");
   });
 
-  it("shows a dim hint line for ask mode", () => {
-    const out = plain(renderStatus({ ...base, mode: "ask", hint: "/codey:explain for the why" }));
-    expect(out).toContain("/codey:explain for the why");
+  it("shows a dim hint line when a hint is set", () => {
+    const out = plain(renderStatus({ ...base, mode: "deep", hint: "/codey:timeline for the full story" }));
+    expect(out).toContain("/codey:timeline for the full story");
   });
 
   it("colors the bar differently per mode", () => {
@@ -109,7 +109,7 @@ describe("renderStatus", () => {
   });
 
   it("keeps the HUD to two logical lines (status bar then sentence)", () => {
-    const lines = plain(renderStatus({ ...base, sentence: "Claude is editing render.ts to change how the statusline behaves.", hint: "/codey:explain for the why", budgetLeft: "3.8k left" })).split("\n");
+    const lines = plain(renderStatus({ ...base, sentence: "Claude is editing render.ts to change how the statusline behaves.", hint: "/codey:timeline for the full story", budgetLeft: "3.8k left" })).split("\n");
     expect(lines.length).toBeLessThanOrEqual(2);
   });
 });

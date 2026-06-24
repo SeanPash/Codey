@@ -196,12 +196,6 @@ describe("buildCaption", () => {
     expect(c.simple).not.toBe("Because dist files ship compiled.");
   });
 
-  it("ignores the AI why in ask mode, keeping only free deterministic labels", () => {
-    const c = buildCaption(chunk(), "ask", "Some generated why.");
-    expect(c.simple).not.toBe("Some generated why.");
-    expect(c.deep).toBeUndefined();
-  });
-
   it("reports an outcome when an action failed and recovered", () => {
     const c = buildCaption(chunk({ stage: "debugging", failed: true, resolved: true }), "deep");
     expect(c.outcome).toMatch(/recover/i);

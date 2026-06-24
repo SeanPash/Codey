@@ -1,5 +1,5 @@
 export type ToolPhase = "pre" | "post";
-export type Mode = "simple" | "deep" | "teach" | "ask";
+export type Mode = "simple" | "deep" | "teach";
 
 export interface ToolEvent {
   id: string;          // unique per emitted event

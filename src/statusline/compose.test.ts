@@ -192,14 +192,6 @@ describe("composeView live phase", () => {
     expect(view.sentence).toBe("Claude is checking how Codey records prompts.");
   });
 
-  it("ask mode keeps a free deterministic caption and points at the explain command", () => {
-    const events = [pre("1", "Read", { file_path: "a.ts" }, 10)];
-    const view = composeView(events, snap({ mode: "ask", why: "an AI why" }), 1000, []);
-    expect(view.sentence).not.toBe("an AI why");
-    expect(view.sentence).toContain("Claude is reading");
-    expect(view.hint).toBe("/codey:explain for the why");
-  });
-
   it("makes deep mode meaningfully richer than simple for the same step, with no AI why", () => {
     const events = [pre("a", "Bash", { command: "git status" }, 0)];
     const simple = composeView(events, snap({ mode: "simple", why: null }), 1000, []);

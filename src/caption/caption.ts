@@ -244,8 +244,6 @@ export function buildCaption(chunk: WorkChunk, mode: Mode, why?: string | null):
 
   const caption: LiveCaption = { stage: chunk.stage, title: d.title, simple: d.simple, outcome, evidence };
 
-  if (mode === "ask") return caption;
-
   if (mode === "simple") {
     if (clean) caption.simple = clean;
     return caption;
