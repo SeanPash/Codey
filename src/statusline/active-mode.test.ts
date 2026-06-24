@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { writeSessionMode, readSessionMode, clearSessionMode, anyActiveSession, inheritedMode } from "./active-mode.js";
-import { writeMetaIfAbsent } from "../store/session-meta.js";
+import { writeSessionMode, readSessionMode, clearSessionMode, anyActiveSession } from "./active-mode.js";
 
 describe("per-session mode store", () => {
   it("round-trips the chosen mode for a session", () => {
@@ -43,59 +42,5 @@ describe("anyActiveSession", () => {
     expect(anyActiveSession(root)).toBe(true);
     clearSessionMode(a);
     expect(anyActiveSession(root)).toBe(false);
-  });
-});
-
-describe("inheritedMode", () => {
-  it("carries the mode from a prior same-cwd session forward", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
-    writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/proj" }, root);
-    writeSessionMode("deep", join(root, "old"));
-    expect(inheritedMode("/proj", "new", root)).toBe("deep");
-  });
-
-  it("returns null when no prior session shares the cwd", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
-    writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/other" }, root);
-    writeSessionMode("deep", join(root, "old"));
-    expect(inheritedMode("/proj", "new", root)).toBeNull();
-  });
-
-  it("ignores prior sessions in the same cwd that have Codey off", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
-    writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/proj" }, root);
-    expect(inheritedMode("/proj", "new", root)).toBeNull();
-  });
-
-  it("never inherits from the session itself", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
-    writeMetaIfAbsent({ sessionId: "self", transcriptPath: null, cwd: "/proj" }, root);
-    writeSessionMode("teach", join(root, "self"));
-    expect(inheritedMode("/proj", "self", root)).toBeNull();
-  });
-
-  it("returns null for an unknown cwd", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
-    expect(inheritedMode(null, "new", root)).toBeNull();
-  });
-
-  it("does not inherit from a prior session that has been idle past the window", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
-    writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/proj" }, root);
-    writeSessionMode("deep", join(root, "old"));
-    // Pretend we are asking far in the future: the prior session is stale, so a fresh terminal
-    // starts off and the user must opt in again rather than silently resuming deep.
-    const farFuture = Date.now() + 60 * 60_000;
-    expect(inheritedMode("/proj", "new", root, farFuture)).toBeNull();
-  });
-
-  it("picks the most recently active session when several share the cwd", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-root-"));
-    writeMetaIfAbsent({ sessionId: "older", transcriptPath: null, cwd: "/proj" }, root);
-    writeSessionMode("simple", join(root, "older"));
-    writeMetaIfAbsent({ sessionId: "newer", transcriptPath: null, cwd: "/proj" }, root);
-    writeSessionMode("teach", join(root, "newer"));
-    // newer's mode file was written last, so it is the most recent Codey activity in /proj.
-    expect(inheritedMode("/proj", "new", root)).toBe("teach");
   });
 });

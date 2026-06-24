@@ -326,8 +326,6 @@
     .tokhd .k { margin-bottom:0; }
     .tokhd .toktot { font-size:17px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
     .tokhd .toktot small { font-size:9px; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); margin-left:5px; }
-    /* one quiet line of plain English so the chart says what it is before any color is decoded. */
-    .tokcap { font-size:10.5px; color:var(--muted); margin-top:5px; line-height:1.4; }
     /* the hero: one stacked bar showing every category's share at a glance. Thin seams between
        segments (matched to the card surface) keep neighbours readable without loud borders. */
     .tokbar { display:flex; height:10px; border-radius:5px; overflow:hidden; margin-top:12px;
@@ -341,9 +339,12 @@
     .brkrow .bn { flex:1; min-width:0; font-size:12px; color:var(--ink); font-weight:600; display:inline-flex; align-items:center; gap:8px;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .brkrow .bn .sw { width:10px; height:10px; border-radius:3px; flex:none; }
-    .brkrow .bv { flex:none; display:inline-flex; align-items:baseline; gap:8px; font-variant-numeric:tabular-nums; }
-    .brkrow .bv .bc { font-size:11px; color:var(--body); font-weight:500; text-align:right; min-width:40px; }
-    .brkrow .bv .pct { color:var(--ink2); font-weight:700; font-size:11.5px; min-width:34px; text-align:right; }
+    .brkrow .bv { flex:none; display:inline-flex; align-items:baseline; gap:7px; font-variant-numeric:tabular-nums; }
+    /* the token count is the answer to "how much went here", so it is the bold, legible number;
+       the percent trails it as a quiet secondary. */
+    .brkrow .bv .bc { font-size:13.5px; color:var(--ink); font-weight:700; text-align:right; min-width:46px; letter-spacing:-0.01em; }
+    .brkrow .bv .bc small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:3px; }
+    .brkrow .bv .pct { color:var(--muted); font-weight:500; font-size:11px; min-width:32px; text-align:right; }
     .brkrow .tr { height:4px; border-radius:3px; background:var(--inset); overflow:hidden; }
     .brkrow .tr i { display:block; height:4px; border-radius:3px; min-width:3px; opacity:.85; }
     .tokempty { font-size:11px; color:var(--muted); margin-top:12px; }
@@ -1329,7 +1330,7 @@
             // Compact counts (2.5k) keep the amount and percent columns aligned in the narrow rail.
             return `<div class="brkrow"><div class="top">`
               + `<span class="bn"><span class="sw" style="background:${c}"></span>${esc(r.label)}</span>`
-              + `<span class="bv"><span class="bc num">${kfmt(r.tokens)}</span><span class="pct num">${pctText(r.pct)}</span></span></div>`
+              + `<span class="bv"><span class="bc num">${kfmt(r.tokens)}<small>tok</small></span><span class="pct num">${pctText(r.pct)}</span></span></div>`
               + `<div class="tr"><i style="width:${barW(r.pct)}%;background:${c}"></i></div></div>`;
           }).join("")
         : `<div class="tokempty">No token activity yet.</div>`;
@@ -1354,7 +1355,6 @@
         + `</div>`
         + `<div class="scard tokcard"><div class="tokhd"><span class="k">Token breakdown</span>`
         + `<span class="toktot">${kfmt(bd.total)}<small>tok</small></span></div>`
-        + `<div class="tokcap">Where this session's tokens went, by kind of work</div>`
         + stackBar
         + `<div class="brk">${brkRows}</div>`
         + priciest

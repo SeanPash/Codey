@@ -6,7 +6,7 @@ import { handlePromptInput } from "./prompt-mark.js";
 import { readStatus } from "../statusline/state.js";
 import { readPrompts } from "./prompts.js";
 import { readMeta, writeMetaIfAbsent } from "../store/session-meta.js";
-import { readSessionMode, writeSessionMode, clearSessionMode } from "../statusline/active-mode.js";
+import { readSessionMode, writeSessionMode } from "../statusline/active-mode.js";
 
 describe("handlePromptInput", () => {
   it("stamps promptAt on the session snapshot", () => {
@@ -40,37 +40,15 @@ describe("handlePromptInput", () => {
     expect(readMeta("s1", root)).toEqual({ sessionId: "s1", transcriptPath: "/t/s1.jsonl", cwd: "/proj" });
   });
 
-  it("inherits the mode from a prior same-cwd session on the first prompt", () => {
+  it("does not carry a prior same-cwd session's mode onto a fresh session", () => {
+    // /clear and resume start a new session id in the same folder. Codey must stay off there
+    // until the user opts back in, so viewing the timeline or any first prompt never lights it up.
     const root = mkdtempSync(join(tmpdir(), "codey-prompt-"));
     writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/proj" }, root);
     writeSessionMode("deep", join(root, "old"));
     handlePromptInput(
       JSON.stringify({ session_id: "new", hook_event_name: "UserPromptSubmit", cwd: "/proj" }), 1, root,
     );
-    expect(readSessionMode(join(root, "new"))).toBe("deep");
-  });
-
-  it("does not inherit across a different cwd", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-prompt-"));
-    writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/other" }, root);
-    writeSessionMode("deep", join(root, "old"));
-    handlePromptInput(
-      JSON.stringify({ session_id: "new", hook_event_name: "UserPromptSubmit", cwd: "/proj" }), 1, root,
-    );
-    expect(readSessionMode(join(root, "new"))).toBeNull();
-  });
-
-  it("does not re-inherit after the user turns Codey off mid-session", () => {
-    const root = mkdtempSync(join(tmpdir(), "codey-prompt-"));
-    writeMetaIfAbsent({ sessionId: "old", transcriptPath: null, cwd: "/proj" }, root);
-    writeSessionMode("deep", join(root, "old"));
-    // First prompt inherits deep.
-    handlePromptInput(JSON.stringify({ session_id: "new", hook_event_name: "UserPromptSubmit", cwd: "/proj" }), 1, root);
-    expect(readSessionMode(join(root, "new"))).toBe("deep");
-    // The user turns Codey off in this session.
-    clearSessionMode(join(root, "new"));
-    // A later prompt must not silently turn it back on.
-    handlePromptInput(JSON.stringify({ session_id: "new", hook_event_name: "UserPromptSubmit", cwd: "/proj" }), 2, root);
     expect(readSessionMode(join(root, "new"))).toBeNull();
   });
 

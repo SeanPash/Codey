@@ -37,14 +37,28 @@ function sessionFromPayload(payload: string): string | null {
   }
 }
 
-// Render the line for one specific session. Returns "" (blank) unless that session has
-// Codey turned on, so a fresh tab shows nothing until the user opts in. We never guess a
+// ANSI bits for the off hint, kept local so this file owns its one tiny line.
+const RESET = "\x1b[0m";
+const BOLD = "\x1b[1m";
+const BRAND = "\x1b[38;5;75m"; // the Codey name and the mode commands, sky blue
+const DIM = "\x1b[38;5;244m";  // the surrounding words sit quietly
+
+// Shown when Codey is wired but this session has no mode on. Rather than a blank line, nudge
+// the user toward a mode so they know narration is one command away.
+function offHint(): string {
+  return `${BOLD}${BRAND}Codey${RESET} ${DIM}off · run ${RESET}${BRAND}/codey:simple${RESET}`
+    + `${DIM} or ${RESET}${BRAND}/codey:deep${RESET}${DIM} to narrate this session${RESET}`;
+}
+
+// Render the line for one specific session. When Codey is on for the session we show its live
+// narration; when it is off we show a quiet nudge toward a mode instead of nothing, so opening
+// the timeline (which wires the status line) makes the HUD say how to start. We never guess a
 // different session: a new tab must not inherit the previous tab's narration.
 export function lineForSession(session: string | null, root: string, now: number): string {
   if (!session) return "";
   const dir = join(root, session);
   const mode = readSessionMode(dir);
-  if (!mode) return "";
+  if (!mode) return offHint();
   return statusLineFor(dir, now, mode);
 }
 

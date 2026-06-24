@@ -42,6 +42,14 @@ function statusLineCommand(self: string): string {
   return `node "${self}" statusline`;
 }
 
+// Wire the status line into global settings without turning on a mode. Opening the timeline
+// calls this so the HUD area exists and can show the "run a mode" nudge; a real `on` later just
+// overwrites the same command. Idempotent: leaves an existing status line alone.
+export function ensureStatusLine(self: string): void {
+  const s = readSettings();
+  if (!s.statusLine) writeSettings(withStatusLine(s, statusLineCommand(self)));
+}
+
 // One narrator per session, so two terminals can run Codey without fighting over a
 // single shared pidfile.
 function pidPath(sessionDir: string): string {
