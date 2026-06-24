@@ -334,21 +334,22 @@
       background:var(--inset); box-shadow:inset 0 0 0 1px var(--hair); }
     .tokbar i { display:block; height:10px; min-width:4px; }
     .tokbar i + i { border-left:1.5px solid var(--surf); }
-    /* receipt rows: the category label sits on its own line so it always reads in full, then the
-       mini bar fills the row beneath it with the count and percent right-aligned in fixed columns
-       so every number lines up. The labelled rows are the legend. */
-    .brk { margin-top:16px; display:flex; flex-direction:column; gap:14px; }
-    .brkrow .bn { font-size:12px; color:var(--ink); font-weight:600; display:flex; align-items:center; gap:8px;
-      margin-bottom:7px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .brkrow .bn .sw { width:10px; height:10px; border-radius:3px; flex:none; }
-    .brkrow .meter { display:flex; align-items:center; gap:9px; font-variant-numeric:tabular-nums; }
-    .brkrow .tr { flex:1; min-width:0; height:5px; border-radius:3px; background:var(--inset); overflow:hidden; }
-    .brkrow .tr i { display:block; height:5px; border-radius:3px; min-width:3px; opacity:.9; }
+    /* receipt rows: one clean line each. Color chip, category label, then the count and percent
+       right-aligned in fixed columns so every number lines up. The stacked bar above already shows
+       the shares visually, so rows carry no mini bars. The labelled rows are the legend. */
+    .brk { margin-top:14px; }
+    .brkrow { display:flex; align-items:baseline; gap:9px; padding:7px 0;
+      border-top:1px solid var(--hair); font-variant-numeric:tabular-nums; }
+    .brkrow:first-child { border-top:none; }
+    .brkrow .sw { width:9px; height:9px; border-radius:3px; flex:none; align-self:center; }
+    .brkrow .bn { flex:1; min-width:0; font-size:12px; color:var(--ink); font-weight:600;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     /* the token count is the answer to "how much went here", so it is the bold, legible number;
-       the percent trails it as a quiet secondary. */
-    .brkrow .bc { flex:none; font-size:13px; color:var(--ink); font-weight:700; text-align:right; min-width:46px; letter-spacing:-0.01em; }
+       the percent trails it as a quiet secondary. Both stay on the one line, never wrapping. */
+    .brkrow .bc { flex:none; font-size:12.5px; color:var(--ink); font-weight:700; text-align:right;
+      letter-spacing:-0.01em; white-space:nowrap; }
     .brkrow .bc small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:3px; }
-    .brkrow .pct { flex:none; color:var(--muted); font-weight:500; font-size:11px; min-width:30px; text-align:right; }
+    .brkrow .pct { flex:none; min-width:34px; text-align:right; color:var(--muted); font-weight:500; font-size:11px; }
     .tokempty { font-size:11px; color:var(--muted); margin-top:12px; }
     /* priciest-task footer: its own labelled row below the breakdown, name on the left (truncated),
        spend on the right, so it reads as a separate receipt line and not part of the chart. */
@@ -1329,13 +1330,13 @@
       const brkRows = bd.rows.length
         ? bd.rows.map(r => {
             const c = colorFor(r.label);
-            // The label gets its own line so it always reads in full ("Reading files" never clips
-            // in the narrow rail). The mini bar then fills the row beneath it, with the count and
-            // percent right-aligned in fixed columns so every number lines up.
+            // One clean line per category: chip, label, then count and percent right-aligned. The
+            // stacked bar above carries the visual share, so the row stays a plain receipt line.
             return `<div class="brkrow">`
-              + `<div class="bn"><span class="sw" style="background:${c}"></span>${esc(r.label)}</div>`
-              + `<div class="meter"><div class="tr"><i style="width:${barW(r.pct)}%;background:${c}"></i></div>`
-              + `<span class="bc num">${kfmt(r.tokens)}<small>tok</small></span><span class="pct num">${pctText(r.pct)}</span></div>`
+              + `<span class="sw" style="background:${c}"></span>`
+              + `<span class="bn">${esc(r.label)}</span>`
+              + `<span class="bc num">${kfmt(r.tokens)}<small>tok</small></span>`
+              + `<span class="pct num">${pctText(r.pct)}</span>`
               + `</div>`;
           }).join("")
         : `<div class="tokempty">No token activity yet.</div>`;
