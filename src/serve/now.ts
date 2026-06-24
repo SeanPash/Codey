@@ -120,7 +120,14 @@ export function buildNowView(
   // gap between two back-to-back tools (where Stop has not fired). It is not the generous
   // 30-minute "open" window, or the strip and its Follow-live timer would tick on after a stop.
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  const live = !!current || thinking || recent;
+  // The turn is still in flight when the prompt is newer than the last Stop and we are inside the
+  // thinking window. This matches the snapshot's isRunning, so the strip stays lit through the
+  // longer gaps where Claude is reasoning between tools (no open call, last tool > RUNNING_WINDOW
+  // ago). Without it the strip and the page's "Working now" badge disagree mid-turn.
+  const turnInFlight = status?.promptAt != null
+    && status.promptAt > (status.doneAt ?? 0)
+    && now - status.promptAt < THINKING_WINDOW_MS;
+  const live = !!current || thinking || recent || turnInFlight;
 
   if (current) {
     const action = {

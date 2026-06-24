@@ -4595,6 +4595,13 @@ function stageColor(state, mode) {
 function modeLabel(mode) {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
+var STAGE_MAX = 34;
+function clipStage(stage) {
+  if (stage.length <= STAGE_MAX) return stage;
+  const cut = stage.slice(0, STAGE_MAX);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > STAGE_MAX * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
+}
 var SEP = `${DIM}\u2502${RESET}`;
 function visLen(s) {
   return s.replace(/\x1b\[[0-9;]*m/g, "").length;
@@ -4619,7 +4626,7 @@ function statusBar(view) {
   const accent = stageColor(view.state, view.mode);
   const parts = [`${BOLD}${BRAND}Codey${RESET}`];
   if (view.state !== "done") parts.push(`${MODE_COLOR[view.mode] ?? MODE_COLOR.simple}${modeLabel(view.mode)}${RESET}`);
-  parts.push(`${BOLD}${accent}${view.stage}${RESET}`);
+  parts.push(`${BOLD}${accent}${clipStage(view.stage)}${RESET}`);
   if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
   const budget = view.budgetLeft ? ` ${DIM}\xB7 ${view.budgetLeft}${RESET}` : "";
   return parts.join(` ${SEP} `) + budget;
@@ -5781,7 +5788,8 @@ function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINI
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
   const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && now - status.promptAt < THINKING_WINDOW_MS;
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  const live = !!current || thinking || recent;
+  const turnInFlight = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
+  const live = !!current || thinking || recent || turnInFlight;
   if (current) {
     const action = {
       label: currentLabel(current.tool, current.input),
