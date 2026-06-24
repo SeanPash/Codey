@@ -63,6 +63,11 @@ describe("buildRecap", () => {
     expect(r.sentence).not.toMatch(/updated|created|fixed/i);
   });
 
+  it("falls back to a complete 'Finished this prompt.' when nothing nameable happened", () => {
+    const r = buildRecap([]);
+    expect(r.sentence).toBe("Finished this prompt.");
+  });
+
   it("never uses an em dash", () => {
     const r = buildRecap([pre("Edit", { file_path: "a.ts" }), pre("Bash", { command: "npm run build" })]);
     expect(r.sentence).not.toMatch(/[—–]/);

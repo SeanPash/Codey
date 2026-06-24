@@ -5,11 +5,17 @@
 // test rather than a vague line in front of the user.
 export const BANNED_PHRASES: RegExp[] = [
   /see how it works/i,
+  /follow how it works/i,
+  /adjust how it works/i,
   /see how the pieces fit together/i,
   /\bbefore changing anything\b/i,
   /\bchanging specific lines\b/i,
+  /\bchanging files in place\b/i,
   /\bfind the part it needs\b/i,
   /\bmap how they connect\b/i,
+  /\bchecking the code\b/i,
+  /\bsearching the project for the code\b/i,
+  /\breading files to understand them\b/i,
   /\bseveral files\b/i,
   /\ba few files\b/i,
   /\bvarious files\b/i,

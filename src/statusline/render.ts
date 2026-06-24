@@ -45,32 +45,23 @@ function clipStage(stage: string): string {
 
 const SEP = `${DIM}│${RESET}`;
 
-// Clip the sentence to a single line at the HUD width. The live HUD is a compact two lines, not
-// a paragraph, so a long caption is cut at a word boundary with an ellipsis. The full wording
-// still lives in the browser timeline.
-function clipLine(text: string, width: number): string {
-  const t = text.trim();
-  if (t.length <= width) return t;
-  const cut = t.slice(0, width - 1);
-  const sp = cut.lastIndexOf(" ");
-  return (sp > width * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "…";
-}
-
 // Line one: Codey, the mode, the phase chip, and the turn timer, with the budget cue trailing
-// quietly. Done drops the mode so the line reads as a clean close. While live, a short hint
-// (the explain pointer, a paused notice) rides on this line too, so the body stays two lines.
+// quietly. Done drops the mode and adds a "Summary" chip so it is clear line two is a completion
+// summary, not live narration. While live, a short hint (the explain pointer, a paused notice)
+// rides on this line too, so the body stays two lines.
 function statusBar(view: StatusView): string {
   const accent = stageColor(view.state, view.mode);
   const parts = [`${BOLD}${BRAND}Codey${RESET}`];
   if (view.state !== "done") parts.push(`${MODE_COLOR[view.mode] ?? MODE_COLOR.simple}${modeLabel(view.mode)}${RESET}`);
   parts.push(`${BOLD}${accent}${clipStage(view.stage)}${RESET}`);
+  if (view.state === "done") parts.push(`${DIM}Summary${RESET}`);
   if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
   const budget = view.budgetLeft ? ` ${DIM}· ${view.budgetLeft}${RESET}` : "";
   const hint = view.state !== "done" && view.hint ? ` ${DIM}· ${view.hint}${RESET}` : "";
   return parts.join(` ${SEP} `) + budget + hint;
 }
 
-export function renderStatus(view: StatusView, width = WRAP): string {
+export function renderStatus(view: StatusView, _width = WRAP): string {
   const out = [statusBar(view)];
 
   // A stuck warning is the most important thing on screen, so it takes line two outright.
@@ -79,8 +70,11 @@ export function renderStatus(view: StatusView, width = WRAP): string {
     return out.join("\n");
   }
 
+  // Line two is the sentence, printed whole. The composer already trims it to complete sentences
+  // within a budget, so we never cut it off mid-thought with an ellipsis; an over-long line just
+  // wraps in the terminal, while the fuller detail lives in the browser timeline.
   const body = view.state === "done" ? GREEN : TEXT;
-  out.push(`${body}${clipLine(view.sentence, width)}${RESET}`);
+  out.push(`${body}${view.sentence.trim()}${RESET}`);
 
   // Only the done close keeps a dim footer on its own line ("Run /codey:timeline ..."); live
   // states fold their hint onto the status bar so the HUD never grows past two lines.

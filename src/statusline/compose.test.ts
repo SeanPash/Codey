@@ -175,6 +175,22 @@ describe("composeView live phase", () => {
     expect(view.sentence).toContain("Claude is reading");
   });
 
+  it("drops to a complete deterministic sentence when the live why is too long to show whole", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+    const runOn = "Claude is investigating how the Codey narration system currently captures and tracks what you ask for so that later captions can refer to the real prompt instead of a generic file activity line and stay grounded in the work";
+    const view = composeView(events, snap({ mode: "simple", why: runOn }), 1000, []);
+    expect(view.sentence).not.toBe(runOn);
+    expect(view.sentence).not.toMatch(/…$/);
+    expect(view.sentence.endsWith(".")).toBe(true);
+    expect(view.sentence).toContain("Claude is reading");
+  });
+
+  it("keeps a short live why whole rather than padding it", () => {
+    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+    const view = composeView(events, snap({ mode: "simple", why: "Claude is checking how Codey records prompts." }), 1000, []);
+    expect(view.sentence).toBe("Claude is checking how Codey records prompts.");
+  });
+
   it("ask mode keeps a free deterministic caption and points at the explain command", () => {
     const events = [pre("1", "Read", { file_path: "a.ts" }, 10)];
     const view = composeView(events, snap({ mode: "ask", why: "an AI why" }), 1000, []);

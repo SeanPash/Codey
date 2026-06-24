@@ -13,6 +13,13 @@ describe("sessionDisplayName", () => {
     expect(out.length).toBeLessThanOrEqual(38);
   });
 
+  it("shows a slash command as typed, not the command it ran", () => {
+    // A /codey:timeline session's first action is the bash command that opens the timeline; its
+    // title ("Start Codey timeline server") must not override the user's own "/codey:timeline".
+    expect(sessionDisplayName({ firstChunkName: "Start Codey timeline server", firstPrompt: "/codey:timeline", sessionId: "abc", mtimeMs: 0 }))
+      .toBe("/codey:timeline");
+  });
+
   it("ignores the naive 'Working' placeholder name", () => {
     expect(sessionDisplayName({ firstChunkName: "Working", firstPrompt: "do a thing", sessionId: "abc", mtimeMs: 0 }))
       .toBe("do a thing");

@@ -30,6 +30,21 @@ describe("hasBannedPhrase", () => {
     }
   });
 
+  it("flags the timeline-row fillers that prompted this pass", () => {
+    const bad = [
+      "Reading render.ts to follow how it works.",
+      "Reading prompt.ts to follow how it works.",
+      "Changing banned.ts to adjust how it works.",
+      "Searching the project for the code.",
+      "Checking the code.",
+      "Reading files to understand them.",
+      "Changing files in place.",
+    ];
+    for (const line of bad) {
+      expect(hasBannedPhrase(line)).toBe(true);
+    }
+  });
+
   it("passes real, grounded captions", () => {
     const good = [
       "Claude is reading index.html to find the token breakdown, saver buttons, and active terminal rendering.",

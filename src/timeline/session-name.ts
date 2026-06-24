@@ -25,6 +25,11 @@ function clamp(s: string, n: number): string {
 // A user-set customName wins over all automatic names when present and non-empty.
 export function sessionDisplayName(i: NameInputs): string {
   if (i.customName && i.customName.trim()) return clamp(i.customName.trim(), MAX_TITLE);
+  // A slash command ("/codey:timeline") is the user's own deliberate label. It must show as the
+  // user typed it, never get replaced by the title of the command it happened to run (a session
+  // whose whole job is opening the timeline would otherwise read "Start Codey timeline server").
+  const prompt = i.firstPrompt?.trim() ?? "";
+  if (prompt.startsWith("/")) return clamp(prompt, MAX_TITLE);
   if (i.firstChunkName && !PLACEHOLDER.has(i.firstChunkName)) return clamp(i.firstChunkName, MAX_TITLE);
   if (i.firstPrompt) return clamp(i.firstPrompt, MAX_TITLE);
   return `Session ${i.sessionId.slice(0, 8)}`;
