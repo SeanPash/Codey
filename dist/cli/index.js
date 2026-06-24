@@ -3188,6 +3188,7 @@ function userPrompts(text) {
       continue;
     }
     if (r.type !== "user") continue;
+    if (r.isMeta === true) continue;
     const c = r.message?.content;
     let t = null;
     if (typeof c === "string" && c.trim()) {

@@ -124,6 +124,10 @@ export function userPrompts(text: string): UserPrompt[] {
     let r: Record<string, any>;
     try { r = JSON.parse(line); } catch { continue; }
     if (r.type !== "user") continue;
+    // Skip injected turns: a slash command writes the expanded instruction body as an isMeta
+    // user turn, and pasted-image markers come through the same way. Neither is something the
+    // user actually asked, so they should never become their own "you asked" group.
+    if (r.isMeta === true) continue;
     const c = r.message?.content;
     let t: string | null = null;
     if (typeof c === "string" && c.trim()) {

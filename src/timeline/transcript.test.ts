@@ -175,6 +175,17 @@ describe("userPrompts", () => {
     ].join("\n");
     expect(userPrompts(text).map((p) => p.text)).toEqual(["/codey:timeline", "fix the layout please"]);
   });
+
+  it("skips the injected command body (isMeta) so only the typed command shows", () => {
+    // A slash command writes two user turns: the "/name" invocation, then its expanded
+    // instruction body marked isMeta. Only the first is something the user actually asked.
+    const text = [
+      JSON.stringify({ type: "user", message: { content: "<command-name>codey:deep</command-name>" }, timestamp: "2026-06-21T00:00:01Z" }),
+      JSON.stringify({ type: "user", isMeta: true, message: { content: "Turn Codey narration on by running: node cli on --mode deep" }, timestamp: "2026-06-21T00:00:01Z" }),
+      JSON.stringify({ type: "user", message: { content: "now do the real thing" }, timestamp: "2026-06-21T00:00:05Z" }),
+    ].join("\n");
+    expect(userPrompts(text).map((p) => p.text)).toEqual(["/codey:deep", "now do the real thing"]);
+  });
 });
 
 describe("lastInterruptTs", () => {
