@@ -3,7 +3,8 @@ import type { ReceiptLine } from "../types.js";
 // A trailing run of thinking with no action to fold into: show it plainly on its own. No
 // thinking text exists to reveal, so the row is just a marker that Claude paused to think.
 function loneThinkRow(tokens: number, ts: number): ReceiptLine {
-  return { label: "Thought about what to do next.", tool: "thinking", tokens, status: "none",
+  return { label: "Thought about what to do next.", title: "Thinking it through",
+    subtitle: "Working through the approach before acting.", tool: "thinking", tokens, status: "none",
     errorText: null, resolved: false, raw: null, why: null, failSummary: null, ts, thoughtFirst: false };
 }
 

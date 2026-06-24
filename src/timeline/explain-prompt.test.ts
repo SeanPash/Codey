@@ -5,6 +5,8 @@ import type { ReceiptLine } from "../types.js";
 function line(over: Partial<ReceiptLine> = {}): ReceiptLine {
   return {
     label: "Writing server.ts",
+    title: "Adding server.ts",
+    subtitle: "Creating server.ts.",
     tool: "Write",
     tokens: 100,
     status: "ok",

@@ -35,6 +35,8 @@ export interface Warning {
 
 export interface ReceiptLine {
   label: string;                 // plain-English: "Writing PlayerController.cs"
+  title: string;                 // purpose headline shown collapsed: "Adding math.js"
+  subtitle: string;              // one plain sentence under the title, naming the real subject
   tool: string;                  // "Write" | "Bash" | "thinking" | ...
   tokens: number;                // output tokens attributed to this action
   status: "ok" | "fail" | "none"; // "none" = a non-tool turn (e.g. thinking)

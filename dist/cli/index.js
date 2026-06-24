@@ -3415,7 +3415,7 @@ function buildNarrationPrompt(events, mode) {
 ${lines}
 
 ${instruction2}
-Write plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
+Be specific and concrete: name the actual files, search terms, or commands involved so the reader knows exactly what is happening. Avoid vague filler like "several files" or "the code" when the actions name a real file or term. Write plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }
 
 // src/narration/throttle.ts
@@ -3494,8 +3494,88 @@ function renderHeader(mode) {
   return `Codey (mode: ${mode}) - watching what Claude is doing`;
 }
 function renderCaption(caption) {
-  const stage = caption.stage.charAt(0).toUpperCase() + caption.stage.slice(1);
-  return `\u25B8 ${stage}: ${caption.simple}`;
+  return `\u25B8 ${caption.title}
+    ${caption.simple}`;
+}
+
+// src/caption/subject.ts
+function joinNames(names, max = 4) {
+  const list = names.filter(Boolean);
+  if (list.length === 0) return "";
+  if (list.length === 1) return list[0];
+  if (list.length === 2) return `${list[0]} and ${list[1]}`;
+  if (list.length <= max) return `${list.slice(0, -1).join(", ")}, and ${list[list.length - 1]}`;
+  const shown = list.slice(0, max - 1);
+  return `${shown.join(", ")}, and ${list.length - shown.length} more`;
+}
+function humanFile(name) {
+  if (!name) return name;
+  if (name.includes(" ")) return name;
+  const test = /^(.+)\.(test|spec)\.[jt]sx?$/.exec(name);
+  if (test) return `${test[1]} tests`;
+  if (/^readme(\.|$)/i.test(name)) return "the README";
+  return name;
+}
+function patternTokens(pattern) {
+  return pattern.replace(/\\[a-z]/gi, " ").split(/[^A-Za-z0-9_]+/).filter((t) => t.length >= 2);
+}
+var EXT_NOISE = /* @__PURE__ */ new Set(["js", "ts", "jsx", "tsx", "mjs", "cjs", "json", "md", "css", "html"]);
+function phrasePattern(pattern) {
+  const raw = (pattern ?? "").trim();
+  if (!raw) return "the code";
+  if (/[\\()\[\]+?^$]/.test(raw)) return "the code";
+  const tokens = patternTokens(raw).filter((t) => !EXT_NOISE.has(t.toLowerCase()));
+  if (tokens.length === 0 || tokens.length > 4) return "the code";
+  return joinNames(tokens);
+}
+function purposeTitle(tool, stage, subject, count) {
+  const many = count > 1;
+  switch (stage) {
+    case "editing": {
+      const adds = tool === "Write" || tool === "NotebookEdit";
+      if (many) return adds ? "Creating several files" : "Updating several files";
+      return adds ? `Adding ${subject}` : `Updating ${subject}`;
+    }
+    case "inspecting":
+      if (many) return "Checking several files";
+      return `Checking ${subject}`;
+    case "testing":
+      return `Verifying ${subject}`;
+    case "debugging":
+      return "Working through an error";
+    case "planning":
+      return "Planning the next step";
+    case "summarizing":
+      return "Wrapping up";
+    case "waiting":
+    default:
+      return "Getting started";
+  }
+}
+function purposeSentence(tool, stage, subject, count) {
+  const many = count > 1;
+  switch (stage) {
+    case "editing": {
+      const adds = tool === "Write" || tool === "NotebookEdit";
+      if (many) return adds ? "Adding several new files to the project." : "Editing several related files.";
+      return adds ? `Creating ${subject}.` : `Changing ${subject} to adjust how it works.`;
+    }
+    case "inspecting":
+      if (many) return "Reading through several files to follow how the code fits together.";
+      if (tool === "Grep" || tool === "Glob") return `Searching the project for ${subject}.`;
+      return `Reading ${subject} to follow how it works.`;
+    case "testing":
+      return `Running ${subject} to check it passes.`;
+    case "debugging":
+      return "Reading the error and trying a different approach.";
+    case "planning":
+      return "Working out the next step before changing anything.";
+    case "summarizing":
+      return "Pulling the work together into a clear recap.";
+    case "waiting":
+    default:
+      return "Getting started on the request.";
+  }
 }
 
 // src/statusline/labels.ts
@@ -3629,7 +3709,8 @@ function actionLabel(tool, input) {
     case "Grep":
     case "Glob": {
       const p = str(input, "pattern");
-      if (p && /^[\w.\-/ ]+$/.test(p) && p.length <= 40) return { tag: "searching for", target: p };
+      const phrased = phrasePattern(p ?? "");
+      if (phrased !== "the code") return { tag: "searching for", target: phrased };
       return tool === "Glob" ? { tag: "looking for", target: "files" } : { tag: "searching", target: "the code" };
     }
   }
@@ -3823,71 +3904,82 @@ function mutating(stage) {
 }
 
 // src/caption/caption.ts
-function phraseTargets(targets, fallback) {
-  const names = targets.filter(Boolean);
-  if (names.length === 0) return fallback;
-  if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
-  return fallback;
+function subjectOf(chunk) {
+  if (chunk.tool === "Grep" || chunk.tool === "Glob") return phrasePattern(chunk.raw ?? "");
+  return humanFile(chunk.targets[0] ?? "") || "the code";
 }
 function describe(chunk) {
-  const many = chunk.count > 1 || chunk.targets.length > 1;
+  const subject = subjectOf(chunk);
+  const title = purposeTitle(chunk.tool, chunk.stage, subject, chunk.count);
+  const few = chunk.targets.length <= 3 && chunk.count <= 3;
+  const names = joinNames(chunk.targets.map(humanFile)) || "the code";
   switch (chunk.stage) {
     case "inspecting": {
-      const subject = phraseTargets(chunk.targets, "the code");
-      return many ? {
-        title: `Reading ${chunk.count} files`,
-        simple: "Claude is checking several project files to understand how the code works.",
-        deep: "Claude is reading through several project files to see how the pieces fit together before changing anything.",
-        teach: "Claude is reading through several project files to see how the pieces fit together before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there."
-      } : {
-        title: `Reading ${subject}`,
-        simple: `Claude is reading ${subject} to understand how it works.`,
-        deep: `Claude is reading ${subject} to understand how it works before changing anything.`,
-        teach: `Claude is reading ${subject} to understand how it works before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.`
+      if (chunk.tool === "Grep" || chunk.tool === "Glob") {
+        return {
+          title,
+          simple: `Claude is searching the project for ${subject}.`,
+          deep: `Claude is searching the project for ${subject} to see where it is used.`,
+          teach: `Claude is searching the project for ${subject} to see where it is used. Searching first shows every place a change would ripple to, so nothing gets missed.`
+        };
+      }
+      if (few) {
+        return {
+          title,
+          simple: `Claude is reading ${names} to understand the code.`,
+          deep: `Claude is reading ${names} to see how it works before changing anything.`,
+          teach: `Claude is reading ${names} to see how it works before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.`
+        };
+      }
+      return {
+        title,
+        simple: "Claude is checking several files to see how the code works.",
+        deep: "Claude is checking several files to see how the pieces fit together before changing anything.",
+        teach: "Claude is checking several files to see how the pieces fit together before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there."
       };
     }
     case "editing": {
-      const subject = phraseTargets(chunk.targets, "the code");
-      return many ? {
-        title: `Editing ${chunk.count} files`,
-        simple: "Claude is editing several files to make the change.",
-        deep: "Claude is editing several files, changing the code so it behaves the way the task needs.",
-        teach: "Claude is editing several files, changing the code so it behaves the way the task needs. An edit rewrites part of a source file, and the change only takes effect once the code runs or is rebuilt."
-      } : {
-        title: `Editing ${subject}`,
-        simple: `Claude is editing ${subject} to make a change.`,
-        deep: `Claude is editing ${subject}, changing the code so it behaves the way the task needs.`,
-        teach: `Claude is editing ${subject}, changing the code so it behaves the way the task needs. An edit rewrites part of a source file, and the change only takes effect once the code runs or is rebuilt.`
+      const adds = chunk.tool === "Write" || chunk.tool === "NotebookEdit";
+      if (few) {
+        const verb = adds ? "creating" : "updating";
+        return {
+          title,
+          simple: `Claude is ${verb} ${names} for the task.`,
+          deep: `Claude is ${verb} ${names}, changing the code so it behaves the way the task needs.`,
+          teach: `Claude is ${verb} ${names}, changing the code so it behaves the way the task needs. An edit only takes effect once the code runs or is rebuilt.`
+        };
+      }
+      return {
+        title,
+        simple: "Claude is updating several related files to keep the implementation in sync.",
+        deep: "Claude is updating several related files so the implementation and its tests stay in sync.",
+        teach: "Claude is updating several related files so the implementation and its tests stay in sync. Keeping related files aligned is what stops a change in one place from breaking another."
       };
     }
-    case "testing": {
-      const subject = chunk.targets.length === 1 ? chunk.targets[0] : "the tests";
+    case "testing":
       return {
-        title: `Running ${subject}`,
+        title,
         simple: `Claude is running ${subject} to check its work.`,
         deep: `Claude is running ${subject} to confirm the changes work and nothing else broke.`,
         teach: `Claude is running ${subject} to confirm the changes work and nothing else broke. Tests are small programs that check the real code behaves as expected, so a problem shows up right away.`
       };
-    }
     case "debugging":
       return {
-        title: "Debugging",
+        title,
         simple: "Claude hit an error and is working out what went wrong.",
         deep: "Claude is debugging, reading the error from a failed action and trying a different approach.",
         teach: "Claude is debugging, reading the error from a failed action and trying a different approach. Debugging is the loop of reading an error, guessing the cause, and testing a fix until it holds."
       };
     case "planning":
       return {
-        title: "Planning",
+        title,
         simple: "Claude is thinking through what to do next.",
         deep: "Claude is planning its next step before changing any files.",
         teach: "Claude is planning its next step before changing any files. Thinking the work through first keeps the changes deliberate instead of guesswork."
       };
     case "summarizing":
       return {
-        title: "Wrapping up",
+        title,
         simple: "Claude is wrapping up and pulling together what it did.",
         deep: "Claude is summarizing the work so the result is easy to follow.",
         teach: "Claude is summarizing the work so the result is easy to follow. A clear recap is what turns a pile of edits into something a person can review."
@@ -3895,7 +3987,7 @@ function describe(chunk) {
     case "waiting":
     default:
       return {
-        title: "Getting started",
+        title,
         simple: "Claude is getting started.",
         deep: "Claude is getting started on your request.",
         teach: "Claude is getting started on your request."
@@ -4248,9 +4340,6 @@ function cardsFromEvents(events) {
   }
   return built.map(({ names, lastTs, ...card }) => card);
 }
-function stageChip(stage) {
-  return stage.charAt(0).toUpperCase() + stage.slice(1);
-}
 function pickSentence(caption, mode) {
   if (mode === "deep") return caption.deep ?? caption.simple;
   if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
@@ -4288,8 +4377,10 @@ function composeView(events, snap, now, whys = [], budget = null) {
   const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
   return {
     ...base,
+    // The line-one chip leads with the purpose ("Adding math.js"), not the bare stage, so the
+    // HUD says what Claude is working on at a glance.
     state: "live",
-    stage: stageChip(caption.stage),
+    stage: caption.title,
     sentence: pickSentence(caption, snap.mode),
     warning: snap.warning,
     hint
@@ -4853,6 +4944,13 @@ function basename2(p) {
   const parts = p.split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
+function patternFrom(input) {
+  if (input && typeof input === "object") {
+    const p = input.pattern;
+    if (typeof p === "string") return p;
+  }
+  return null;
+}
 function fileFrom(input) {
   if (input && typeof input === "object") {
     const r = input;
@@ -4902,12 +5000,30 @@ function describeAction(tool, input) {
     case "PowerShell":
       return descFrom(input) ?? "Ran a command";
     case "Grep":
-    case "Glob":
-      return "Searched the code";
+    case "Glob": {
+      const p = patternFrom(input);
+      return p ? `Searched for ${phrasePattern(p)}` : "Searched the code";
+    }
   }
   const m = /^mcp__([^_]+)__(.+)$/.exec(tool);
   if (m) return `${prettify(m[2])} via ${m[1]}`;
   return tool;
+}
+function actionSubject(tool, input) {
+  if (tool === "Grep" || tool === "Glob") return phrasePattern(patternFrom(input) ?? "");
+  const file7 = fileFrom(input);
+  if (file7) return humanFile(file7);
+  return humanFile(shortTarget(actionLabel(tool, input).target)) || "the code";
+}
+function actionTitle(tool, input) {
+  if (!tool || tool === "thinking") return "Thinking it through";
+  return purposeTitle(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
+}
+function actionSubtitle(tool, input) {
+  if (!tool || tool === "thinking") return "Working through the approach before acting.";
+  const desc = descFrom(input);
+  if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
+  return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 function rawDetail(tool, input) {
   if (!tool) return null;
@@ -4943,6 +5059,8 @@ function attributeChunk(turns, startTs, endTs) {
     const isFail = !!(t.tool && t.tool !== "thinking" && t.isError);
     workLines.push({
       label: describeAction(t.tool, t.input),
+      title: actionTitle(t.tool, t.input),
+      subtitle: actionSubtitle(t.tool, t.input),
       tool: t.tool ?? "thinking",
       tokens: t.outputTokens,
       status: t.tool && t.tool !== "thinking" ? t.isError ? "fail" : "ok" : "none",
@@ -4974,6 +5092,8 @@ function sessionTotals(turns) {
 function loneThinkRow(tokens, ts) {
   return {
     label: "Thought about what to do next.",
+    title: "Thinking it through",
+    subtitle: "Working through the approach before acting.",
     tool: "thinking",
     tokens,
     status: "none",
@@ -5202,9 +5322,9 @@ function actionInstruction(depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this single step and why.";
     case "teach":
-      return "In a few plain English sentences for someone learning to code, explain what Claude did in this single step and why, then briefly teach the key concept involved (define any technical term you use).";
+      return "Explain this single step for someone learning to code, in three labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why Claude did it. Start the next line with 'How Claude did it:' then one or two sentences on how the step works. Start a final line with 'Concept:' then briefly teach the key concept involved and define any technical term you use.";
     default:
-      return "In a few plain English sentences for a non-technical person, explain what Claude did in this single step, why it matters, and how it works.";
+      return "Explain this single step for a non-technical person, in two labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why this step matters. Start the next line with 'How Claude did it:' then one or two sentences on how the step works.";
   }
 }
 var SELF_CONTAINED = "Explain only the steps shown above. The steps are all the context that exists, so never ask the user for more information, never say you lack context, and never ask them to describe what happened. If the detail is sparse, give your best plain high-level explanation from what is shown.";

@@ -9,8 +9,8 @@ export function renderHeader(mode: Mode): string {
   return `Codey (mode: ${mode}) - watching what Claude is doing`;
 }
 
-// The live phase line: a stage chip and the plain-English sentence, not a raw tool call.
+// The live phase: the purpose title leads, the plain-English sentence sits under it. Raw
+// paths and commands stay out of the live line so a long temp path never dominates.
 export function renderCaption(caption: LiveCaption): string {
-  const stage = caption.stage.charAt(0).toUpperCase() + caption.stage.slice(1);
-  return `▸ ${stage}: ${caption.simple}`;
+  return `▸ ${caption.title}\n    ${caption.simple}`;
 }

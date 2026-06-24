@@ -7,7 +7,8 @@ import { armBudget, addSpend } from "../budget/budget.js";
 import type { SessionSnapshot, ReceiptLine, TimelineChunk, PromptGroup } from "../types.js";
 
 function rl(over: Partial<ReceiptLine> = {}): ReceiptLine {
-  return { label: "Reading a.ts", tool: "Read", tokens: 10, status: "ok", errorText: null,
+  return { label: "Reading a.ts", title: "Checking a.ts", subtitle: "Reading a.ts to follow how it works.",
+    tool: "Read", tokens: 10, status: "ok", errorText: null,
     resolved: false, raw: "a.ts", why: "checking the shape", failSummary: null, ts: 1, thoughtFirst: false, ...over };
 }
 function chunk(id: string, lines: ReceiptLine[]): TimelineChunk {

@@ -14,5 +14,5 @@ export function buildNarrationPrompt(events: ToolEvent[], mode: Mode): string {
       : mode === "deep"
       ? "In 2-3 plain-English sentences for a non-technical person, explain what Claude is doing, why it matters, and how this change actually addresses the problem. Do not list the tools; describe the goal."
       : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Do not list the tools; describe the goal.";
-  return `These are the most recent actions an AI coding agent took:\n${lines}\n\n${instruction}\nWrite plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
+  return `These are the most recent actions an AI coding agent took:\n${lines}\n\n${instruction}\nBe specific and concrete: name the actual files, search terms, or commands involved so the reader knows exactly what is happening. Avoid vague filler like "several files" or "the code" when the actions name a real file or term. Write plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }

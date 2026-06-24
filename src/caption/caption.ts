@@ -2,6 +2,7 @@ import type { Mode } from "../types.js";
 import { stripDashes } from "../util/text.js";
 import type { WorkChunk } from "./chunks.js";
 import type { Stage } from "./stage.js";
+import { humanFile, phrasePattern, purposeTitle, joinNames } from "./subject.js";
 
 // The one caption shape every surface renders from. `simple` is always a complete sentence;
 // `deep` and `teach` layer on more only when the mode asks for them. The optional fields are
@@ -23,78 +24,87 @@ interface Described {
   teach: string;
 }
 
-// Join a few names the way a person would speak them, and fall back to a stage noun when
-// the names are too many or too few to read well.
-function phraseTargets(targets: string[], fallback: string): string {
-  const names = targets.filter(Boolean);
-  if (names.length === 0) return fallback;
-  if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]}`;
-  return fallback;
+// The best short subject for this chunk: a search pattern phrased plainly, otherwise the
+// humanized name of the first thing touched.
+function subjectOf(chunk: WorkChunk): string {
+  if (chunk.tool === "Grep" || chunk.tool === "Glob") return phrasePattern(chunk.raw ?? "");
+  return humanFile(chunk.targets[0] ?? "") || "the code";
 }
 
 function describe(chunk: WorkChunk): Described {
-  const many = chunk.count > 1 || chunk.targets.length > 1;
+  const subject = subjectOf(chunk);
+  const title = purposeTitle(chunk.tool, chunk.stage, subject, chunk.count);
+  // A few named files read better than a vague "several files"; past a handful we summarize.
+  const few = chunk.targets.length <= 3 && chunk.count <= 3;
+  const names = joinNames(chunk.targets.map(humanFile)) || "the code";
+
   switch (chunk.stage) {
     case "inspecting": {
-      const subject = phraseTargets(chunk.targets, "the code");
-      return many
-        ? {
-            title: `Reading ${chunk.count} files`,
-            simple: "Claude is checking several project files to understand how the code works.",
-            deep: "Claude is reading through several project files to see how the pieces fit together before changing anything.",
-            teach: "Claude is reading through several project files to see how the pieces fit together before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.",
-          }
-        : {
-            title: `Reading ${subject}`,
-            simple: `Claude is reading ${subject} to understand how it works.`,
-            deep: `Claude is reading ${subject} to understand how it works before changing anything.`,
-            teach: `Claude is reading ${subject} to understand how it works before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.`,
-          };
+      if (chunk.tool === "Grep" || chunk.tool === "Glob") {
+        return {
+          title,
+          simple: `Claude is searching the project for ${subject}.`,
+          deep: `Claude is searching the project for ${subject} to see where it is used.`,
+          teach: `Claude is searching the project for ${subject} to see where it is used. Searching first shows every place a change would ripple to, so nothing gets missed.`,
+        };
+      }
+      if (few) {
+        return {
+          title,
+          simple: `Claude is reading ${names} to understand the code.`,
+          deep: `Claude is reading ${names} to see how it works before changing anything.`,
+          teach: `Claude is reading ${names} to see how it works before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.`,
+        };
+      }
+      return {
+        title,
+        simple: "Claude is checking several files to see how the code works.",
+        deep: "Claude is checking several files to see how the pieces fit together before changing anything.",
+        teach: "Claude is checking several files to see how the pieces fit together before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.",
+      };
     }
     case "editing": {
-      const subject = phraseTargets(chunk.targets, "the code");
-      return many
-        ? {
-            title: `Editing ${chunk.count} files`,
-            simple: "Claude is editing several files to make the change.",
-            deep: "Claude is editing several files, changing the code so it behaves the way the task needs.",
-            teach: "Claude is editing several files, changing the code so it behaves the way the task needs. An edit rewrites part of a source file, and the change only takes effect once the code runs or is rebuilt.",
-          }
-        : {
-            title: `Editing ${subject}`,
-            simple: `Claude is editing ${subject} to make a change.`,
-            deep: `Claude is editing ${subject}, changing the code so it behaves the way the task needs.`,
-            teach: `Claude is editing ${subject}, changing the code so it behaves the way the task needs. An edit rewrites part of a source file, and the change only takes effect once the code runs or is rebuilt.`,
-          };
-    }
-    case "testing": {
-      const subject = chunk.targets.length === 1 ? chunk.targets[0] : "the tests";
+      const adds = chunk.tool === "Write" || chunk.tool === "NotebookEdit";
+      if (few) {
+        const verb = adds ? "creating" : "updating";
+        return {
+          title,
+          simple: `Claude is ${verb} ${names} for the task.`,
+          deep: `Claude is ${verb} ${names}, changing the code so it behaves the way the task needs.`,
+          teach: `Claude is ${verb} ${names}, changing the code so it behaves the way the task needs. An edit only takes effect once the code runs or is rebuilt.`,
+        };
+      }
       return {
-        title: `Running ${subject}`,
+        title,
+        simple: "Claude is updating several related files to keep the implementation in sync.",
+        deep: "Claude is updating several related files so the implementation and its tests stay in sync.",
+        teach: "Claude is updating several related files so the implementation and its tests stay in sync. Keeping related files aligned is what stops a change in one place from breaking another.",
+      };
+    }
+    case "testing":
+      return {
+        title,
         simple: `Claude is running ${subject} to check its work.`,
         deep: `Claude is running ${subject} to confirm the changes work and nothing else broke.`,
         teach: `Claude is running ${subject} to confirm the changes work and nothing else broke. Tests are small programs that check the real code behaves as expected, so a problem shows up right away.`,
       };
-    }
     case "debugging":
       return {
-        title: "Debugging",
+        title,
         simple: "Claude hit an error and is working out what went wrong.",
         deep: "Claude is debugging, reading the error from a failed action and trying a different approach.",
         teach: "Claude is debugging, reading the error from a failed action and trying a different approach. Debugging is the loop of reading an error, guessing the cause, and testing a fix until it holds.",
       };
     case "planning":
       return {
-        title: "Planning",
+        title,
         simple: "Claude is thinking through what to do next.",
         deep: "Claude is planning its next step before changing any files.",
         teach: "Claude is planning its next step before changing any files. Thinking the work through first keeps the changes deliberate instead of guesswork.",
       };
     case "summarizing":
       return {
-        title: "Wrapping up",
+        title,
         simple: "Claude is wrapping up and pulling together what it did.",
         deep: "Claude is summarizing the work so the result is easy to follow.",
         teach: "Claude is summarizing the work so the result is easy to follow. A clear recap is what turns a pile of edits into something a person can review.",
@@ -102,7 +112,7 @@ function describe(chunk: WorkChunk): Described {
     case "waiting":
     default:
       return {
-        title: "Getting started",
+        title,
         simple: "Claude is getting started.",
         deep: "Claude is getting started on your request.",
         teach: "Claude is getting started on your request.",

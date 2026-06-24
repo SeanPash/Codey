@@ -69,11 +69,6 @@ export function cardsFromEvents(events: ToolEvent[]): Card[] {
   return built.map(({ names, lastTs, ...card }) => card);
 }
 
-// The phase chip on line one, Title Case so it reads as a label not a shout.
-function stageChip(stage: string): string {
-  return stage.charAt(0).toUpperCase() + stage.slice(1);
-}
-
 // Pick the sentence for the current mode: simple is one line, deep and teach reach for the
 // richer fields when they exist and fall back gracefully when they do not.
 function pickSentence(caption: LiveCaption, mode: Mode): string {
@@ -143,8 +138,10 @@ export function composeView(
 
   return {
     ...base,
+    // The line-one chip leads with the purpose ("Adding math.js"), not the bare stage, so the
+    // HUD says what Claude is working on at a glance.
     state: "live",
-    stage: stageChip(caption.stage),
+    stage: caption.title,
     sentence: pickSentence(caption, snap.mode),
     warning: snap.warning,
     hint,
