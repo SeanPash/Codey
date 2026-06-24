@@ -91,13 +91,15 @@ describe("composeView done", () => {
     expect(view.state).toBe("done");
     expect(view.stage).toBe("Done");
     expect(view.sentence).toBe("Wired the summary section.");
-    expect(view.hint).toContain("/codey:timeline");
+    // The closing footer sits beneath the recap on every finished prompt.
+    expect(view.hint).toBe("Finished this prompt. Run /codey:timeline to see the full breakdown.");
   });
 
-  it("falls back to a clean generic line when there is no recap", () => {
+  it("falls back to the closing footer as the line itself when there is no recap", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const view = composeView(events, snap({ doneAt: 200, why: null }), 10000);
-    expect(view.sentence).toBe("Finished this prompt. Run /codey:timeline for the full breakdown.");
+    expect(view.sentence).toBe("Finished this prompt. Run /codey:timeline to see the full breakdown.");
+    expect(view.hint).toBe(null);
   });
 
   it("snaps to done even before any reveal would have caught up", () => {
@@ -158,6 +160,16 @@ describe("composeView live phase", () => {
     ];
     expect(composeView(events, snap(), 1000, whys).sentence).toBe("first explanation here");
     expect(composeView(events, snap(), 5000, whys).sentence).toBe("second explanation here");
+  });
+
+  it("ignores a why from a previous turn so the explanation matches this turn's work", () => {
+    const events = [pre("b", "Read", { file_path: "b.ts" }, 200)]; // this turn's tool
+    const whys = [{ ts: 10, why: "explanation of the previous prompt" }]; // stamped before this turn
+    // With the prior why scoped out, the deep sentence falls back to this turn's deterministic
+    // caption instead of describing last turn's work under this turn's stage.
+    const view = composeView(events, snap({ promptAt: 150, why: null }), 5000, whys);
+    expect(view.sentence).not.toBe("explanation of the previous prompt");
+    expect(view.sentence).toContain("Claude is reading");
   });
 
   it("ask mode keeps a free deterministic caption and points at the explain command", () => {

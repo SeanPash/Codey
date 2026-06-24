@@ -77,8 +77,9 @@ function pickSentence(caption: LiveCaption, mode: Mode): string {
   return caption.simple;
 }
 
-const DONE_SENTENCE = "Finished this prompt. Run /codey:timeline for the full breakdown.";
-const SEE_MORE = "/codey:timeline · /codey:costs";
+// The closing footer, shown at the bottom of every finished prompt so there is always a clear
+// "this turn is done, here is where to see more" line, whether or not a recap was generated.
+const DONE_FOOTER = "Finished this prompt. Run /codey:timeline to see the full breakdown.";
 
 export function composeView(
   events: ToolEvent[],
@@ -112,10 +113,11 @@ export function composeView(
   }
 
   if (done) {
-    // Keep the AI recap when there is one, since it says what the turn actually accomplished;
-    // otherwise fall back to a clean generic line. Either way, point at the fuller views.
-    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : DONE_SENTENCE;
-    return { ...base, state: "done", stage: "Done", sentence: recap, warning: null, hint: SEE_MORE };
+    // Keep the AI recap when there is one, since it says what the turn actually accomplished, and
+    // put the closing footer beneath it. With no recap the footer becomes the line itself, so a
+    // finished prompt always ends with "Finished this prompt. Run /codey:timeline..." at the bottom.
+    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : null;
+    return { ...base, state: "done", stage: "Done", sentence: recap ?? DONE_FOOTER, warning: null, hint: recap ? DONE_FOOTER : null };
   }
 
   // The live phase is scoped to the current turn so it resets cleanly on each new prompt.
@@ -131,8 +133,11 @@ export function composeView(
   // line holds a meaningful caption instead of flickering once per tool call.
   const current = chunks[chunks.length - 1];
   // In ask mode nothing is narrated automatically; when the budget is spent we stop too. In
-  // both cases the caption falls back to its free deterministic wording.
-  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(whys, now) ?? snap.why;
+  // both cases the caption falls back to its free deterministic wording. The why history is
+  // scoped to the current turn so a leftover explanation from the previous prompt never shows
+  // under this turn's stage: the explanation always matches the work on screen.
+  const turnWhys = whys.filter((w) => w.ts >= turnStart);
+  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
   const caption = buildCaption(current, snap.mode, ai);
   const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
 

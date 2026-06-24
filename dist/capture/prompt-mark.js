@@ -84,7 +84,8 @@ function lastActive(dir) {
   }
   return t;
 }
-function inheritedMode(cwd, excludeId, root) {
+var INHERIT_WINDOW_MS = 10 * 6e4;
+function inheritedMode(cwd, excludeId, root, now = Date.now()) {
   if (!cwd || !existsSync3(root)) return null;
   let best = null;
   for (const name of readdirSync(root)) {
@@ -96,7 +97,9 @@ function inheritedMode(cwd, excludeId, root) {
     const at = lastActive(dir);
     if (!best || at > best.at) best = { mode, at };
   }
-  return best?.mode ?? null;
+  if (!best) return null;
+  if (now - best.at > INHERIT_WINDOW_MS) return null;
+  return best.mode;
 }
 
 // src/capture/prompts.ts
@@ -124,14 +127,14 @@ function handlePromptInput(rawJson, now = Date.now(), root = defaultRoot()) {
   const dir = join6(root, raw.session_id);
   mkdirSync3(dir, { recursive: true });
   const firstPrompt = readMeta(raw.session_id, root) === null;
-  patchStatus(dir, { promptAt: now });
+  patchStatus(dir, { promptAt: now, why: null, action: null, warning: null, doneAt: null });
   appendPrompt(dir, now);
   writeMetaIfAbsent(
     { sessionId: raw.session_id, transcriptPath: raw.transcript_path ?? null, cwd: raw.cwd ?? null },
     root
   );
   if (firstPrompt && readSessionMode(dir) === null) {
-    const inherit = inheritedMode(raw.cwd ?? null, raw.session_id, root);
+    const inherit = inheritedMode(raw.cwd ?? null, raw.session_id, root, now);
     if (inherit) writeSessionMode(inherit, dir);
   }
 }

@@ -4575,8 +4575,7 @@ function pickSentence(caption, mode) {
   if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
   return caption.simple;
 }
-var DONE_SENTENCE = "Finished this prompt. Run /codey:timeline for the full breakdown.";
-var SEE_MORE = "/codey:timeline \xB7 /codey:costs";
+var DONE_FOOTER = "Finished this prompt. Run /codey:timeline to see the full breakdown.";
 function composeView(events, snap, now, whys = [], budget = null) {
   const budgetLeft = budgetLeftLabel(budget);
   const paused = budgetPausedMessage(budget);
@@ -4593,8 +4592,8 @@ function composeView(events, snap, now, whys = [], budget = null) {
     return { ...base, state: "thinking", stage: "Thinking", sentence: "Claude is thinking about your request.", warning: null, hint: null };
   }
   if (done) {
-    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : DONE_SENTENCE;
-    return { ...base, state: "done", stage: "Done", sentence: recap, warning: null, hint: SEE_MORE };
+    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : null;
+    return { ...base, state: "done", stage: "Done", sentence: recap ?? DONE_FOOTER, warning: null, hint: recap ? DONE_FOOTER : null };
   }
   const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
   const chunks = chunkEvents(events.filter((e) => e.timestamp >= turnStart));
@@ -4602,7 +4601,8 @@ function composeView(events, snap, now, whys = [], budget = null) {
     return { ...base, state: "idle", stage: "Idle", sentence: "Waiting for Claude.", warning: snap.warning, hint: null };
   }
   const current = chunks[chunks.length - 1];
-  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(whys, now) ?? snap.why;
+  const turnWhys = whys.filter((w) => w.ts >= turnStart);
+  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
   const caption = buildCaption(current, snap.mode, ai);
   const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
   return {
@@ -5007,6 +5007,7 @@ function readSessionMode(sessionDir) {
   const raw = readFileSync12(p, "utf8").trim();
   return raw === "simple" || raw === "deep" || raw === "teach" || raw === "ask" ? raw : null;
 }
+var INHERIT_WINDOW_MS = 10 * 6e4;
 function anyActiveSession(root) {
   if (!existsSync13(root)) return false;
   for (const name of readdirSync2(root)) {
@@ -5122,7 +5123,7 @@ function createServer(deps) {
     const route = resolveRoute(req.method, req.url);
     try {
       if (route.type === "page") {
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         res.end(readFileSync14(deps.pagePath, "utf8"));
       } else if (route.type === "health") {
         sendJson(res, 200, { build: deps.buildId });
@@ -6020,7 +6021,8 @@ function loadLive(root = defaultRoot()) {
       thinking: running && !runningTool,
       prompt,
       cancelled,
-      groupId
+      groupId,
+      seedDepth: snap.seedDepth
     };
   });
   return { sessions, liveCount: sessions.filter((s) => s.running).length, hidden };
@@ -6343,7 +6345,7 @@ function turnOn(mode, session) {
   mkdirSync10(dir, { recursive: true });
   stopNarrator(pidPath(dir));
   writeSessionMode(mode, dir);
-  patchStatus(dir, { mode });
+  patchStatus(dir, { mode, why: null, action: null, warning: null, doneAt: null });
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
     detached: true,

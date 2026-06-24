@@ -192,6 +192,7 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
       prompt,
       cancelled,
       groupId,
+      seedDepth: snap.seedDepth,
     };
   });
   // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".

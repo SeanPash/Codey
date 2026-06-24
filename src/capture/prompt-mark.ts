@@ -27,7 +27,11 @@ export function handlePromptInput(rawJson: string, now = Date.now(), root: strin
   mkdirSync(dir, { recursive: true });
   // No meta yet means this is the session's first prompt. Check before writing it below.
   const firstPrompt = readMeta(raw.session_id, root) === null;
-  patchStatus(dir, { promptAt: now });
+  // A new prompt starts a fresh turn, so drop the last turn's explanation, terse action, warning,
+  // and done-stamp. Without this the status line shows the previous turn's recap or "why" next to
+  // the new turn's stage (an old explanation under a new task). The narrator refills `why` for this
+  // turn and capture refills `action` on the first tool; until then the line falls back cleanly.
+  patchStatus(dir, { promptAt: now, why: null, action: null, warning: null, doneAt: null });
   appendPrompt(dir, now);
   // Record the transcript path and cwd here too, not just on tool calls, so a turn with no
   // tools (a plain chat, a slash command, a skill) still has a real name and timeline content.
@@ -39,7 +43,7 @@ export function handlePromptInput(rawJson: string, now = Date.now(), root: strin
   // directory. Only on the first prompt, and only when nothing is set yet, so turning Codey
   // off in a session is never silently undone.
   if (firstPrompt && readSessionMode(dir) === null) {
-    const inherit = inheritedMode(raw.cwd ?? null, raw.session_id, root);
+    const inherit = inheritedMode(raw.cwd ?? null, raw.session_id, root, now);
     if (inherit) writeSessionMode(inherit, dir);
   }
 }

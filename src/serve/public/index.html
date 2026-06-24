@@ -23,7 +23,7 @@
       --sel:#5fa8e0; --sel-dim:#2c4d63;
       /* token-category hues: live ONLY inside the stats card, never on timeline rows. Restrained
          so the breakdown reads like a colored receipt, not a rainbow chart. */
-      --tok-file:#6aa3c4; --tok-cmd:#7377bd; --tok-search:#c39a59; --tok-reason:#a98ec9; --tok-other:#6e7785;
+      --tok-read:#6aa3c4; --tok-edit:#7a86c9; --tok-search:#c39a59; --tok-cmd:#c2807a; --tok-reason:#a98ec9; --tok-other:#6e7785;
       /* ---- radius ---- */
       --r-sm:6px; --r-task:8px; --r-card:10px;
       /* ---- motion ---- */
@@ -190,6 +190,10 @@
     .geyebrow.gcancel::before { box-shadow:none; }
     .geyebrow.glive .rdot { margin-right:1px; background:var(--live); animation:ppl 1.6s infinite; }
     .grpnote { color:var(--muted); font-size:11.5px; padding:8px 4px 2px; }
+    /* the live "thinking" note in the feed (before the first tool lands): a calm pulsing dot plus
+       the same wording as the NOW strip and status line, so all three agree the instant a prompt lands. */
+    .grpnote.think { display:flex; align-items:center; gap:8px; color:var(--body); font-size:12px; }
+    .grpnote.think .pip { width:6px; height:6px; border-radius:50%; background:var(--live); animation:pp 1.4s infinite; flex:none; }
     .grpcancel { color:var(--warn); font-size:11.5px; font-weight:600; padding:8px 4px 2px; }
     /* echo: first sentence of the recap, for scanning a completed prompt */
     .gecho { font-size:12px; color:var(--body); line-height:1.5; margin-top:9px; padding:1px 0 1px 10px; border-left:2px solid var(--line); }
@@ -322,9 +326,11 @@
     .tokhd .k { margin-bottom:0; }
     .tokhd .toktot { font-size:17px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
     .tokhd .toktot small { font-size:9px; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); margin-left:5px; }
+    /* one quiet line of plain English so the chart says what it is before any color is decoded. */
+    .tokcap { font-size:10.5px; color:var(--muted); margin-top:5px; line-height:1.4; }
     /* the hero: one stacked bar showing every category's share at a glance. Thin seams between
        segments (matched to the card surface) keep neighbours readable without loud borders. */
-    .tokbar { display:flex; height:10px; border-radius:5px; overflow:hidden; margin-top:13px;
+    .tokbar { display:flex; height:10px; border-radius:5px; overflow:hidden; margin-top:12px;
       background:var(--inset); box-shadow:inset 0 0 0 1px var(--hair); }
     .tokbar i { display:block; height:10px; min-width:4px; }
     .tokbar i + i { border-left:1.5px solid var(--surf); }
@@ -332,12 +338,12 @@
        columns so every number lines up, mini bar beneath. The rows are the legend. */
     .brk { margin-top:16px; display:flex; flex-direction:column; gap:13px; }
     .brkrow .top { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
-    .brkrow .bn { flex:1; min-width:0; font-size:11.5px; color:var(--ink2); display:inline-flex; align-items:center; gap:8px;
+    .brkrow .bn { flex:1; min-width:0; font-size:12px; color:var(--ink); font-weight:600; display:inline-flex; align-items:center; gap:8px;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .brkrow .bn .sw { width:9px; height:9px; border-radius:3px; flex:none; }
+    .brkrow .bn .sw { width:10px; height:10px; border-radius:3px; flex:none; }
     .brkrow .bv { flex:none; display:inline-flex; align-items:baseline; gap:8px; font-variant-numeric:tabular-nums; }
-    .brkrow .bv .bc { font-size:11.5px; color:var(--ink); font-weight:600; text-align:right; min-width:40px; }
-    .brkrow .bv .pct { color:var(--muted); font-weight:500; font-size:11px; min-width:32px; text-align:right; }
+    .brkrow .bv .bc { font-size:11px; color:var(--body); font-weight:500; text-align:right; min-width:40px; }
+    .brkrow .bv .pct { color:var(--ink2); font-weight:700; font-size:11.5px; min-width:34px; text-align:right; }
     .brkrow .tr { height:4px; border-radius:3px; background:var(--inset); overflow:hidden; }
     .brkrow .tr i { display:block; height:4px; border-radius:3px; min-width:3px; opacity:.85; }
     .tokempty { font-size:11px; color:var(--muted); margin-top:12px; }
@@ -542,6 +548,14 @@
     .phead .pname { font-weight:600; font-size:12.5px; color:var(--ink); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .phead .pproj { font-size:10px; color:var(--body); background:var(--surf-h); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--ink2); }
+    /* per-pane Depth control: a compact Simple/Deep/Teach segmented switch, scoped to this terminal
+       so one pane can read Simple while another reads Deep. Mirrors the single view's top control. */
+    .pdepth { flex:none; display:inline-flex; align-items:center; gap:6px; }
+    .pdepth .pdl { font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:700; }
+    .pseg { display:flex; background:var(--inset); border:1px solid var(--line); border-radius:7px; padding:2px; }
+    .pseg button { font:inherit; font-size:10.5px; padding:2px 8px; border:none; background:transparent; color:var(--muted); border-radius:5px; cursor:pointer; }
+    .pseg button:hover { color:var(--ink2); }
+    .pseg button.on { background:var(--surf-h); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); }
     /* per-pane Follow live toggle: green when on, like the single view's strip, but scoped here */
     .pfollow { flex:none; font:inherit; font-size:10.5px; display:inline-flex; align-items:center; gap:5px;
       background:var(--inset); border:1px solid var(--line); color:var(--muted); border-radius:7px; padding:3px 9px; cursor:pointer; }
@@ -732,10 +746,15 @@
     // Deep and Teach each drive a different --accent, so the chrome reads as the mode you are in.
     const applyMode = () => { document.body.dataset.mode = curDepth(); };
     applyMode();
-    const ekey = (scope, id) => scope + "|" + id + "|" + curDepth();
+    // While an Active Terminals pane is being built, renderDepth holds that pane's chosen depth so
+    // every explanation/summary block keys and labels at the pane's depth, not the page default.
+    // It is null in the single view and reset to null after each pane, so nothing leaks across panes.
+    let renderDepth = null;
+    const activeDepth = () => renderDepth || curDepth();
+    const ekey = (scope, id) => scope + "|" + id + "|" + activeDepth();
     const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
 
-    async function generate(scope, id, rerender) {
+    async function generate(scope, id, rerender, gdepth) {
       // Active Terminals namespaces ids as "<sessionId>~<chunkId>" so a button knows its own
       // session; the single view uses a bare id and the current session. Split on the first ~.
       let sessionId = currentId, serverId = id;
@@ -743,14 +762,17 @@
       if (tilde !== -1) { sessionId = id.slice(0, tilde); serverId = id.slice(tilde + 1); }
       if (!sessionId) return;
       const redraw = rerender || (() => { if (lastSnap) renderSingle(lastSnap); });
-      const key = ekey(scope, id);
+      // The depth comes from the button that was clicked (a pane carries its own), not the live
+      // render context, which is null by the time this async click handler runs.
+      const d = gdepth || curDepth();
+      const key = scope + "|" + id + "|" + d;
       if (explCache.has(key) || explLoading.has(key)) return;
       explLoading.add(key);
       redraw();
       try {
         const res = await fetch("/api/session/" + encodeURIComponent(sessionId) + "/explain", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ scope, id: serverId, depth: curDepth() }),
+          body: JSON.stringify({ scope, id: serverId, depth: d }),
         });
         const data = await res.json();
         if (data && data.paused) budgetPaused = true;
@@ -800,11 +822,11 @@
     function explainBlock(scope, id) {
       const key = ekey(scope, id);
       const cached = explCache.get(key);
-      if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(curDepth())}</span></div><div class="etext">${esc(cached)}</div></div>`;
-      if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(curDepth())} depth…</span></div>`;
+      if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(activeDepth())}</span></div><div class="etext">${esc(cached)}</div></div>`;
+      if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(activeDepth())} depth…</span></div>`;
       if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining. Raise it with <b>/codey:budget &lt;n&gt;</b> in your terminal, then try again.</div>`;
-      return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}"><span class="ic">&#9670;</span> Explain this task</button>`
-        + `<div class="genhint">Generates a ${esc(curDepth())} explanation. Uses your Codey tokens.</div></div>`;
+      return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#9670;</span> Explain this task</button>`
+        + `<div class="genhint">Generates a ${esc(activeDepth())} explanation. Uses your Codey tokens.</div></div>`;
     }
 
     // The closing recap card for a prompt group.
@@ -815,8 +837,8 @@
       if (explLoading.has(key)) return `<div class="recap"><span class="gening"><span class="spin"></span>Summarizing this prompt…</span></div>`;
       if (g.live) return `<div class="recap"><span class="pend">A recap appears here once Claude finishes this prompt.</span></div>`;
       if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached. Raise it with /codey:budget, then summarize.</span></div>`;
-      return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
-        + `<div class="genhint">Generates a ${esc(curDepth())} recap. Uses your Codey tokens.</div></div>`;
+      return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
+        + `<div class="genhint">Generates a ${esc(activeDepth())} recap. Uses your Codey tokens.</div></div>`;
     }
 
     // ---- Live NOW strip + Follow Live ----
@@ -987,14 +1009,14 @@
     function actionWhyBtn(c, idx) {
       const key = ekey("action", c.id + "#" + idx);
       if (explCache.has(key) || explLoading.has(key) || budgetPaused) return "";
-      return `<button class="whybtn primary" type="button" data-gen-scope="action" data-gen-id="${esc(c.id + "#" + idx)}">Explain this step</button>`;
+      return `<button class="whybtn primary" type="button" data-gen-scope="action" data-gen-id="${esc(c.id + "#" + idx)}" data-gen-depth="${esc(activeDepth())}">Explain this step</button>`;
     }
     // The generated why/how panel for a step: cached sections, a spinner, or a budget notice.
     function actionWhyOut(c, idx) {
       const key = ekey("action", c.id + "#" + idx);
       const cached = explCache.get(key);
       if (cached) return `<div class="expls">${explainSections(cached)}</div>`;
-      if (explLoading.has(key)) return `<div class="expls"><span class="gening"><span class="spin"></span>Explaining at ${esc(curDepth())} depth…</span></div>`;
+      if (explLoading.has(key)) return `<div class="expls"><span class="gening"><span class="spin"></span>Explaining at ${esc(activeDepth())} depth…</span></div>`;
       if (budgetPaused) return `<div class="expls paused">Budget reached, so Codey paused explaining. Raise it with <b>/codey:budget</b>, then try again.</div>`;
       return "";
     }
@@ -1183,7 +1205,9 @@
     // pane uses its own Follow live state and still shows the summary echo. Omitted in the single view.
     function groupHtml(g, snap, barFor, opts) {
       const cards = g.chunks.map((c) => cardHtml(c, barFor(c), snap)).join("")
-        || `<div class="grpnote">${g.live ? "Working on it…" : "Answered directly, no tools used."}</div>`;
+        || (g.live
+          ? `<div class="grpnote think"><span class="pip"></span>Claude is thinking about your request…</div>`
+          : `<div class="grpnote">Answered directly, no tools used.</div>`);
       // Eyebrow: live gets the pulsing dot, cancelled gets a quiet note, otherwise "You asked".
       const eyebrow = g.live
         ? `<div class="geye live"><span class="geye-dot"></span>Working now</div>`
@@ -1214,16 +1238,20 @@
     // Walks all receipt work lines and groups tokens into honest categories.
     // Returns { total, rows: [{label, tokens, pct}] } sorted by tokens descending.
     function tokenBreakdown(snap) {
-      const buckets = { Reasoning: 0, "File work": 0, Searches: 0, Commands: 0, Other: 0 };
+      // Plain-language categories so a row reads as what Claude actually did, not a tool name.
+      // Reading and editing are split out on purpose: "did it just look, or did it change files?"
+      // is the first thing anyone wants to know from the breakdown.
+      const buckets = { "Reading files": 0, "Editing files": 0, "Searching": 0, "Running commands": 0, "Thinking": 0, "Other": 0 };
       for (const c of (snap.chunks || [])) {
         for (const line of (c.receipt && c.receipt.workLines || [])) {
           const t = line.tool || "";
           const tok = line.tokens || 0;
-          if (t === "thinking") buckets.Reasoning += tok;
-          else if (["Read", "Write", "Edit", "MultiEdit"].includes(t)) buckets["File work"] += tok;
-          else if (["Grep", "Glob"].includes(t)) buckets.Searches += tok;
-          else if (["Bash", "PowerShell"].includes(t)) buckets.Commands += tok;
-          else buckets.Other += tok;
+          if (t === "thinking") buckets["Thinking"] += tok;
+          else if (t === "Read") buckets["Reading files"] += tok;
+          else if (["Write", "Edit", "MultiEdit"].includes(t)) buckets["Editing files"] += tok;
+          else if (["Grep", "Glob"].includes(t)) buckets["Searching"] += tok;
+          else if (["Bash", "PowerShell"].includes(t)) buckets["Running commands"] += tok;
+          else buckets["Other"] += tok;
         }
       }
       const total = Object.values(buckets).reduce((a, b) => a + b, 0);
@@ -1283,8 +1311,9 @@
       // One steady hue per category, reused across the stacked bar, legend swatch, and row bar so
       // the eye links them. Deliberately non-green: green is reserved for the single live thing.
       const colorFor = (label) => ({
-        "Commands": "var(--tok-cmd)", "File work": "var(--tok-file)", "Searches": "var(--tok-search)",
-        "Reasoning": "var(--tok-reason)", "Other": "var(--tok-other)",
+        "Reading files": "var(--tok-read)", "Editing files": "var(--tok-edit)",
+        "Searching": "var(--tok-search)", "Running commands": "var(--tok-cmd)",
+        "Thinking": "var(--tok-reason)", "Other": "var(--tok-other)",
       }[label] || "var(--tok-other)");
       // A category with real tokens but a sub-1% share shows "<1%" rather than a bare "0%", and
       // keeps a visible sliver in the bar (min-width), so nothing tiny reads as empty.
@@ -1325,6 +1354,7 @@
         + `</div>`
         + `<div class="scard tokcard"><div class="tokhd"><span class="k">Token breakdown</span>`
         + `<span class="toktot">${kfmt(bd.total)}<small>tok</small></span></div>`
+        + `<div class="tokcap">Where this session's tokens went, by kind of work</div>`
         + stackBar
         + `<div class="brk">${brkRows}</div>`
         + priciest
@@ -1532,7 +1562,7 @@
     function wireGenerate(scope, rerender) {
       scope.querySelectorAll("[data-gen-scope]").forEach((b) => b.addEventListener("click", (e) => {
         e.stopPropagation();
-        generate(b.dataset.genScope, b.dataset.genId, rerender);
+        generate(b.dataset.genScope, b.dataset.genId, rerender, b.dataset.genDepth);
       }));
     }
 
@@ -1666,6 +1696,10 @@
     const paneFollow = {};       // sessionId -> bool (absent = following by default)
     const paneLiveGroupId = {};  // sessionId -> last live group id, to re-engage follow on a new prompt
     const paneFollowOn = (sid) => paneFollow[sid] !== false;
+    // Each pane carries its own explanation depth so one terminal can read Simple while another
+    // reads Deep, with no swapping. Absent -> fall back to that session's seed depth, then "deep".
+    const paneDepth = {};        // sessionId -> "simple" | "deep" | "teach"
+    const paneDepthOn = (sid, seed) => paneDepth[sid] || seed || "deep";
 
     async function dismissTerminal(id) {
       try { await fetch("/api/session/" + encodeURIComponent(id) + "/dismiss", { method: "POST" }); } catch { /* refetch handles it */ }
@@ -1714,11 +1748,15 @@
       const liveChunks = liveGroup ? liveGroup.chunks : [];
       const liveChunkId = s.running && liveChunks.length ? liveChunks[liveChunks.length - 1].id : null;
       const follow = paneFollowOn(sid);
+      const pd = paneDepthOn(sid, s.seedDepth);
       // Pseudo-snapshot for the shared card/group renderers: this pane's own live flag and live row.
       const lastFinite = groups.reduce((m, g) => Math.max(m, g.endTs < 1e15 ? g.endTs : g.startTs), 0) || Date.now();
       const pseudo = { live: s.running, lastActivityAt: lastFinite, liveChunkId };
       const barNone = () => null; // panes carry no intervention warnings
 
+      // Build this pane's body under its own depth so every Explain/Summarize block keys and labels
+      // at the pane's depth. Reset to null right after, so the next pane (or the single view) is clean.
+      renderDepth = pd;
       let body;
       if (groups.length) {
         body = `<div class="feed">`
@@ -1731,6 +1769,7 @@
       } else {
         body = `<div class="pnote"><span class="pn1">Answered directly</span>No tools used for this prompt.</div>`;
       }
+      renderDepth = null;
       // Per-pane Follow live toggle, shown only while the terminal is live. Off keeps the user's
       // scroll put; the "Jump to live" affordance below surfaces when new work lands out of view.
       const followBtn = s.running
@@ -1738,10 +1777,14 @@
           + `<span class="fd"></span>${follow ? "Following" : "Follow live"}</button>` : "";
       const jump = s.running
         ? `<button class="pjump" type="button" data-jump="${esc(sid)}" hidden>New live activity &#8595;</button>` : "";
+      // This pane's own depth control: Simple/Deep/Teach, scoped to this terminal only.
+      const dseg = (val, lab) => `<button class="${val === pd ? "on" : ""}" type="button" data-pdepth="${esc(sid)}" data-pd-val="${val}">${lab}</button>`;
+      const depthCtl = `<span class="pdepth"><span class="pdl">Depth</span><span class="pseg">`
+        + dseg("simple", "Simple") + dseg("deep", "Deep") + dseg("teach", "Teach") + `</span></span>`;
       return `<div class="${cls}" data-sid="${esc(sid)}"><div class="phead">`
         + `<span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
         + `<span class="pname">${esc(s.name)}</span>${proj}${pill}`
-        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${followBtn}${dismissBtn}</div>`
+        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${depthCtl}${followBtn}${dismissBtn}</div>`
         + `<div class="pbody" data-sid="${esc(sid)}">${body}</div>${jump}</div>`;
     }
 
@@ -1780,11 +1823,11 @@
       const running = pane.classList.contains("run");
       jump.hidden = !(running && !paneFollowOn(sid) && !paneAtBottom(body));
     }
-    // Flip one pane's Follow live without touching the others or the single view.
-    function setPaneFollow(sid, on) {
-      paneFollow[sid] = on;
+    // Paint one pane's Follow live button + live-group state and (if following) snap it to the live edge.
+    function paintPaneFollow(sid) {
       const pane = paneEl(sid);
       if (!pane) return;
+      const on = paneFollowOn(sid);
       const btn = pane.querySelector(".pfollow");
       if (btn) { btn.classList.toggle("on", on); btn.innerHTML = `<span class="fd"></span>${on ? "Following" : "Follow live"}`; }
       pane.querySelectorAll(".grp.live").forEach((g) => g.classList.toggle("following", on));
@@ -1792,9 +1835,33 @@
       if (on && body) body.scrollTop = body.scrollHeight;
       updateJump(sid);
     }
+    // Follow live is exclusive: only one terminal follows at a time. Turning one on parks every
+    // other running pane, so the live edge the user is watching is unambiguous. Turning one off
+    // just parks that pane and leaves the rest alone.
+    function setPaneFollow(sid, on) {
+      paneFollow[sid] = on;
+      if (on) {
+        document.querySelectorAll(".pane.run[data-sid]").forEach((pane) => {
+          const other = pane.dataset.sid;
+          if (other && other !== sid && paneFollowOn(other)) {
+            paneFollow[other] = false;
+            paintPaneFollow(other);
+          }
+        });
+      }
+      paintPaneFollow(sid);
+    }
+    // Switch one pane's depth and re-render so its explanations re-key and relabel at the new depth.
+    function setPaneDepth(sid, d) {
+      if (paneDepth[sid] === d) return;
+      paneDepth[sid] = d;
+      renderSplit(lastLive);
+    }
     // Wire each pane's follow toggle, jump button, and scroll/wheel behaviour. A deliberate scroll
     // up in a pane means "let me read", so it parks that pane (and only that pane).
     function wirePanes(main) {
+      main.querySelectorAll("[data-pdepth]").forEach((b) =>
+        b.addEventListener("click", (e) => { e.stopPropagation(); setPaneDepth(b.dataset.pdepth, b.dataset.pdVal); }));
       main.querySelectorAll("[data-follow]").forEach((b) =>
         b.addEventListener("click", (e) => { e.stopPropagation(); setPaneFollow(b.dataset.follow, !paneFollowOn(b.dataset.follow)); }));
       main.querySelectorAll("[data-jump]").forEach((b) =>
@@ -1878,12 +1945,13 @@
       });
     }, 1000);
 
-    // Self-scheduling poll: 1s while something is live so the current step and receipts keep
-    // pace with Claude, easing to 2.5s when idle to stay cheap. Re-scheduled after each tick so
-    // a slow fetch never stacks requests.
+    // Self-scheduling poll: ~0.9s while something is live so the current step and receipts keep
+    // pace with Claude, easing to ~1.2s when idle. The idle gap is kept short on purpose so a fresh
+    // prompt's "thinking" state pops up almost at once in Active Terminals (the single view's NOW
+    // strip already polls faster). Re-scheduled after each tick so a slow fetch never stacks requests.
     async function tickLoop() {
       try { await tick(); } catch { /* keep the loop alive on a transient error */ }
-      setTimeout(tickLoop, liveNow ? 1000 : 2500);
+      setTimeout(tickLoop, liveNow ? 900 : 1200);
     }
     tickLoop();
     // The NOW strip polls a cheap endpoint a bit under once a second so the current step and the
