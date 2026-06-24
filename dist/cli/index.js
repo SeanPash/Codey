@@ -341,8 +341,8 @@ var require_help = __commonJS({
        * @returns {number}
        */
       longestSubcommandTermLength(cmd, helper) {
-        return helper.visibleCommands(cmd).reduce((max, command) => {
-          return Math.max(max, helper.subcommandTerm(command).length);
+        return helper.visibleCommands(cmd).reduce((max, command2) => {
+          return Math.max(max, helper.subcommandTerm(command2).length);
         }, 0);
       }
       /**
@@ -1054,8 +1054,8 @@ var require_command = __commonJS({
        */
       _getCommandAndAncestors() {
         const result = [];
-        for (let command = this; command; command = command.parent) {
-          result.push(command);
+        for (let command2 = this; command2; command2 = command2.parent) {
+          result.push(command2);
         }
         return result;
       }
@@ -1483,21 +1483,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {Command} command
        * @private
        */
-      _registerCommand(command) {
+      _registerCommand(command2) {
         const knownBy = (cmd) => {
           return [cmd.name()].concat(cmd.aliases());
         };
-        const alreadyUsed = knownBy(command).find(
+        const alreadyUsed = knownBy(command2).find(
           (name) => this._findCommand(name)
         );
         if (alreadyUsed) {
           const existingCmd = knownBy(this._findCommand(alreadyUsed)).join("|");
-          const newCmd = knownBy(command).join("|");
+          const newCmd = knownBy(command2).join("|");
           throw new Error(
             `cannot add command '${newCmd}' as already have command '${existingCmd}'`
           );
         }
-        this.commands.push(command);
+        this.commands.push(command2);
       }
       /**
        * Add an option.
@@ -2598,12 +2598,12 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let suggestion = "";
         if (flag.startsWith("--") && this._showSuggestionAfterError) {
           let candidateFlags = [];
-          let command = this;
+          let command2 = this;
           do {
-            const moreFlags = command.createHelp().visibleOptions(command).filter((option) => option.long).map((option) => option.long);
+            const moreFlags = command2.createHelp().visibleOptions(command2).filter((option) => option.long).map((option) => option.long);
             candidateFlags = candidateFlags.concat(moreFlags);
-            command = command.parent;
-          } while (command && !command._enablePositionalOptions);
+            command2 = command2.parent;
+          } while (command2 && !command2._enablePositionalOptions);
           suggestion = suggestSimilar(flag, candidateFlags);
         }
         const message = `error: unknown option '${flag}'${suggestion}`;
@@ -2633,9 +2633,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let suggestion = "";
         if (this._showSuggestionAfterError) {
           const candidateNames = [];
-          this.createHelp().visibleCommands(this).forEach((command) => {
-            candidateNames.push(command.name());
-            if (command.alias()) candidateNames.push(command.alias());
+          this.createHelp().visibleCommands(this).forEach((command2) => {
+            candidateNames.push(command2.name());
+            if (command2.alias()) candidateNames.push(command2.alias());
           });
           suggestion = suggestSimilar(unknownName, candidateNames);
         }
@@ -2706,11 +2706,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
        */
       alias(alias) {
         if (alias === void 0) return this._aliases[0];
-        let command = this;
+        let command2 = this;
         if (this.commands.length !== 0 && this.commands[this.commands.length - 1]._executableHandler) {
-          command = this.commands[this.commands.length - 1];
+          command2 = this.commands[this.commands.length - 1];
         }
-        if (alias === command._name)
+        if (alias === command2._name)
           throw new Error("Command alias can't be the same as its name");
         const matchingCommand = this.parent?._findCommand(alias);
         if (matchingCommand) {
@@ -2719,7 +2719,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
             `cannot add alias '${alias}' to command '${this.name()}' as already have command '${existingCmd}'`
           );
         }
-        command._aliases.push(alias);
+        command2._aliases.push(alias);
         return this;
       }
       /**
@@ -2842,7 +2842,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           contextOptions = void 0;
         }
         const context = this._getHelpContext(contextOptions);
-        this._getCommandAndAncestors().reverse().forEach((command) => command.emit("beforeAllHelp", context));
+        this._getCommandAndAncestors().reverse().forEach((command2) => command2.emit("beforeAllHelp", context));
         this.emit("beforeHelp", context);
         let helpInformation = this.helpInformation(context);
         if (deprecatedCallback) {
@@ -2857,7 +2857,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
         }
         this.emit("afterHelp", context);
         this._getCommandAndAncestors().forEach(
-          (command) => command.emit("afterAllHelp", context)
+          (command2) => command2.emit("afterAllHelp", context)
         );
       }
       /**
@@ -3989,8 +3989,8 @@ function descriptionIntent(desc) {
   }
   return intent(clean, title, `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`);
 }
-function describeShellIntent(command, description) {
-  const cmd = (command ?? "").trim();
+function describeShellIntent(command2, description) {
+  const cmd = (command2 ?? "").trim();
   const desc = (description ?? "").trim();
   if (desc && !descriptionIsVague(desc)) return descriptionIntent(desc);
   const matched = commandIntent(cmd);
@@ -3999,6 +3999,96 @@ function describeShellIntent(command, description) {
   const word = firstWord2(cmd);
   if (word) return intent(`the ${word} step`, `Running ${word}`, `Claude is running ${word}.`);
   return intent("a shell command", "Running a command", "Claude is running a shell command.");
+}
+
+// src/caption/evidence.ts
+var NOISE = /* @__PURE__ */ new Set([
+  "console",
+  "assert",
+  "log",
+  "error",
+  "warn",
+  "info",
+  "debug",
+  "expect",
+  "require",
+  "import",
+  "export",
+  "return",
+  "throw",
+  "await",
+  "async",
+  "if",
+  "for",
+  "while",
+  "switch",
+  "case",
+  "catch",
+  "try",
+  "else",
+  "do",
+  "function",
+  "const",
+  "let",
+  "var",
+  "class",
+  "new",
+  "typeof",
+  "instanceof",
+  "this",
+  "super",
+  "void",
+  "delete",
+  "yield",
+  "Number",
+  "String",
+  "Boolean",
+  "Array",
+  "Object",
+  "JSON",
+  "Math",
+  "Map",
+  "Set",
+  "Promise",
+  "Date",
+  "RegExp",
+  "Symbol",
+  "parseInt",
+  "parseFloat",
+  "it",
+  "test",
+  "describe",
+  "beforeEach",
+  "afterEach",
+  "beforeAll",
+  "afterAll"
+]);
+function addedText(tool, input) {
+  const o = input && typeof input === "object" ? input : {};
+  if (tool === "Write" && typeof o.content === "string") return o.content;
+  if (tool === "Edit" && typeof o.new_string === "string") return o.new_string;
+  if (tool === "NotebookEdit" && typeof o.new_source === "string") return o.new_source;
+  if (tool === "MultiEdit" && Array.isArray(o.edits)) {
+    return o.edits.map((e) => e && typeof e === "object" ? e.new_string : null).filter((s) => typeof s === "string").join("\n");
+  }
+  return "";
+}
+function push(list, name) {
+  const n = (name ?? "").trim();
+  if (n.length >= 2 && !NOISE.has(n) && !list.includes(n)) list.push(n);
+}
+function extractSymbols(tool, input, max = 3) {
+  const text = addedText(tool, input);
+  if (!text) return [];
+  const out = [];
+  for (const m of text.matchAll(/\b(?:it|test|describe)\s*\(\s*["'`]([^"'`]+)["'`]/g)) {
+    push(out, m[1]);
+  }
+  for (const m of text.matchAll(/\b(?:function|class)\s+([A-Za-z_$][\w$]*)/g)) push(out, m[1]);
+  for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g)) push(out, m[1]);
+  for (const m of text.matchAll(/\bdef\s+([A-Za-z_$][\w$]*)/g)) push(out, m[1]);
+  for (const m of text.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)) push(out, m[1]);
+  return out.slice(0, max);
 }
 
 // src/caption/chunks.ts
@@ -4030,14 +4120,14 @@ function outcomes(events) {
 }
 function shellFields(input) {
   const o = input && typeof input === "object" ? input : {};
-  const command = typeof o.command === "string" ? o.command : null;
+  const command2 = typeof o.command === "string" ? o.command : null;
   const description = typeof o.description === "string" ? o.description : null;
-  return { command, description };
+  return { command: command2, description };
 }
 function shortName(tool, input) {
   if (tool === "Bash" || tool === "PowerShell") {
-    const { command, description } = shellFields(input);
-    if (command) return describeShellIntent(command, description).subject;
+    const { command: command2, description } = shellFields(input);
+    if (command2) return describeShellIntent(command2, description).subject;
   }
   return shortTarget(actionLabel(tool, input).target);
 }
@@ -4052,6 +4142,7 @@ function chunkEvents(events) {
     const isSearch = e.tool === "Grep" || e.tool === "Glob";
     const searchLiteral = isSearch ? rawTarget(e.tool, e.input) : null;
     const name = shortName(e.tool, e.input);
+    const symbols = extractSymbols(e.tool, e.input);
     const last = built[built.length - 1];
     const stageMatches = last && (last.stage === stage || mutating(last.stage) && mutating(stage));
     const close = last && e.timestamp - last.endTs <= IDLE_SPLIT_MS;
@@ -4061,6 +4152,9 @@ function chunkEvents(events) {
         if (!last.searches.includes(searchLiteral) && last.searches.length < 6) last.searches.push(searchLiteral);
       } else if (last.targets.length < 6) {
         last.targets.push(name);
+      }
+      for (const s of symbols) {
+        if (!last.symbols.includes(s) && last.symbols.length < 4) last.symbols.push(s);
       }
       last.endTs = e.timestamp;
       last.tools.push(e.tool);
@@ -4080,6 +4174,7 @@ function chunkEvents(events) {
         tool: e.tool,
         targets: searchLiteral ? [] : [name],
         searches: searchLiteral ? [searchLiteral] : [],
+        symbols,
         raw: rawTarget(e.tool, e.input),
         startTs: e.timestamp,
         endTs: e.timestamp,
@@ -4107,6 +4202,13 @@ function namedTargets(chunk) {
 function namedSearches(chunk) {
   const phrases = chunk.searches.map(phraseSearch).filter((p) => !!p);
   return joinNames(phrases);
+}
+function namedSymbols(chunk, max = 2) {
+  return joinNames(chunk.symbols ?? [], max);
+}
+function testModule(chunk) {
+  const m = /^(.+)\.(test|spec)\.[jt]sx?$/.exec(chunk.targets[0] ?? "");
+  return m ? m[1] : null;
 }
 function describe(chunk) {
   if ((chunk.tool === "Bash" || chunk.tool === "PowerShell") && chunk.count === 1 && chunk.raw) {
@@ -4142,21 +4244,32 @@ function describe(chunk) {
         return {
           title,
           simple: `Claude is reading ${names}.`,
-          deep: `Claude is reading ${names} to find the part it needs before editing it.`,
-          teach: `Claude is reading ${names} to find the part it needs before editing it. Reading the existing code first is how you avoid breaking something you did not know was there.`
+          deep: `Claude is reading ${names} to see what it does before changing it.`,
+          teach: `Claude is reading ${names} to see what it does before changing it. Reading the existing code first is how you avoid breaking something you did not know was there.`
         };
       }
       return {
         title,
         simple: `Claude is reading ${names}.`,
-        deep: `Claude is reading ${names} to map how they connect before editing them.`,
-        teach: `Claude is reading ${names} to map how they connect before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`
+        deep: `Claude is reading ${names} to trace how they work together before editing them.`,
+        teach: `Claude is reading ${names} to trace how they work together before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`
       };
     }
     case "editing": {
       const adds = chunk.tool === "Write" || chunk.tool === "NotebookEdit";
+      const sym = (chunk.symbols ?? [])[0] ?? null;
+      const syms = namedSymbols(chunk);
+      const mod = testModule(chunk);
       if (single) {
         if (adds) {
+          if (sym) {
+            return {
+              title,
+              simple: `Claude is creating ${names}, starting with ${sym}.`,
+              deep: `Claude is creating ${names} and writing ${sym} into it.`,
+              teach: `Claude is creating ${names} and writing ${sym} into it. A new file does nothing until something imports or runs it.`
+            };
+          }
           return {
             title,
             simple: `Claude is creating ${names}.`,
@@ -4164,11 +4277,27 @@ function describe(chunk) {
             teach: `Claude is creating ${names} and writing its initial contents. A new file does nothing until something imports or runs it.`
           };
         }
+        if (sym && mod) {
+          return {
+            title,
+            simple: `Claude is adding a ${sym} test to the ${mod} tests.`,
+            deep: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}.`,
+            teach: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}. A test is a small program that checks the real code, so a problem with ${sym} shows up right away.`
+          };
+        }
+        if (sym) {
+          return {
+            title,
+            simple: `Claude is updating ${sym} in ${names}.`,
+            deep: `Claude is updating ${sym} in ${names} to change how it behaves.`,
+            teach: `Claude is updating ${sym} in ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`
+          };
+        }
         return {
           title,
           simple: `Claude is updating ${names}.`,
-          deep: `Claude is editing ${names}, changing specific lines in place.`,
-          teach: `Claude is editing ${names}, changing specific lines in place. An edit only takes effect once the code runs or is rebuilt.`
+          deep: `Claude is updating ${names} to change how it behaves.`,
+          teach: `Claude is updating ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`
         };
       }
       if (adds) {
@@ -4177,6 +4306,14 @@ function describe(chunk) {
           simple: `Claude is creating ${names}.`,
           deep: `Claude is creating ${names} as a set of new files for one piece of work.`,
           teach: `Claude is creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`
+        };
+      }
+      if (syms) {
+        return {
+          title,
+          simple: `Claude is updating ${names} around ${syms}.`,
+          deep: `Claude is updating ${names} together so ${syms} stay consistent.`,
+          teach: `Claude is updating ${names} together so ${syms} stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`
         };
       }
       return {
@@ -4527,6 +4664,89 @@ function formatDuration(ms) {
   return `${h}h ${String(rm).padStart(2, "0")}m`;
 }
 
+// src/caption/recap.ts
+function basename2(p) {
+  const parts = p.replace(/["']/g, "").split(/[\\/]/);
+  return parts[parts.length - 1] || p;
+}
+function filePath(input) {
+  if (input && typeof input === "object") {
+    const o = input;
+    const v = o.file_path ?? o.path;
+    if (typeof v === "string") return basename2(v);
+  }
+  return null;
+}
+function command(input) {
+  if (input && typeof input === "object") {
+    const c = input.command;
+    if (typeof c === "string") return c;
+  }
+  return null;
+}
+function verificationOf(cmd) {
+  if (/\b(test|vitest|jest|mocha|pytest)\b/.test(cmd)) return "the tests";
+  if (/\bbuild\b/.test(cmd)) return "the build";
+  if (/\b(typecheck|tsc|lint|eslint)\b/.test(cmd)) return "the checks";
+  return null;
+}
+function pushUnique(list, value) {
+  if (!list.includes(value)) list.push(value);
+}
+function buildRecap(events) {
+  const created = [];
+  const edited = [];
+  const verified = [];
+  const inspected = [];
+  for (const e of events) {
+    if (e.phase !== "pre") continue;
+    switch (e.tool) {
+      case "Write":
+      case "NotebookEdit": {
+        const f = filePath(e.input);
+        if (f) pushUnique(created, f);
+        break;
+      }
+      case "Edit":
+      case "MultiEdit": {
+        const f = filePath(e.input);
+        if (f) pushUnique(edited, f);
+        break;
+      }
+      case "Read":
+      case "NotebookRead": {
+        const f = filePath(e.input);
+        if (f) pushUnique(inspected, f);
+        break;
+      }
+      case "Bash":
+      case "PowerShell": {
+        const cmd = command(e.input);
+        const v = cmd ? verificationOf(cmd) : null;
+        if (v) pushUnique(verified, v);
+        break;
+      }
+    }
+  }
+  const changed = [...edited, ...created];
+  const changedNames = joinNames(changed.map(humanFile), 3);
+  const verifiedNames = joinNames(verified, 2);
+  let sentence;
+  if (changed.length) {
+    const verb = edited.length === 0 ? "Created" : "Updated";
+    sentence = `${verb} ${changedNames}`;
+    if (verified.length) sentence += `, verified with ${verifiedNames}`;
+    sentence += ".";
+  } else if (verified.length) {
+    sentence = `Ran ${verifiedNames}.`;
+  } else if (inspected.length) {
+    sentence = `Inspected ${joinNames(inspected.map(humanFile), 3)}.`;
+  } else {
+    sentence = "Finished the request.";
+  }
+  return { sentence, changed, verified, inspected };
+}
+
 // src/statusline/compose.ts
 var GROUP_WINDOW_MS = 2500;
 function shortName2(target) {
@@ -4575,7 +4795,7 @@ function pickSentence(caption, mode) {
   if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
   return caption.simple;
 }
-var DONE_FOOTER = "Finished this prompt. Run /codey:timeline to see the full breakdown.";
+var DONE_FOOTER = "Run /codey:timeline for the full breakdown.";
 function composeView(events, snap, now, whys = [], budget = null) {
   const budgetLeft = budgetLeftLabel(budget);
   const paused = budgetPausedMessage(budget);
@@ -4592,8 +4812,9 @@ function composeView(events, snap, now, whys = [], budget = null) {
     return { ...base, state: "thinking", stage: "Thinking", sentence: "Claude is thinking about your request.", warning: null, hint: null };
   }
   if (done) {
-    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : null;
-    return { ...base, state: "done", stage: "Done", sentence: recap ?? DONE_FOOTER, warning: null, hint: recap ? DONE_FOOTER : null };
+    const turnStart2 = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+    const recap = buildRecap(events.filter((e) => e.timestamp >= turnStart2));
+    return { ...base, state: "done", stage: "Done", sentence: recap.sentence, warning: null, hint: DONE_FOOTER };
   }
   const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
   const chunks = chunkEvents(events.filter((e) => e.timestamp >= turnStart));
@@ -4648,24 +4869,12 @@ function clipStage(stage) {
   return (sp > STAGE_MAX * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
 }
 var SEP = `${DIM}\u2502${RESET}`;
-function visLen(s) {
-  return s.replace(/\x1b\[[0-9;]*m/g, "").length;
-}
-function wrap(text, width) {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines = [];
-  let cur = "";
-  for (const w of words) {
-    const next = cur ? `${cur} ${w}` : w;
-    if (visLen(next) > width && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = next;
-    }
-  }
-  if (cur) lines.push(cur);
-  return lines.length ? lines : [""];
+function clipLine(text, width) {
+  const t = text.trim();
+  if (t.length <= width) return t;
+  const cut = t.slice(0, width - 1);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > width * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
 }
 function statusBar(view) {
   const accent = stageColor(view.state, view.mode);
@@ -4674,7 +4883,8 @@ function statusBar(view) {
   parts.push(`${BOLD}${accent}${clipStage(view.stage)}${RESET}`);
   if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
   const budget = view.budgetLeft ? ` ${DIM}\xB7 ${view.budgetLeft}${RESET}` : "";
-  return parts.join(` ${SEP} `) + budget;
+  const hint = view.state !== "done" && view.hint ? ` ${DIM}\xB7 ${view.hint}${RESET}` : "";
+  return parts.join(` ${SEP} `) + budget + hint;
 }
 function renderStatus(view, width = WRAP) {
   const out = [statusBar(view)];
@@ -4683,9 +4893,8 @@ function renderStatus(view, width = WRAP) {
     return out.join("\n");
   }
   const body = view.state === "done" ? GREEN : TEXT;
-  const lines = wrap(view.sentence, width);
-  lines.forEach((ln) => out.push(`${body}${ln}${RESET}`));
-  if (view.hint) out.push(`${DIM}${view.hint}${RESET}`);
+  out.push(`${body}${clipLine(view.sentence, width)}${RESET}`);
+  if (view.state === "done" && view.hint) out.push(`${DIM}${view.hint}${RESET}`);
   return out.join("\n");
 }
 
@@ -4715,22 +4924,22 @@ function field(input, key2) {
   }
   return null;
 }
-function basename2(p) {
+function basename3(p) {
   return p.split(/[\\/]/).pop() || p;
 }
 function eventSummary(e) {
   if (e.tool === "Bash" || e.tool === "PowerShell") {
-    const command = field(e.input, "command");
+    const command2 = field(e.input, "command");
     const desc = field(e.input, "description");
-    if (command) {
-      const intent2 = describeShellIntent(command, desc);
+    if (command2) {
+      const intent2 = describeShellIntent(command2, desc);
       const note = desc && desc !== intent2.title ? ` (${desc})` : "";
       return `${intent2.title}${note}`;
     }
     return desc ?? "ran a command";
   }
   const file7 = field(e.input, "file_path") ?? field(e.input, "path") ?? field(e.input, "notebook_path");
-  if (file7) return `${e.tool} ${basename2(file7)}`;
+  if (file7) return `${e.tool} ${basename3(file7)}`;
   const pattern = field(e.input, "pattern");
   if (pattern) return `${e.tool} for ${pattern}`;
   return e.tool;
@@ -5215,7 +5424,7 @@ import { statSync as statSync2 } from "node:fs";
 import { join as join15 } from "node:path";
 
 // src/timeline/attribution.ts
-function basename3(p) {
+function basename4(p) {
   const parts = p.split(/[\\/]/);
   return parts[parts.length - 1] || p;
 }
@@ -5230,7 +5439,7 @@ function fileFrom(input) {
   if (input && typeof input === "object") {
     const r = input;
     const p = r.file_path ?? r.path ?? r.notebook_path;
-    if (typeof p === "string") return basename3(p);
+    if (typeof p === "string") return basename4(p);
   }
   return null;
 }
@@ -5638,14 +5847,68 @@ function taskBlock(t) {
   return `- ${t.name}
 ${reasons}`;
 }
+function basename5(p) {
+  return p.replace(/["']/g, "").split(/[\\/]/).pop() || p;
+}
+var EDIT_TOOLS = /* @__PURE__ */ new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
+function changedFiles(tasks) {
+  const out = [];
+  for (const t of tasks) {
+    for (const l of t.lines) {
+      if (EDIT_TOOLS.has(l.tool) && l.raw) {
+        const name = basename5(l.raw);
+        if (!out.includes(name)) out.push(name);
+      }
+    }
+  }
+  return out;
+}
+function verifications(tasks) {
+  const out = [];
+  for (const t of tasks) {
+    for (const l of t.lines) {
+      if (l.tool !== "Bash" && l.tool !== "PowerShell" || !l.raw) continue;
+      const cmd = l.raw;
+      let v = null;
+      if (/\b(test|vitest|jest|mocha|pytest)\b/.test(cmd)) v = "the tests";
+      else if (/\bbuild\b/.test(cmd)) v = "the build";
+      else if (/\b(typecheck|tsc|lint|eslint)\b/.test(cmd)) v = "the checks";
+      if (v && !out.includes(v)) out.push(v);
+    }
+  }
+  return out;
+}
+function evidenceBlock(tasks) {
+  const files = changedFiles(tasks);
+  const checks = verifications(tasks);
+  const lines = [
+    "Grounding evidence (use only what is listed here, do not invent more):",
+    `Files touched: ${files.length ? files.join(", ") : "none (Claude only looked around, did not change files)"}`,
+    `Verification that ran: ${checks.length ? checks.join(", ") : "none (do not claim anything was tested or verified)"}`
+  ];
+  return lines.join("\n");
+}
 function instruction(depth) {
   switch (depth) {
     case "simple":
-      return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt.";
+      return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found.";
     case "teach":
-      return "In a few plain English sentences for someone learning to code, recap what Claude accomplished for this prompt and why it matters, then briefly teach the key concept involved (define any technical term you use).";
+      return [
+        "Recap what Claude accomplished, for someone learning to code, using these sections with a blank line between them:",
+        "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
+        "Files touched: the files from the evidence, comma separated.",
+        "Verification: the checks from the evidence, or omit this section entirely if none ran.",
+        "Then add one short plain-English note teaching the key concept involved (define any technical term you use).",
+        "Only say fixed, updated, reinstalled, or verified when the evidence supports it."
+      ].join("\n");
     default:
-      return "In two or three plain English sentences for a non-technical person, recap what Claude accomplished for this prompt and how it addressed the request.";
+      return [
+        "Recap what Claude accomplished for a non-technical person, using these sections with a blank line between them:",
+        "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
+        "Files touched: the files from the evidence, comma separated.",
+        "Verification: the checks from the evidence, or omit this section entirely if none ran.",
+        "Only say fixed, updated, reinstalled, or verified when the evidence supports it."
+      ].join("\n");
   }
 }
 function buildSummaryPrompt(promptText, tasks, depth) {
@@ -5654,6 +5917,8 @@ function buildSummaryPrompt(promptText, tasks, depth) {
     `A user asked an AI coding agent: "${promptText}"`,
     "It worked through these tasks, with its own reasoning:",
     body,
+    "",
+    evidenceBlock(tasks),
     "",
     `${instruction(depth)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`
   ].join("\n");
@@ -6303,8 +6568,8 @@ import { readFileSync as readFileSync18, writeFileSync as writeFileSync10, exist
 import { spawn } from "node:child_process";
 import { join as join20, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
-function withStatusLine(s, command) {
-  return { ...s, statusLine: { type: "command", command } };
+function withStatusLine(s, command2) {
+  return { ...s, statusLine: { type: "command", command: command2 } };
 }
 function withoutStatusLine(s) {
   const next = { ...s };
