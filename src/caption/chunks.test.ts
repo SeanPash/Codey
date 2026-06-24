@@ -35,6 +35,17 @@ describe("chunkEvents", () => {
     expect(chunks[0].targets).toContain("a.ts");
   });
 
+  it("keeps search patterns and read files in separate buckets", () => {
+    const chunks = chunkEvents([
+      pre("Grep", { pattern: "TOKEN BREAKDOWN" }, 0),
+      pre("Grep", { pattern: "Active Terminal" }, 100),
+      pre("Read", { file_path: "index.html" }, 200),
+    ]);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0].searches).toEqual(["TOKEN BREAKDOWN", "Active Terminal"]);
+    expect(chunks[0].targets).toEqual(["index.html"]);
+  });
+
   it("names a shell chunk by its real purpose, not a generic shell phrase", () => {
     const chunks = chunkEvents([
       pre("Bash", { command: "grep -i codey installed_plugins.json" }, 0),

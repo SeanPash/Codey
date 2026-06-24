@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { humanFile, phrasePattern, purposeTitle, purposeSentence, joinNames } from "./subject.js";
+import { humanFile, phrasePattern, phraseSearch, purposeTitle, purposeSentence, joinNames } from "./subject.js";
 
 describe("humanFile", () => {
   it("turns a test file into a readable noun", () => {
@@ -62,6 +62,29 @@ describe("joinNames", () => {
   });
 });
 
+describe("phraseSearch", () => {
+  it("reads a multi-word literal as a lowercase phrase", () => {
+    expect(phraseSearch("TOKEN BREAKDOWN")).toBe("token breakdown");
+    expect(phraseSearch("Active Terminal")).toBe("active terminal");
+    expect(phraseSearch("Follow Live")).toBe("follow live");
+  });
+
+  it("keeps a code identifier as written", () => {
+    expect(phraseSearch("validateUser")).toBe("validateUser");
+    expect(phraseSearch("Priciest")).toBe("Priciest");
+  });
+
+  it("lowercases a single all-caps word", () => {
+    expect(phraseSearch("SAVER")).toBe("saver");
+  });
+
+  it("rejects a dense regex it cannot read as a subject", () => {
+    expect(phraseSearch("function\\s+\\w+")).toBeNull();
+    expect(phraseSearch("foo.*bar")).toBeNull();
+    expect(phraseSearch("")).toBeNull();
+  });
+});
+
 describe("purposeTitle", () => {
   it("frames a write as adding", () => {
     expect(purposeTitle("Write", "editing", "math.js", 1)).toBe("Adding math.js");
@@ -80,10 +103,16 @@ describe("purposeTitle", () => {
     expect(purposeTitle("Bash", "testing", "the tests", 1)).toBe("Verifying the tests");
   });
 
-  it("uses purpose words for grouped work, not a file name", () => {
-    expect(purposeTitle("Write", "editing", "math.js", 4)).toBe("Creating several files");
-    expect(purposeTitle("Edit", "editing", "math.js", 4)).toBe("Updating several files");
-    expect(purposeTitle("Read", "inspecting", "a.ts", 4)).toBe("Checking several files");
+  it("grounds grouped work in the lead subject instead of saying several files", () => {
+    expect(purposeTitle("Write", "editing", "math.js", 4)).toBe("Adding math.js and more");
+    expect(purposeTitle("Edit", "editing", "math.js", 4)).toBe("Updating math.js and more");
+    expect(purposeTitle("Read", "inspecting", "a.ts", 4)).toBe("Checking a.ts and more");
+    for (const t of [
+      purposeTitle("Write", "editing", "math.js", 4),
+      purposeTitle("Read", "inspecting", "a.ts", 4),
+    ]) {
+      expect(t).not.toMatch(/several files/i);
+    }
   });
 
   it("has a steady title for the non-file stages", () => {

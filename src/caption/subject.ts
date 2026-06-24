@@ -57,6 +57,26 @@ export function phrasePattern(pattern: string): string {
   return joinNames(tokens);
 }
 
+// A literal search string (a Grep pattern or a quoted phrase) turned into a readable subject.
+// "TOKEN BREAKDOWN" reads as "token breakdown", a code identifier like "validateUser" stays
+// as written, and a dense regex returns null so the caller knows there is no plain subject.
+// This is what lets a caption say what Claude was actually looking for, not "the code".
+export function phraseSearch(literal: string): string | null {
+  const raw = (literal ?? "").trim();
+  if (!raw) return null;
+  // Regex metacharacters mean this is a pattern, not a phrase a person reads as a subject.
+  if (/[\\()[\]{}+?^$.*|]/.test(raw)) return null;
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 6) return null;
+  if (words.length === 1) {
+    const w = words[0];
+    // A mixed-case identifier (validateUser, Priciest) is a real name; keep it. A shout in all
+    // caps (TOKEN, SAVER) reads better lowercased.
+    return /[a-z]/.test(w) ? w : w.toLowerCase();
+  }
+  return words.join(" ").toLowerCase();
+}
+
 // The collapsed-card headline: a short purpose label (verb + subject), 4 to 7 words. It is
 // deterministic and stable on purpose, so titles do not shift around as explanations load.
 export function purposeTitle(tool: string, stage: Stage, subject: string, count: number): string {
@@ -64,11 +84,11 @@ export function purposeTitle(tool: string, stage: Stage, subject: string, count:
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
-      if (many) return adds ? "Creating several files" : "Updating several files";
+      if (many) return adds ? `Adding ${subject} and more` : `Updating ${subject} and more`;
       return adds ? `Adding ${subject}` : `Updating ${subject}`;
     }
     case "inspecting":
-      if (many) return "Checking several files";
+      if (many) return `Checking ${subject} and more`;
       return `Checking ${subject}`;
     case "testing":
       return `Verifying ${subject}`;
@@ -91,11 +111,11 @@ export function purposeSentence(tool: string, stage: Stage, subject: string, cou
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
-      if (many) return adds ? "Adding several new files to the project." : "Editing several related files.";
+      if (many) return adds ? `Adding new files, starting with ${subject}.` : `Updating ${subject} and the files alongside it.`;
       return adds ? `Creating ${subject}.` : `Changing ${subject} to adjust how it works.`;
     }
     case "inspecting":
-      if (many) return "Reading through several files to follow how the code fits together.";
+      if (many) return `Reading ${subject} and the files around it to map how they connect.`;
       if (tool === "Grep" || tool === "Glob") return `Searching the project for ${subject}.`;
       return `Reading ${subject} to follow how it works.`;
     case "testing":

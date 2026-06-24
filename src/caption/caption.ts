@@ -2,7 +2,7 @@ import type { Mode } from "../types.js";
 import { stripDashes } from "../util/text.js";
 import type { WorkChunk } from "./chunks.js";
 import type { Stage } from "./stage.js";
-import { humanFile, phrasePattern, purposeTitle, joinNames } from "./subject.js";
+import { humanFile, phrasePattern, phraseSearch, purposeTitle, joinNames } from "./subject.js";
 import { describeShellIntent } from "./shell.js";
 
 // The one caption shape every surface renders from. `simple` is always a complete sentence;
@@ -32,6 +32,19 @@ function subjectOf(chunk: WorkChunk): string {
   return humanFile(chunk.targets[0] ?? "") || "the code";
 }
 
+// The files this chunk touched, named the way a person would say them. Falls back to a plain
+// phrase only when there is genuinely nothing to name.
+function namedTargets(chunk: WorkChunk): string {
+  return joinNames(chunk.targets.map(humanFile)) || "the code";
+}
+
+// What the chunk searched for, phrased plainly: "token breakdown, active terminal, and saver".
+// Empty when the chunk did no search or every pattern was a dense regex with no readable subject.
+function namedSearches(chunk: WorkChunk): string {
+  const phrases = chunk.searches.map(phraseSearch).filter((p): p is string => !!p);
+  return joinNames(phrases);
+}
+
 function describe(chunk: WorkChunk): Described {
   // A single shell command knows its own purpose better than any stage template can phrase it,
   // so use the shell intent's title and sentence directly instead of "reading X to understand
@@ -42,39 +55,56 @@ function describe(chunk: WorkChunk): Described {
   }
 
   const subject = subjectOf(chunk);
-  const title = purposeTitle(chunk.tool, chunk.stage, subject, chunk.count);
-  // A few named files read better than a vague "several files"; past a handful we summarize.
-  const few = chunk.targets.length <= 3 && chunk.count <= 3;
-  const names = joinNames(chunk.targets.map(humanFile)) || "the code";
+  const names = namedTargets(chunk);
+  const single = chunk.targets.length <= 1 && chunk.count <= 1;
+  // The chip title names the lead one or two files for a grouped run, so it stays short while
+  // still being concrete: "Updating caption.ts and render.ts", not a vague count.
+  const groupSubject = chunk.targets.length ? joinNames(chunk.targets.map(humanFile), 2) : subject;
+  const title = single
+    ? purposeTitle(chunk.tool, chunk.stage, subject, chunk.count)
+    : purposeTitle(chunk.tool, chunk.stage, groupSubject, 1);
 
   switch (chunk.stage) {
     case "inspecting": {
+      // A run that searched for specific terms names them: this is the strongest context a
+      // deterministic caption has, so it leads with what Claude was actually looking for and,
+      // when it also opened a file, where it was looking.
+      const searches = namedSearches(chunk);
+      if (searches) {
+        const where = chunk.targets.length ? namedTargets(chunk) : "the project";
+        return {
+          title: chunk.targets.length ? `Searching ${humanFile(chunk.targets[0])}` : "Searching the project",
+          simple: `Claude is searching ${where} for ${searches}.`,
+          deep: `Claude is searching ${where} for ${searches} to land on the right section before editing it.`,
+          teach: `Claude is searching ${where} for ${searches} to land on the right section before editing it. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
+        };
+      }
       if (chunk.tool === "Grep" || chunk.tool === "Glob") {
         return {
           title,
-          simple: `Claude is searching the project for ${subject}.`,
-          deep: `Claude is searching the project for ${subject} to see where it is used.`,
-          teach: `Claude is searching the project for ${subject} to see where it is used. Searching first shows every place a change would ripple to, so nothing gets missed.`,
+          simple: `Claude is searching ${subject === "the code" ? "the project" : `the project for ${subject}`}.`,
+          deep: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used.`,
+          teach: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
         };
       }
-      if (few) {
+      if (single) {
         return {
           title,
-          simple: `Claude is reading ${names} to understand the code.`,
-          deep: `Claude is reading ${names} to see how it works before changing anything.`,
-          teach: `Claude is reading ${names} to see how it works before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.`,
+          simple: `Claude is reading ${names}.`,
+          deep: `Claude is reading ${names} to find the part it needs before editing it.`,
+          teach: `Claude is reading ${names} to find the part it needs before editing it. Reading the existing code first is how you avoid breaking something you did not know was there.`,
         };
       }
       return {
         title,
-        simple: "Claude is checking several files to see how the code works.",
-        deep: "Claude is checking several files to see how the pieces fit together before changing anything.",
-        teach: "Claude is checking several files to see how the pieces fit together before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.",
+        simple: `Claude is reading ${names}.`,
+        deep: `Claude is reading ${names} to map how they connect before editing them.`,
+        teach: `Claude is reading ${names} to map how they connect before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`,
       };
     }
     case "editing": {
       const adds = chunk.tool === "Write" || chunk.tool === "NotebookEdit";
-      if (few) {
+      if (single) {
         if (adds) {
           return {
             title,
@@ -90,11 +120,19 @@ function describe(chunk: WorkChunk): Described {
           teach: `Claude is editing ${names}, changing specific lines in place. An edit only takes effect once the code runs or is rebuilt.`,
         };
       }
+      if (adds) {
+        return {
+          title,
+          simple: `Claude is creating ${names}.`,
+          deep: `Claude is creating ${names} as a set of new files for one piece of work.`,
+          teach: `Claude is creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`,
+        };
+      }
       return {
         title,
-        simple: "Claude is updating several files.",
-        deep: "Claude is editing several related files in one change.",
-        teach: "Claude is editing several related files in one change. Keeping related files aligned is what stops a change in one place from breaking another.",
+        simple: `Claude is updating ${names}.`,
+        deep: `Claude is updating ${names} together so they stay consistent.`,
+        teach: `Claude is updating ${names} together so they stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`,
       };
     }
     case "testing":
