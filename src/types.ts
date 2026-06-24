@@ -125,6 +125,7 @@ export interface LiveSession {
   thinking: boolean;           // live but not mid-tool: prompt in flight or between tool calls
   prompt: string;              // the latest prompt text (what the user asked), clamped; "" if none
   cancelled: boolean;          // the latest turn was interrupted by the user (Esc mid-prompt)
+  groupId: string | null;      // current turn's group id, so a pane can summarize the prompt
 }
 
 // A terminal the user hid from the grid, kept so it can be listed and restored.
