@@ -79,7 +79,7 @@ function pickSentence(caption: LiveCaption, mode: Mode): string {
 
 // The closing footer, shown at the bottom of every finished prompt so there is always a clear
 // "this turn is done, here is where to see more" line, whether or not a recap was generated.
-const DONE_FOOTER = "Finished this prompt. Run /codey:timeline to see the full breakdown.";
+const DONE_FOOTER = "Run /codey:timeline for the full breakdown.";
 
 export function composeView(
   events: ToolEvent[],

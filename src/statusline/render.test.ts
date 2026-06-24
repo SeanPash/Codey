@@ -97,10 +97,17 @@ describe("renderStatus", () => {
     expect(plain(renderStatus({ ...base, stage: "Editing" }))).not.toContain("…");
   });
 
-  it("wraps a long sentence instead of spilling past the width", () => {
+  it("clips a long live sentence to a single line instead of spilling into a paragraph", () => {
     const long = "Claude is working through " + "several connected files ".repeat(8) + "to finish the change.";
     const lines = plain(renderStatus({ ...base, sentence: long }, 60)).split("\n");
-    expect(lines.length).toBeGreaterThan(2);
+    expect(lines).toHaveLength(2);
     for (const ln of lines) expect(ln.length).toBeLessThanOrEqual(60);
+    expect(lines[1]).toMatch(/…$/);
+  });
+
+  it("never exceeds two lines for a live HUD, even with a long sentence and a hint", () => {
+    const long = "Claude is updating the caption builder and timeline renderer " + "with more detail ".repeat(10);
+    const lines = plain(renderStatus({ ...base, sentence: long, hint: "/codey:explain for the why", budgetLeft: "3.8k left" })).split("\n");
+    expect(lines.length).toBeLessThanOrEqual(2);
   });
 });

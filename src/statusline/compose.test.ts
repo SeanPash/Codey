@@ -92,13 +92,13 @@ describe("composeView done", () => {
     expect(view.stage).toBe("Done");
     expect(view.sentence).toBe("Wired the summary section.");
     // The closing footer sits beneath the recap on every finished prompt.
-    expect(view.hint).toBe("Finished this prompt. Run /codey:timeline to see the full breakdown.");
+    expect(view.hint).toBe("Run /codey:timeline for the full breakdown.");
   });
 
   it("falls back to the closing footer as the line itself when there is no recap", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const view = composeView(events, snap({ doneAt: 200, why: null }), 10000);
-    expect(view.sentence).toBe("Finished this prompt. Run /codey:timeline to see the full breakdown.");
+    expect(view.sentence).toBe("Run /codey:timeline for the full breakdown.");
     expect(view.hint).toBe(null);
   });
 
