@@ -108,7 +108,7 @@ export function composeView(
   const base = { mode: snap.mode, elapsed, budgetLeft };
 
   if (thinking) {
-    return { ...base, state: "thinking", stage: "Thinking", sentence: "Claude is thinking through your request.", warning: null, hint: null };
+    return { ...base, state: "thinking", stage: "Thinking", sentence: "Claude is thinking about your request.", warning: null, hint: null };
   }
 
   if (done) {

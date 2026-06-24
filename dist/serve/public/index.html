@@ -150,7 +150,11 @@
     @keyframes pp { 0%{box-shadow:0 0 0 0 rgba(52,211,153,.35)} 70%{box-shadow:0 0 0 3px rgba(52,211,153,0)} 100%{box-shadow:0 0 0 0 rgba(52,211,153,0)} }
 
     .center { flex:1; min-width:0; padding:16px 20px; }
-    .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px; position:sticky; top:var(--head); align-self:stretch; transition:width var(--t-drawer) var(--ease); }
+    /* The stats column sticks below the header and follows the page as you scroll, instead of
+       stretching the full row height (which pins its content at the top and scrolls it away). */
+    .summary { width:210px; flex:none; border-left:1px solid var(--line); padding:16px 13px;
+      position:sticky; top:var(--head); align-self:flex-start; max-height:calc(100vh - var(--head));
+      overflow-y:auto; transition:width var(--t-drawer) var(--ease); }
 
     /* pill warning badge on a task row */
     .pill { font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
@@ -294,15 +298,26 @@
     .pair .v { color:var(--ink2); font-weight:600; }
     .pair .v .dim { color:var(--muted); font-weight:500; }
 
-    /* token breakdown rows */
-    .brk { margin-top:13px; display:flex; flex-direction:column; gap:9px; }
-    .brkrow .top { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:5px; }
-    .brkrow .bn { font-size:11px; color:var(--body); }
-    .brkrow .bv { font-size:11px; color:var(--ink2); }
-    .brkrow .bv .pct { color:var(--muted); margin-left:5px; }
-    .brkrow .tr { height:4px; border-radius:2px; background:var(--inset); overflow:hidden; }
-    /* neutral fill for breakdown bars - these are historical data, not the live action */
-    .brkrow .tr i { display:block; height:4px; border-radius:2px; background:var(--body); }
+    /* token chart: a small colored breakdown so spend reads as a chart, not a list. Each
+       category keeps one hue across the stacked bar, its legend swatch, and its row bar. */
+    .tokhd { display:flex; align-items:baseline; justify-content:space-between; }
+    .tokhd .k { margin-bottom:0; }
+    .tokhd .toktot { font-size:16px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
+    .tokhd .toktot small { font-size:9px; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); margin-left:5px; }
+    /* the hero: one stacked bar showing every category's share at a glance */
+    .tokbar { display:flex; height:10px; border-radius:6px; overflow:hidden; margin-top:11px;
+      background:var(--inset); box-shadow:inset 0 0 0 1px var(--hair); }
+    .tokbar i { display:block; height:10px; min-width:3px; }
+    .tokbar i + i { border-left:1px solid var(--surf); }
+    /* legend: swatch + label on the left, tokens + percent on the right, mini bar beneath */
+    .brk { margin-top:14px; display:flex; flex-direction:column; gap:11px; }
+    .brkrow .top { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+    .brkrow .bn { font-size:11.5px; color:var(--body); display:inline-flex; align-items:center; gap:8px; }
+    .brkrow .bn .sw { width:9px; height:9px; border-radius:3px; flex:none; box-shadow:0 0 7px -1px currentColor; }
+    .brkrow .bv { font-size:11.5px; color:var(--ink2); font-weight:600; }
+    .brkrow .bv .pct { color:var(--muted); margin-left:6px; font-weight:500; }
+    .brkrow .tr { height:5px; border-radius:3px; background:var(--inset); overflow:hidden; }
+    .brkrow .tr i { display:block; height:5px; border-radius:3px; min-width:3px; }
 
     /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
        in green with a soft glow - unmistakably the live element on the page. */
@@ -442,7 +457,7 @@
         transform var(--t-hover) var(--ease), box-shadow var(--t-hover) var(--ease); }
     .task:hover { background:var(--surf-h); border-color:var(--line); transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.26); }
     /* spine node for tasks - scoped to .feed only */
-    .feed .task::before { content:""; position:absolute; left:-21.5px; top:50%; transform:translateY(-50%);
+    .feed .task::before { content:""; position:absolute; left:-24.5px; top:50%; transform:translateY(-50%);
       width:7px; height:7px; border-radius:50%; background:var(--bg); border:1.5px solid var(--faint);
       box-shadow:0 0 0 3px var(--bg); transition:border-color var(--t-hover) var(--ease); }
     .feed .task:hover::before, .feed .task.open::before { border-color:var(--muted); }
@@ -768,7 +783,7 @@
       const tool = n.action ? `<span class="ntool">${esc(n.action.tool)}</span>` : "";
       const act = n.action
         ? `${tool}<span class="nact">${esc(n.action.detail || n.action.label)}</span>`
-        : n.thinking ? `<span class="nact think">Thinking through the prompt</span>` : `<span class="nact">Working</span>`;
+        : n.thinking ? `<span class="nact think">Thinking about your request</span>` : `<span class="nact">Working</span>`;
       const timer = n.since ? `<span class="ntime timer" data-since="${n.since}">${fmtDur(Date.now() - n.since)}</span>` : "";
       const follow = `<button class="follow${followLive ? " on" : ""}" id="follow-toggle" type="button">`
         + `<span class="fd"></span>${followLive ? "Following" : "Follow live"}</button>`;
@@ -1202,11 +1217,24 @@
         : fmtDur((snap.lastActivityAt || snap.startedAt || 0) - (snap.startedAt || 0));
       const prompts = (snap.groups || []).length;
       const bd = tokenBreakdown(snap);
+      // One steady hue per category, reused across the stacked bar, legend swatch, and row bar so
+      // the eye links them. Deliberately non-green: green is reserved for the single live thing.
+      const colorFor = (label) => ({
+        "Commands": "#7c83ff", "File work": "#4aa8ff", "Searches": "#e0a23a",
+        "Reasoning": "#c07cf0", "Other": "#7a8595",
+      }[label] || "#7a8595");
+      const stackBar = bd.rows.length
+        ? `<div class="tokbar">` + bd.rows.map(r =>
+            `<i style="width:${r.pct}%;background:${colorFor(r.label)}" title="${esc(r.label)} ${r.pct}%"></i>`).join("") + `</div>`
+        : "";
       const brkRows = bd.rows.length
-        ? bd.rows.map(r =>
-            `<div class="brkrow"><div class="top"><span class="bn">${esc(r.label)}</span>`
-            + `<span class="bv num">${fmt(r.tokens)} <span class="pct">${r.pct}%</span></span></div>`
-            + `<div class="tr"><i style="width:${r.pct}%"></i></div></div>`).join("")
+        ? bd.rows.map(r => {
+            const c = colorFor(r.label);
+            return `<div class="brkrow"><div class="top">`
+              + `<span class="bn"><span class="sw" style="background:${c};color:${c}"></span>${esc(r.label)}</span>`
+              + `<span class="bv num">${fmt(r.tokens)} <span class="pct">${r.pct}%</span></span></div>`
+              + `<div class="tr"><i style="width:${r.pct}%;background:${c}"></i></div></div>`;
+          }).join("")
         : `<div style="font-size:11px;color:var(--muted)">No token activity yet.</div>`;
 
       document.getElementById("summary").innerHTML =
@@ -1218,8 +1246,10 @@
         + `<div class="pair"><span class="l">Duration</span><span class="v num">${sessDur}</span></div>`
         + `<div class="pair"><span class="l">Prompts</span><span class="v num">${prompts}</span></div>`
         + `<div class="pair"><span class="l">Priciest task</span><span class="v">${esc(snap.priciestTaskName || "none yet")}</span></div>`
-        + `<div style="height:13px"></div>`
-        + `<div class="k">Tokens &middot; ${fmt(bd.total)}</div>`
+        + `<div style="height:15px"></div>`
+        + `<div class="tokhd"><span class="k">Tokens used</span>`
+        + `<span class="toktot">${fmt(bd.total)}<small>tok</small></span></div>`
+        + stackBar
         + `<div class="brk">${brkRows}</div>`
         + `</div></div>`;
 
@@ -1583,7 +1613,7 @@
       const cards = chunks.map((c) => cardHtml(c, null, pseudo)).join("");
       // The body: thinking banner, the cards so far, and the live "running X now" line. When a
       // terminal has done no tool work, say so plainly instead of dimming it like it is broken.
-      const think = s.thinking ? `<div class="pthink"><span class="pip"></span>Thinking through the prompt…</div>` : "";
+      const think = s.thinking ? `<div class="pthink"><span class="pip"></span>Thinking about your request…</div>` : "";
       const runl = s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
       // Mirror the single view's end-of-turn note when the user pressed Esc mid-prompt.
       const cancelNote = s.cancelled ? `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>` : "";

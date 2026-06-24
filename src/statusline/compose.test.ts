@@ -74,7 +74,7 @@ describe("composeView thinking", () => {
     const view = composeView(events, snap({ promptAt: 100 }), 5000);
     expect(view.state).toBe("thinking");
     expect(view.stage).toBe("Thinking");
-    expect(view.sentence).toContain("thinking through your request");
+    expect(view.sentence).toContain("thinking about your request");
   });
 
   it("is not thinking once a newer tool event exists", () => {

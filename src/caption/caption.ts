@@ -75,19 +75,26 @@ function describe(chunk: WorkChunk): Described {
     case "editing": {
       const adds = chunk.tool === "Write" || chunk.tool === "NotebookEdit";
       if (few) {
-        const verb = adds ? "creating" : "updating";
+        if (adds) {
+          return {
+            title,
+            simple: `Claude is creating ${names}.`,
+            deep: `Claude is creating ${names} and writing its initial contents.`,
+            teach: `Claude is creating ${names} and writing its initial contents. A new file does nothing until something imports or runs it.`,
+          };
+        }
         return {
           title,
-          simple: `Claude is ${verb} ${names} for the task.`,
-          deep: `Claude is ${verb} ${names}, changing the code so it behaves the way the task needs.`,
-          teach: `Claude is ${verb} ${names}, changing the code so it behaves the way the task needs. An edit only takes effect once the code runs or is rebuilt.`,
+          simple: `Claude is updating ${names}.`,
+          deep: `Claude is editing ${names}, changing specific lines in place.`,
+          teach: `Claude is editing ${names}, changing specific lines in place. An edit only takes effect once the code runs or is rebuilt.`,
         };
       }
       return {
         title,
-        simple: "Claude is updating several related files to keep the implementation in sync.",
-        deep: "Claude is updating several related files so the implementation and its tests stay in sync.",
-        teach: "Claude is updating several related files so the implementation and its tests stay in sync. Keeping related files aligned is what stops a change in one place from breaking another.",
+        simple: "Claude is updating several files.",
+        deep: "Claude is editing several related files in one change.",
+        teach: "Claude is editing several related files in one change. Keeping related files aligned is what stops a change in one place from breaking another.",
       };
     }
     case "testing":
