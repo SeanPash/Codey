@@ -1009,8 +1009,11 @@
       return html;
     }
 
-    // The "Explain this step" button, shown until an explanation is generated or loading.
-    function actionWhyBtn(c, idx) {
+    // The "Explain this step" button, shown until an explanation is generated or loading. A
+    // thinking row with no concrete decision (explainable === false) gets no button: there is
+    // nothing specific to explain, and generating filler is exactly what this pass removes.
+    function actionWhyBtn(c, l, idx) {
+      if (l && l.explainable === false) return "";
       const key = ekey("action", c.id + "#" + idx);
       if (explCache.has(key) || explLoading.has(key) || budgetPaused) return "";
       return `<button class="whybtn primary" type="button" data-gen-scope="action" data-gen-id="${esc(c.id + "#" + idx)}" data-gen-depth="${esc(activeDepth())}">Explain this step</button>`;
@@ -1033,7 +1036,7 @@
       const hasRaw = !!(l.raw || l.why || l.thoughtFirst || (l.status === "fail" && l.errorText));
       const rawBtn = hasRaw
         ? `<button class="rawbtn" type="button" data-raw="${esc(key)}">${rawShown ? "Hide raw details" : "Show raw details"}</button>` : "";
-      const acts = `<div class="lacts">${actionWhyBtn(c, idx)}${rawBtn}</div>`;
+      const acts = `<div class="lacts">${actionWhyBtn(c, l, idx)}${rawBtn}</div>`;
 
       const raw = [];
       if (rawShown) {

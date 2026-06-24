@@ -64,7 +64,9 @@ function describe(chunk: WorkChunk): Described {
   // the code". The teach line adds why the step matters for that stage.
   if ((chunk.tool === "Bash" || chunk.tool === "PowerShell") && chunk.count === 1 && chunk.raw) {
     const intent = describeShellIntent(chunk.raw);
-    return { title: intent.title, simple: intent.sentence, deep: intent.sentence, teach: intent.sentence };
+    // Each depth is genuinely different: simple says what, deep adds why this step matters, teach
+    // adds the concept. Deep mode never reads as simple with a longer tail.
+    return { title: intent.title, simple: intent.sentence, deep: intent.deep, teach: intent.teach };
   }
 
   const subject = subjectOf(chunk);

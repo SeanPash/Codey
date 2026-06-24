@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { describeShellIntent } from "./shell.js";
+import { hasBannedPhrase } from "./banned.js";
 
 // Phrases that mean we failed to say anything real about the command. The whole point of the
 // helper is that none of these ever become the main title or sentence when better context exists.
@@ -16,11 +17,18 @@ function isGeneric(text: string): boolean {
   return GENERIC.some((re) => re.test(text));
 }
 
-// Every intent the helper returns must read as a purpose, never as a tool category.
-function expectMeaningful(intent: { title: string; sentence: string; subject: string }) {
+// Every intent the helper returns must read as a purpose, never as a tool category, and each
+// depth must genuinely grow: deep adds why on top of the simple sentence, teach adds a concept
+// on top of deep. Deep must never read identical to simple.
+function expectMeaningful(intent: { title: string; sentence: string; subject: string; deep: string; teach: string }) {
   expect(isGeneric(intent.title)).toBe(false);
   expect(isGeneric(intent.sentence)).toBe(false);
   expect(intent.sentence.startsWith("Claude is ")).toBe(true);
+  expect(intent.deep).not.toBe(intent.sentence);
+  expect(intent.deep.length).toBeGreaterThan(intent.sentence.length);
+  expect(intent.teach.length).toBeGreaterThan(intent.deep.length);
+  expect(hasBannedPhrase(intent.deep)).toBe(false);
+  expect(hasBannedPhrase(intent.teach)).toBe(false);
 }
 
 describe("describeShellIntent: command patterns are real purposes, not tool categories", () => {
@@ -97,5 +105,20 @@ describe("describeShellIntent: only goes generic when there is truly nothing to 
     // No pattern, no description: this is the one case a plain fallback is allowed.
     expect(intent.sentence.startsWith("Claude is ")).toBe(true);
     expect(intent.subject.length).toBeGreaterThan(0);
+    // Even here deep stays richer than simple, so deep mode never reads like simple mode.
+    expect(intent.deep).not.toBe(intent.sentence);
+  });
+});
+
+describe("describeShellIntent: deep and teach grow for a described command", () => {
+  it("a feed command verifies live narration and grows from simple to deep to teach", () => {
+    const intent = describeShellIntent(
+      "node dist/cli/index.js feed",
+      "Check live now endpoint and statusline output",
+    );
+    expect(intent.deep).not.toBe(intent.sentence);
+    expect(intent.deep.length).toBeGreaterThan(intent.sentence.length);
+    expect(intent.teach.length).toBeGreaterThan(intent.deep.length);
+    expect(hasBannedPhrase(intent.deep)).toBe(false);
   });
 });

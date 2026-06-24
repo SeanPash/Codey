@@ -87,9 +87,16 @@ export function purposeTitle(tool: string, stage: Stage, subject: string, count:
       if (many) return adds ? `Adding ${subject} and more` : `Updating ${subject} and more`;
       return adds ? `Adding ${subject}` : `Updating ${subject}`;
     }
-    case "inspecting":
+    case "inspecting": {
+      // A search or read that could not name its target must not collapse to the banned
+      // "Checking the code". A nameless search reads as searching the project; a nameless read as
+      // checking the project. A real subject (a file name, a search term) flows through unchanged.
+      if (subject === "the code") {
+        return tool === "Grep" || tool === "Glob" ? "Searching the project" : "Checking the project";
+      }
       if (many) return `Checking ${subject} and more`;
       return `Checking ${subject}`;
+    }
     case "testing":
       return `Verifying ${subject}`;
     case "debugging":
