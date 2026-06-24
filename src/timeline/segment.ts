@@ -15,8 +15,11 @@ export interface RawChunk {
 export function naiveSegment(events: ToolEvent[]): RawChunk[] {
   if (events.length === 0) return [];
   const chunks = chunkEvents(events).map((c) => {
-    const caption = buildCaption(c, "simple");
-    return { startIndex: c.startIndex, name: caption.title, narration: caption.simple };
+    // The timeline card has room for one fuller sentence, so use the deep line: it names the
+    // same real files and adds the relationship Claude is after, making the collapsed card
+    // useful on its own without expanding it.
+    const caption = buildCaption(c, "deep");
+    return { startIndex: c.startIndex, name: caption.title, narration: caption.deep ?? caption.simple };
   });
   // chunkEvents starts at the first pre event; the timeline expects the first task to cover
   // everything from index 0, so anchor it there.

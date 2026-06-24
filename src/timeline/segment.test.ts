@@ -24,6 +24,19 @@ describe("naiveSegment", () => {
     expect(chunks[0].narration).toMatch(/Claude is/);
   });
 
+  it("narrates a collapsed card with the deeper grounded sentence, naming real files", () => {
+    const chunks = naiveSegment([
+      ev({ tool: "Read", input: { file_path: "compose.ts" }, timestamp: 1000 }),
+      ev({ tool: "Read", input: { file_path: "render.ts" }, timestamp: 1100 }),
+      ev({ tool: "Read", input: { file_path: "segment.ts" }, timestamp: 1200 }),
+    ]);
+    expect(chunks[0].narration).toMatch(/compose\.ts/);
+    expect(chunks[0].narration).toMatch(/render\.ts/);
+    // Deep wording carries the relationship, not just "Claude is reading ...".
+    expect(chunks[0].narration).toMatch(/to map how they connect/);
+    expect(chunks[0].narration).not.toMatch(/several files|see how the pieces fit together/i);
+  });
+
   it("splits when the work phase changes", () => {
     const chunks = naiveSegment([
       ev({ tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 }),

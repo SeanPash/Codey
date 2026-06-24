@@ -11,7 +11,8 @@ export interface WorkChunk {
   startIndex: number; // index of the chunk's first event in the source array, for the timeline
   count: number;      // how many actions were folded into this chunk
   tool: string;       // the first action's tool, a representative
-  targets: string[];  // plain short names touched, in order ("a.ts", "the tests")
+  targets: string[];  // plain short names of files touched, in order ("a.ts", "the tests")
+  searches: string[]; // literal search patterns looked for in this run ("Active Terminal")
   raw: string | null; // the first action's raw detail, revealed only when truly useful
   startTs: number;
   endTs: number;
@@ -82,6 +83,11 @@ export function chunkEvents(events: ToolEvent[]): WorkChunk[] {
     if (e.phase !== "pre") continue;
     const failed = failedBy.get(e) ?? false;
     const stage = classifyStage(e.tool, e.input, failed);
+    const isSearch = e.tool === "Grep" || e.tool === "Glob";
+    // A search keeps its literal pattern in `searches` so a caption can name what Claude was
+    // looking for; a file action keeps its readable name in `targets`. Splitting the two means
+    // a "grep X then read Y" run can say "searching Y for X" instead of muddling both together.
+    const searchLiteral = isSearch ? rawTarget(e.tool, e.input) : null;
     const name = shortName(e.tool, e.input);
     const last = built[built.length - 1];
 
@@ -96,7 +102,11 @@ export function chunkEvents(events: ToolEvent[]): WorkChunk[] {
 
     if (last && stageMatches && close) {
       last.count++;
-      if (last.targets.length < 6) last.targets.push(name);
+      if (searchLiteral) {
+        if (!last.searches.includes(searchLiteral) && last.searches.length < 6) last.searches.push(searchLiteral);
+      } else if (last.targets.length < 6) {
+        last.targets.push(name);
+      }
       last.endTs = e.timestamp;
       last.tools.push(e.tool);
       // A debugging action anywhere pulls the whole chunk into the debugging stage.
@@ -114,7 +124,8 @@ export function chunkEvents(events: ToolEvent[]): WorkChunk[] {
         startIndex: i,
         count: 1,
         tool: e.tool,
-        targets: [name],
+        targets: searchLiteral ? [] : [name],
+        searches: searchLiteral ? [searchLiteral] : [],
         raw: rawTarget(e.tool, e.input),
         startTs: e.timestamp,
         endTs: e.timestamp,
