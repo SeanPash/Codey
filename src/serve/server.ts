@@ -90,7 +90,10 @@ export function createServer(deps: ServerDeps): Server {
     const route = resolveRoute(req.method, req.url);
     try {
       if (route.type === "page") {
-        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        // no-store so a rebuilt timeline page is never served from the browser cache. The page is
+        // small and only loaded by hand, so skipping the cache costs nothing and avoids the stale
+        // "I still see the old version" trap after an update.
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         res.end(readFileSync(deps.pagePath, "utf8"));
       } else if (route.type === "health") {
         sendJson(res, 200, { build: deps.buildId });

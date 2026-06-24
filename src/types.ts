@@ -128,6 +128,7 @@ export interface LiveSession {
   cancelled: boolean;          // the latest turn was interrupted by the user (Esc mid-prompt)
   groupId: string | null;      // current turn's group id, so a pane can summarize the prompt
   groups: PromptGroup[];       // full prompt history, so a pane is a real single-terminal timeline
+  seedDepth: "simple" | "deep" | "teach"; // this session's mode, the pane's default depth
 }
 
 // A terminal the user hid from the grid, kept so it can be listed and restored.
