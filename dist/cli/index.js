@@ -3529,16 +3529,28 @@ function phrasePattern(pattern) {
   if (tokens.length === 0 || tokens.length > 4) return "the code";
   return joinNames(tokens);
 }
+function phraseSearch(literal) {
+  const raw = (literal ?? "").trim();
+  if (!raw) return null;
+  if (/[\\()[\]{}+?^$.*|]/.test(raw)) return null;
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 6) return null;
+  if (words.length === 1) {
+    const w = words[0];
+    return /[a-z]/.test(w) ? w : w.toLowerCase();
+  }
+  return words.join(" ").toLowerCase();
+}
 function purposeTitle(tool, stage, subject, count) {
   const many = count > 1;
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
-      if (many) return adds ? "Creating several files" : "Updating several files";
+      if (many) return adds ? `Adding ${subject} and more` : `Updating ${subject} and more`;
       return adds ? `Adding ${subject}` : `Updating ${subject}`;
     }
     case "inspecting":
-      if (many) return "Checking several files";
+      if (many) return `Checking ${subject} and more`;
       return `Checking ${subject}`;
     case "testing":
       return `Verifying ${subject}`;
@@ -3558,11 +3570,11 @@ function purposeSentence(tool, stage, subject, count) {
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
-      if (many) return adds ? "Adding several new files to the project." : "Editing several related files.";
+      if (many) return adds ? `Adding new files, starting with ${subject}.` : `Updating ${subject} and the files alongside it.`;
       return adds ? `Creating ${subject}.` : `Changing ${subject} to adjust how it works.`;
     }
     case "inspecting":
-      if (many) return "Reading through several files to follow how the code fits together.";
+      if (many) return `Reading ${subject} and the files around it to map how they connect.`;
       if (tool === "Grep" || tool === "Glob") return `Searching the project for ${subject}.`;
       return `Reading ${subject} to follow how it works.`;
     case "testing":
@@ -4037,13 +4049,19 @@ function chunkEvents(events) {
     if (e.phase !== "pre") continue;
     const failed = failedBy.get(e) ?? false;
     const stage = classifyStage(e.tool, e.input, failed);
+    const isSearch = e.tool === "Grep" || e.tool === "Glob";
+    const searchLiteral = isSearch ? rawTarget(e.tool, e.input) : null;
     const name = shortName(e.tool, e.input);
     const last = built[built.length - 1];
     const stageMatches = last && (last.stage === stage || mutating(last.stage) && mutating(stage));
     const close = last && e.timestamp - last.endTs <= IDLE_SPLIT_MS;
     if (last && stageMatches && close) {
       last.count++;
-      if (last.targets.length < 6) last.targets.push(name);
+      if (searchLiteral) {
+        if (!last.searches.includes(searchLiteral) && last.searches.length < 6) last.searches.push(searchLiteral);
+      } else if (last.targets.length < 6) {
+        last.targets.push(name);
+      }
       last.endTs = e.timestamp;
       last.tools.push(e.tool);
       if (stage === "debugging") last.stage = "debugging";
@@ -4060,7 +4078,8 @@ function chunkEvents(events) {
         startIndex: i,
         count: 1,
         tool: e.tool,
-        targets: [name],
+        targets: searchLiteral ? [] : [name],
+        searches: searchLiteral ? [searchLiteral] : [],
         raw: rawTarget(e.tool, e.input),
         startTs: e.timestamp,
         endTs: e.timestamp,
@@ -4082,43 +4101,61 @@ function subjectOf(chunk) {
   if (chunk.tool === "Grep" || chunk.tool === "Glob") return phrasePattern(chunk.raw ?? "");
   return humanFile(chunk.targets[0] ?? "") || "the code";
 }
+function namedTargets(chunk) {
+  return joinNames(chunk.targets.map(humanFile)) || "the code";
+}
+function namedSearches(chunk) {
+  const phrases = chunk.searches.map(phraseSearch).filter((p) => !!p);
+  return joinNames(phrases);
+}
 function describe(chunk) {
   if ((chunk.tool === "Bash" || chunk.tool === "PowerShell") && chunk.count === 1 && chunk.raw) {
     const intent2 = describeShellIntent(chunk.raw);
     return { title: intent2.title, simple: intent2.sentence, deep: intent2.sentence, teach: intent2.sentence };
   }
   const subject = subjectOf(chunk);
-  const title = purposeTitle(chunk.tool, chunk.stage, subject, chunk.count);
-  const few = chunk.targets.length <= 3 && chunk.count <= 3;
-  const names = joinNames(chunk.targets.map(humanFile)) || "the code";
+  const names = namedTargets(chunk);
+  const single = chunk.targets.length <= 1 && chunk.count <= 1;
+  const groupSubject = chunk.targets.length ? joinNames(chunk.targets.map(humanFile), 2) : subject;
+  const title = single ? purposeTitle(chunk.tool, chunk.stage, subject, chunk.count) : purposeTitle(chunk.tool, chunk.stage, groupSubject, 1);
   switch (chunk.stage) {
     case "inspecting": {
+      const searches = namedSearches(chunk);
+      if (searches) {
+        const where = chunk.targets.length ? namedTargets(chunk) : "the project";
+        return {
+          title: chunk.targets.length ? `Searching ${humanFile(chunk.targets[0])}` : "Searching the project",
+          simple: `Claude is searching ${where} for ${searches}.`,
+          deep: `Claude is searching ${where} for ${searches} to land on the right section before editing it.`,
+          teach: `Claude is searching ${where} for ${searches} to land on the right section before editing it. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
+        };
+      }
       if (chunk.tool === "Grep" || chunk.tool === "Glob") {
         return {
           title,
-          simple: `Claude is searching the project for ${subject}.`,
-          deep: `Claude is searching the project for ${subject} to see where it is used.`,
-          teach: `Claude is searching the project for ${subject} to see where it is used. Searching first shows every place a change would ripple to, so nothing gets missed.`
+          simple: `Claude is searching ${subject === "the code" ? "the project" : `the project for ${subject}`}.`,
+          deep: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used.`,
+          teach: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
         };
       }
-      if (few) {
+      if (single) {
         return {
           title,
-          simple: `Claude is reading ${names} to understand the code.`,
-          deep: `Claude is reading ${names} to see how it works before changing anything.`,
-          teach: `Claude is reading ${names} to see how it works before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there.`
+          simple: `Claude is reading ${names}.`,
+          deep: `Claude is reading ${names} to find the part it needs before editing it.`,
+          teach: `Claude is reading ${names} to find the part it needs before editing it. Reading the existing code first is how you avoid breaking something you did not know was there.`
         };
       }
       return {
         title,
-        simple: "Claude is checking several files to see how the code works.",
-        deep: "Claude is checking several files to see how the pieces fit together before changing anything.",
-        teach: "Claude is checking several files to see how the pieces fit together before changing anything. Reading the existing code first is how you avoid breaking something you did not know was there."
+        simple: `Claude is reading ${names}.`,
+        deep: `Claude is reading ${names} to map how they connect before editing them.`,
+        teach: `Claude is reading ${names} to map how they connect before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`
       };
     }
     case "editing": {
       const adds = chunk.tool === "Write" || chunk.tool === "NotebookEdit";
-      if (few) {
+      if (single) {
         if (adds) {
           return {
             title,
@@ -4134,11 +4171,19 @@ function describe(chunk) {
           teach: `Claude is editing ${names}, changing specific lines in place. An edit only takes effect once the code runs or is rebuilt.`
         };
       }
+      if (adds) {
+        return {
+          title,
+          simple: `Claude is creating ${names}.`,
+          deep: `Claude is creating ${names} as a set of new files for one piece of work.`,
+          teach: `Claude is creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`
+        };
+      }
       return {
         title,
-        simple: "Claude is updating several files.",
-        deep: "Claude is editing several related files in one change.",
-        teach: "Claude is editing several related files in one change. Keeping related files aligned is what stops a change in one place from breaking another."
+        simple: `Claude is updating ${names}.`,
+        deep: `Claude is updating ${names} together so they stay consistent.`,
+        teach: `Claude is updating ${names} together so they stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`
       };
     }
     case "testing":
@@ -4656,8 +4701,8 @@ import { join as join6 } from "node:path";
 function naiveSegment(events) {
   if (events.length === 0) return [];
   const chunks = chunkEvents(events).map((c) => {
-    const caption = buildCaption(c, "simple");
-    return { startIndex: c.startIndex, name: caption.title, narration: caption.simple };
+    const caption = buildCaption(c, "deep");
+    return { startIndex: c.startIndex, name: caption.title, narration: caption.deep ?? caption.simple };
   });
   if (chunks.length === 0) return [{ startIndex: 0, name: "Getting started", narration: "Claude is getting started." }];
   chunks[0] = { ...chunks[0], startIndex: 0 };
