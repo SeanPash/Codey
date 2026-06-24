@@ -4530,7 +4530,7 @@ function pickSentence(caption, mode) {
   if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
   return caption.simple;
 }
-var DONE_SENTENCE = "Finished this prompt. Open the timeline for the full breakdown.";
+var DONE_SENTENCE = "Finished this prompt. Run /codey:timeline for the full breakdown.";
 var SEE_MORE = "/codey:timeline \xB7 /codey:costs";
 function composeView(events, snap, now, whys = [], budget = null) {
   const budgetLeft = budgetLeftLabel(budget);
@@ -5508,6 +5508,7 @@ function buildSnapshot(input) {
     contextTotal: totals.context,
     taskCount: chunks.length,
     priciestTaskName: priciest ? priciest.name : null,
+    priciestTaskWork: priciest ? priciest.workTotal : 0,
     groups,
     chunks,
     activeWarning: null,
@@ -5965,6 +5966,9 @@ function loadLive(root = defaultRoot()) {
       open: s.open,
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
+      // The full prompt history, so each pane renders as a real single-terminal timeline
+      // (oldest prompt on top, newest below) instead of a single overwriting receipt.
+      groups: snap.groups,
       runningTool,
       acted: s.acted,
       // Live but no tool open: Claude is thinking (before the first tool) or between calls.

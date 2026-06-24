@@ -43,7 +43,7 @@ describe("renderStatus", () => {
       ...base,
       state: "done",
       stage: "Done",
-      sentence: "Finished this prompt. Open the timeline for the full breakdown.",
+      sentence: "Finished this prompt. Run /codey:timeline for the full breakdown.",
       elapsed: "2m 14s",
       hint: "/codey:timeline · /codey:costs",
     }));

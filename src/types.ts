@@ -100,6 +100,7 @@ export interface SessionSnapshot {
   contextTotal: number;            // session context tokens (input + cache)
   taskCount: number;
   priciestTaskName: string | null; // ranked by work tokens, not context
+  priciestTaskWork: number;        // work tokens of the priciest task, for its receipt footer
   groups: PromptGroup[];           // per-prompt grouping, the Single view's structure
   chunks: TimelineChunk[];         // flat task list, still used by the Active Terminals view
   activeWarning: Warning | null;   // Plan 3: the live "stuck" warning, or null; drives the bar
@@ -126,6 +127,7 @@ export interface LiveSession {
   prompt: string;              // the latest prompt text (what the user asked), clamped; "" if none
   cancelled: boolean;          // the latest turn was interrupted by the user (Esc mid-prompt)
   groupId: string | null;      // current turn's group id, so a pane can summarize the prompt
+  groups: PromptGroup[];       // full prompt history, so a pane is a real single-terminal timeline
 }
 
 // A terminal the user hid from the grid, kept so it can be listed and restored.

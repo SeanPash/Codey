@@ -23,7 +23,7 @@
       --sel:#5fa8e0; --sel-dim:#2c4d63;
       /* token-category hues: live ONLY inside the stats card, never on timeline rows. Restrained
          so the breakdown reads like a colored receipt, not a rainbow chart. */
-      --tok-file:#5aa0e6; --tok-cmd:#8b88ef; --tok-search:#d6a24a; --tok-reason:#bd7fe0; --tok-other:#6e7886;
+      --tok-file:#6aa3c4; --tok-cmd:#7377bd; --tok-search:#c39a59; --tok-reason:#a98ec9; --tok-other:#6e7785;
       /* ---- radius ---- */
       --r-sm:6px; --r-task:8px; --r-card:10px;
       /* ---- motion ---- */
@@ -322,30 +322,34 @@
     .tokhd .k { margin-bottom:0; }
     .tokhd .toktot { font-size:17px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
     .tokhd .toktot small { font-size:9px; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); margin-left:5px; }
-    /* the hero: one stacked bar showing every category's share at a glance */
-    .tokbar { display:flex; height:11px; border-radius:6px; overflow:hidden; margin-top:12px;
+    /* the hero: one stacked bar showing every category's share at a glance. Thin seams between
+       segments (matched to the card surface) keep neighbours readable without loud borders. */
+    .tokbar { display:flex; height:10px; border-radius:5px; overflow:hidden; margin-top:13px;
       background:var(--inset); box-shadow:inset 0 0 0 1px var(--hair); }
-    .tokbar i { display:block; height:11px; min-width:3px; }
-    .tokbar i + i { border-left:1px solid var(--surf); }
+    .tokbar i { display:block; height:10px; min-width:4px; }
+    .tokbar i + i { border-left:1.5px solid var(--surf); }
     /* receipt rows: swatch + label on the left, count then percent right-aligned in fixed
-       columns so every number lines up, mini bar beneath. */
-    .brk { margin-top:15px; display:flex; flex-direction:column; gap:12px; }
+       columns so every number lines up, mini bar beneath. The rows are the legend. */
+    .brk { margin-top:16px; display:flex; flex-direction:column; gap:13px; }
     .brkrow .top { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
     .brkrow .bn { flex:1; min-width:0; font-size:11.5px; color:var(--ink2); display:inline-flex; align-items:center; gap:8px;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .brkrow .bn .sw { width:9px; height:9px; border-radius:3px; flex:none; box-shadow:0 0 8px -2px currentColor; }
-    .brkrow .bv { flex:none; display:inline-flex; align-items:baseline; gap:9px; }
-    .brkrow .bv .bc { font-size:11.5px; color:var(--ink2); font-weight:600; text-align:right; }
-    .brkrow .bv .pct { color:var(--muted); font-weight:500; font-size:11px; min-width:30px; text-align:right; }
+    .brkrow .bn .sw { width:9px; height:9px; border-radius:3px; flex:none; }
+    .brkrow .bv { flex:none; display:inline-flex; align-items:baseline; gap:8px; font-variant-numeric:tabular-nums; }
+    .brkrow .bv .bc { font-size:11.5px; color:var(--ink); font-weight:600; text-align:right; min-width:40px; }
+    .brkrow .bv .pct { color:var(--muted); font-weight:500; font-size:11px; min-width:32px; text-align:right; }
     .brkrow .tr { height:4px; border-radius:3px; background:var(--inset); overflow:hidden; }
-    .brkrow .tr i { display:block; height:4px; border-radius:3px; min-width:3px; }
+    .brkrow .tr i { display:block; height:4px; border-radius:3px; min-width:3px; opacity:.85; }
     .tokempty { font-size:11px; color:var(--muted); margin-top:12px; }
-    /* priciest-task footer: a quiet line below the breakdown, not a stat pair */
-    .tokfoot { display:flex; align-items:baseline; gap:8px; justify-content:space-between;
-      margin-top:14px; padding-top:11px; border-top:1px solid var(--hair); font-size:11px; }
-    .tokfoot .l { color:var(--muted); flex:none; }
-    .tokfoot .v { color:var(--body); text-align:right; min-width:0;
+    /* priciest-task footer: its own labelled row below the breakdown, name on the left (truncated),
+       spend on the right, so it reads as a separate receipt line and not part of the chart. */
+    .tokfoot { margin-top:15px; padding-top:12px; border-top:1px solid var(--hair); }
+    .tokfoot .pl { font-size:8.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:6px; }
+    .tokfoot .pr { display:flex; align-items:baseline; gap:8px; justify-content:space-between; }
+    .tokfoot .pr .pn { color:var(--body); font-size:11.5px; min-width:0;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .tokfoot .pr .pt { flex:none; font-size:11.5px; font-weight:600; color:var(--ink2); font-variant-numeric:tabular-nums; }
+    .tokfoot .pr .pt small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:4px; }
 
     /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
        in green with a soft glow - unmistakably the live element on the page. */
@@ -538,6 +542,16 @@
     .phead .pname { font-weight:600; font-size:12.5px; color:var(--ink); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .phead .pproj { font-size:10px; color:var(--body); background:var(--surf-h); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--ink2); }
+    /* per-pane Follow live toggle: green when on, like the single view's strip, but scoped here */
+    .pfollow { flex:none; font:inherit; font-size:10.5px; display:inline-flex; align-items:center; gap:5px;
+      background:var(--inset); border:1px solid var(--line); color:var(--muted); border-radius:7px; padding:3px 9px; cursor:pointer; }
+    .pfollow.on { background:rgba(52,211,153,.13); color:var(--live-ink); border-color:rgba(52,211,153,.4); }
+    .pfollow .fd { width:6px; height:6px; border-radius:50%; background:currentColor; }
+    /* "Jump to live" affordance: floats at the foot of a parked pane when new live work arrives */
+    .pjump { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:2; font:inherit; font-size:10.5px;
+      font-weight:600; display:inline-flex; align-items:center; gap:5px; color:var(--live-ink); background:var(--surf-h);
+      border:1px solid rgba(52,211,153,.42); border-radius:999px; padding:5px 12px; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.3); }
+    .pjump[hidden] { display:none; }
     /* cancelled pane: quiet amber frame, no beam - not running, just interrupted */
     .pane.cancelled { border-color:rgba(224,162,58,.4); }
     /* Pinned prompt strip: echoes the single view's "You asked" heading at the top of a pane and
@@ -768,7 +782,7 @@
         `<div class="ctlgrp"><span class="cl">Depth</span><div class="seg" id="seg-depth">`
         + seg("simple", curDepth(), "Simple") + seg("deep", curDepth(), "Deep") + seg("teach", curDepth(), "Teach") + `</div></div>`
         + `<div class="ctlgrp"><span class="cl">Summaries</span><div class="seg" id="seg-gen">`
-        + seg("auto", genMode, "Auto") + seg("saver", genMode, "Saver") + `</div></div>`
+        + seg("auto", genMode, "Auto") + seg("saver", genMode, "Manual") + `</div></div>`
         + cue;
       el.querySelectorAll("#seg-depth button").forEach((b) => b.addEventListener("click", () => {
         depth = b.dataset.val; localStorage.setItem("codey-depth", depth); autoFired.clear();
@@ -1133,7 +1147,10 @@
 
     function cardHtml(c, barWarning, snap) {
       const isOpen = isCardOpen(c.id);
-      const liveTask = snap.live && c.id === liveOpenId;
+      // Panes pass their own live chunk id (one live task per terminal); the single view leaves it
+      // unset and falls back to the global liveOpenId.
+      const liveId = ("liveChunkId" in snap) ? snap.liveChunkId : liveOpenId;
+      const liveTask = snap.live && c.id === liveId;
       // class list: task is the base; open/live add state. warn is a semantic hook only - it
       // carries no structural CSS; the warning shows via the amber pill on the name.
       const cls = "task"
@@ -1162,7 +1179,9 @@
         + (barWarning ? interventionBar(barWarning, c.id) : "");
     }
 
-    function groupHtml(g, snap, barFor) {
+    // opts (Active Terminals panes): { follow, showEcho } overrides the single-view globals so a
+    // pane uses its own Follow live state and still shows the summary echo. Omitted in the single view.
+    function groupHtml(g, snap, barFor, opts) {
       const cards = g.chunks.map((c) => cardHtml(c, barFor(c), snap)).join("")
         || `<div class="grpnote">${g.live ? "Working on it…" : "Answered directly, no tools used."}</div>`;
       // Eyebrow: live gets the pulsing dot, cancelled gets a quiet note, otherwise "You asked".
@@ -1179,8 +1198,10 @@
       // Heading echo: first sentence of cached summary, for skimming a completed prompt.
       const sumKey = ekey("summary", g.id);
       const sum = explCache.get(sumKey);
-      const echo = (!g.live && sum && view === "single") ? `<div class="gecho">${esc(firstSentence(sum))}</div>` : "";
-      const following = g.live && followLive ? " following" : "";
+      const follow = opts ? opts.follow : followLive;
+      const showEcho = opts ? opts.showEcho : (view === "single");
+      const echo = (!g.live && sum && showEcho) ? `<div class="gecho">${esc(firstSentence(sum))}</div>` : "";
+      const following = g.live && follow ? " following" : "";
       // When the user pressed Esc mid-turn, note it after the cards.
       const cancelNote = g.cancelled ? `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>` : "";
       const pmarkCls = "pmark" + (g.live ? " live" : "");
@@ -1276,16 +1297,20 @@
       const brkRows = bd.rows.length
         ? bd.rows.map(r => {
             const c = colorFor(r.label);
+            // Compact counts (2.5k) keep the amount and percent columns aligned in the narrow rail.
             return `<div class="brkrow"><div class="top">`
-              + `<span class="bn"><span class="sw" style="background:${c};color:${c}"></span>${esc(r.label)}</span>`
-              + `<span class="bv"><span class="bc num">${fmt(r.tokens)}</span><span class="pct num">${pctText(r.pct)}</span></span></div>`
+              + `<span class="bn"><span class="sw" style="background:${c}"></span>${esc(r.label)}</span>`
+              + `<span class="bv"><span class="bc num">${kfmt(r.tokens)}</span><span class="pct num">${pctText(r.pct)}</span></span></div>`
               + `<div class="tr"><i style="width:${barW(r.pct)}%;background:${c}"></i></div></div>`;
           }).join("")
         : `<div class="tokempty">No token activity yet.</div>`;
 
-      // Priciest task lives as a quiet footer on the breakdown card, where spend is the subject.
+      // Priciest task sits in its own row below the breakdown: a small label, then the task name
+      // (truncated) on the left and its spend on the right, so it reads as a separate receipt line.
       const priciest = snap.priciestTaskName
-        ? `<div class="tokfoot"><span class="l">Priciest task</span><span class="v">${esc(snap.priciestTaskName)}</span></div>` : "";
+        ? `<div class="tokfoot"><div class="pl">Priciest task</div>`
+          + `<div class="pr"><span class="pn">${esc(snap.priciestTaskName)}</span>`
+          + `<span class="pt num">${kfmt(snap.priciestTaskWork)}<small>tok</small></span></div></div>` : "";
 
       document.getElementById("summary").innerHTML =
         `<div class="sidehd"><span class="t">Session stats</span>`
@@ -1293,7 +1318,7 @@
         + `<div class="statsbody">`
         + `<div class="scard${nowLive ? " nowcard" : ""}" aria-live="polite"><div class="k">Right now</div>${nowCardInner}</div>`
         + `<div class="scard"><div class="k">This session</div>`
-        + `<div class="pair"><span class="l">Duration</span><span class="v num">${sessDur}</span></div>`
+        + `<div class="pair"><span class="l">Total duration</span><span class="v num">${sessDur}</span></div>`
         + `<div class="pair"><span class="l">Prompts</span><span class="v num">${prompts}</span></div>`
         + `<div class="pair"><span class="l">Tasks</span><span class="v num">${total}</span></div>`
         + `<div class="pair"><span class="l">Total tokens</span><span class="v num">${fmt(bd.total)}</span></div>`
@@ -1636,6 +1661,11 @@
     // machine with many open terminals does not re-render dozens of full receipts every tick.
     const SPLIT_PER_PAGE = 2;
     let lastLive = null; // keep the last payload so pager clicks re-render without a refetch
+    // Each pane runs its own Follow live, independent of the others and of the single view: one
+    // terminal can follow its live work while another stays parked where the user is reading.
+    const paneFollow = {};       // sessionId -> bool (absent = following by default)
+    const paneLiveGroupId = {};  // sessionId -> last live group id, to re-engage follow on a new prompt
+    const paneFollowOn = (sid) => paneFollow[sid] !== false;
 
     async function dismissTerminal(id) {
       try { await fetch("/api/session/" + encodeURIComponent(id) + "/dismiss", { method: "POST" }); } catch { /* refetch handles it */ }
@@ -1656,51 +1686,129 @@
     }
 
     function paneHtml(s, isFirst) {
+      const sid = s.sessionId;
       // A pane is "live" (amber frame) whenever the terminal is running: mid-tool OR thinking.
       // A cancelled turn gets a quiet amber frame too, so an interrupted terminal reads as such.
       const cls = "pane" + (s.running ? " run" : "") + (s.cancelled && !s.running ? " cancelled" : "");
       const pill = s.thinking ? `<span class="badge think">&#9670; Thinking</span>`
         : isFirst && s.running ? `<span class="badge">&#10022; Just prompted</span>` : "";
       const proj = s.project ? `<span class="pproj">${esc(s.project)}</span>` : "";
-      const dismissBtn = `<button class="pdismiss" type="button" data-dismiss="${esc(s.sessionId)}" title="Hide this terminal" aria-label="Hide this terminal">&times;</button>`;
-      // Namespace each chunk id with the session so the same card index in two panes does not
-      // share expand state. Render the full Single-view card so panes get the same receipts.
-      const chunks = s.chunks.map((c) => ({ ...c, id: s.sessionId + "~" + c.id }));
-      const lastFinite = chunks.reduce((m, c) => {
-        const e = c.endTs < 1e15 ? c.endTs : c.startTs;
-        return e > m ? e : m;
-      }, 0) || Date.now();
-      const pseudo = { live: s.running, lastActivityAt: lastFinite };
-      const cards = chunks.map((c) => cardHtml(c, null, pseudo)).join("");
-      // The body: thinking banner, the cards so far, and the live "running X now" line. When a
-      // terminal has done no tool work, say so plainly instead of dimming it like it is broken.
-      const think = s.thinking ? `<div class="pthink"><span class="pip"></span>Thinking about your request…</div>` : "";
-      const runl = s.runningTool ? `<div class="prun"><span class="pip"></span>running ${esc(s.runningTool)} now</div>` : "";
-      // Mirror the single view's end-of-turn note when the user pressed Esc mid-prompt.
-      const cancelNote = s.cancelled ? `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>` : "";
-      // The same "Summarize this prompt" recap the single view offers, keyed by this pane's own
-      // session so the button hits the right terminal. Namespaced id lets generate() route it.
-      const recap = s.groupId ? summaryBlock({ id: s.sessionId + "~" + s.groupId, live: s.running }) : "";
+      const dismissBtn = `<button class="pdismiss" type="button" data-dismiss="${esc(sid)}" title="Hide this terminal" aria-label="Hide this terminal">&times;</button>`;
+      // Full prompt history, oldest on top, newest below: a pane is a real single-terminal timeline,
+      // not a single overwriting receipt. Namespace each group and chunk id with the session so
+      // expand state and "Summarize"/"Explain" requests route to this terminal, never a neighbour.
+      const groups = (s.groups || []).map((g) => ({
+        ...g, id: sid + "~" + g.id,
+        chunks: g.chunks.map((c) => ({ ...c, id: sid + "~" + c.id })),
+      }));
+      // A new prompt re-engages this pane's Follow live, exactly like the single view: when the live
+      // group id changes, snap back to following even if the user had scrolled up to read earlier.
+      const liveGroup = groups.find((g) => g.live);
+      if (liveGroup && paneLiveGroupId[sid] !== liveGroup.id) {
+        paneLiveGroupId[sid] = liveGroup.id;
+        paneFollow[sid] = true;
+      } else if (!liveGroup) {
+        paneLiveGroupId[sid] = null;
+      }
+      // The pane's one live task (last task of its live group), so cardHtml lights the right row.
+      const liveChunks = liveGroup ? liveGroup.chunks : [];
+      const liveChunkId = s.running && liveChunks.length ? liveChunks[liveChunks.length - 1].id : null;
+      const follow = paneFollowOn(sid);
+      // Pseudo-snapshot for the shared card/group renderers: this pane's own live flag and live row.
+      const lastFinite = groups.reduce((m, g) => Math.max(m, g.endTs < 1e15 ? g.endTs : g.startTs), 0) || Date.now();
+      const pseudo = { live: s.running, lastActivityAt: lastFinite, liveChunkId };
+      const barNone = () => null; // panes carry no intervention warnings
+
       let body;
-      if (chunks.length) body = `${think}${cards}${runl}${cancelNote}${recap}`;
-      else if (s.thinking) body = think;
-      else if (s.cancelled) body = cancelNote;
-      else body = `<div class="pnote"><span class="pn1">Answered directly</span>No tools used for this prompt.</div>`;
-      // Pinned prompt strip: what the user asked, like the single view's "You asked" heading. It
-      // stays above the scrolling body so it never scrolls away while a busy pane fills up.
-      const eyebrow = s.running
-        ? `<span class="geyebrow glive"><span class="rdot"></span>You asked &middot; working now</span>`
-        : s.cancelled ? `<span class="geyebrow gcancel">You asked &middot; cancelled</span>`
-        : `<span class="geyebrow">You asked</span>`;
-      const promptStrip = s.prompt
-        ? `<div class="pprompt">${eyebrow}<div class="pptext">${esc(s.prompt)}</div></div>` : "";
-      return `<div class="${cls}"><div class="phead"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
+      if (groups.length) {
+        body = `<div class="feed">`
+          + groups.map((g) => groupHtml(g, pseudo, barNone, { follow, showEcho: true })).join("")
+          + `</div>`;
+      } else if (s.thinking) {
+        body = `<div class="pthink"><span class="pip"></span>Thinking about your request…</div>`;
+      } else if (s.cancelled) {
+        body = `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>`;
+      } else {
+        body = `<div class="pnote"><span class="pn1">Answered directly</span>No tools used for this prompt.</div>`;
+      }
+      // Per-pane Follow live toggle, shown only while the terminal is live. Off keeps the user's
+      // scroll put; the "Jump to live" affordance below surfaces when new work lands out of view.
+      const followBtn = s.running
+        ? `<button class="pfollow${follow ? " on" : ""}" type="button" data-follow="${esc(sid)}">`
+          + `<span class="fd"></span>${follow ? "Following" : "Follow live"}</button>` : "";
+      const jump = s.running
+        ? `<button class="pjump" type="button" data-jump="${esc(sid)}" hidden>New live activity &#8595;</button>` : "";
+      return `<div class="${cls}" data-sid="${esc(sid)}"><div class="phead">`
+        + `<span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
         + `<span class="pname">${esc(s.name)}</span>${proj}${pill}`
-        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${dismissBtn}</div>`
-        + `${promptStrip}<div class="pbody">${body}</div></div>`;
+        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${followBtn}${dismissBtn}</div>`
+        + `<div class="pbody" data-sid="${esc(sid)}">${body}</div>${jump}</div>`;
+    }
+
+    // Locate a pane by session id without trusting the id in a CSS selector.
+    function paneEl(sid) {
+      return [...document.querySelectorAll(".pane[data-sid]")].find((p) => p.dataset.sid === sid) || null;
+    }
+    const paneAtBottom = (body) => body.scrollHeight - (body.scrollTop + body.clientHeight) < 28;
+
+    // Read each pane's current scroll before a re-render so a parked pane can be put back exactly,
+    // instead of snapping to the top every tick when its innerHTML is replaced.
+    function capturePaneScroll() {
+      const map = {};
+      document.querySelectorAll(".pbody[data-sid]").forEach((el) => { map[el.dataset.sid] = el.scrollTop; });
+      return map;
+    }
+    // After a re-render: a following live pane sticks to the bottom; every other pane is restored
+    // to where the user left it. Then refresh each pane's "Jump to live" affordance.
+    function applyPaneScroll(saved) {
+      document.querySelectorAll(".pbody[data-sid]").forEach((el) => {
+        const sid = el.dataset.sid;
+        const pane = el.closest(".pane");
+        const running = pane && pane.classList.contains("run");
+        if (running && paneFollowOn(sid)) el.scrollTop = el.scrollHeight;
+        else if (sid in saved) el.scrollTop = saved[sid];
+        updateJump(sid);
+      });
+    }
+    // Show the affordance only when a pane is live, not following, and parked away from the bottom.
+    function updateJump(sid) {
+      const pane = paneEl(sid);
+      if (!pane) return;
+      const body = pane.querySelector(".pbody");
+      const jump = pane.querySelector(".pjump");
+      if (!body || !jump) return;
+      const running = pane.classList.contains("run");
+      jump.hidden = !(running && !paneFollowOn(sid) && !paneAtBottom(body));
+    }
+    // Flip one pane's Follow live without touching the others or the single view.
+    function setPaneFollow(sid, on) {
+      paneFollow[sid] = on;
+      const pane = paneEl(sid);
+      if (!pane) return;
+      const btn = pane.querySelector(".pfollow");
+      if (btn) { btn.classList.toggle("on", on); btn.innerHTML = `<span class="fd"></span>${on ? "Following" : "Follow live"}`; }
+      pane.querySelectorAll(".grp.live").forEach((g) => g.classList.toggle("following", on));
+      const body = pane.querySelector(".pbody");
+      if (on && body) body.scrollTop = body.scrollHeight;
+      updateJump(sid);
+    }
+    // Wire each pane's follow toggle, jump button, and scroll/wheel behaviour. A deliberate scroll
+    // up in a pane means "let me read", so it parks that pane (and only that pane).
+    function wirePanes(main) {
+      main.querySelectorAll("[data-follow]").forEach((b) =>
+        b.addEventListener("click", (e) => { e.stopPropagation(); setPaneFollow(b.dataset.follow, !paneFollowOn(b.dataset.follow)); }));
+      main.querySelectorAll("[data-jump]").forEach((b) =>
+        b.addEventListener("click", (e) => { e.stopPropagation(); setPaneFollow(b.dataset.jump, true); }));
+      main.querySelectorAll(".pbody[data-sid]").forEach((el) => {
+        el.addEventListener("wheel", (e) => {
+          if (e.deltaY < 0 && paneFollowOn(el.dataset.sid)) setPaneFollow(el.dataset.sid, false);
+        }, { passive: true });
+        el.addEventListener("scroll", () => updateJump(el.dataset.sid), { passive: true });
+      });
     }
 
     function renderSplit(live) {
+      const savedScroll = capturePaneScroll();
       const sessions = live.sessions;
       liveNow = live.liveCount > 0;
       updateLiveBadge(live.liveCount);
@@ -1725,7 +1833,7 @@
         ? `<div class="pager"><button class="nav" id="pg-prev" type="button"${splitPage === 1 ? " disabled" : ""}>&#8249;</button>`
           + `<div class="dots">${dots}</div>`
           + `<button class="nav" id="pg-next" type="button"${splitPage === pages ? " disabled" : ""}>&#8250;</button>`
-          + `<span class="prange">Page ${splitPage} of ${pages} &middot; most recent first</span></div>`
+          + `<span class="prange">Page ${splitPage} of ${pages}</span></div>`
         : "";
       // Controls (pager + hidden tray) pinned above; the two panes fill the row below. A lone
       // pane on the last page spans the full width instead of leaving an empty column.
@@ -1739,6 +1847,8 @@
       wireSplitControls(main);
       wireCards(main, () => renderSplit(lastLive));
       wireGenerate(main, () => renderSplit(lastLive));
+      wirePanes(main);
+      applyPaneScroll(savedScroll);
     }
 
     // Wire the dismiss (X) buttons and the hidden-tray restore buttons.

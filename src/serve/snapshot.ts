@@ -124,6 +124,7 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     contextTotal: totals.context,
     taskCount: chunks.length,
     priciestTaskName: priciest ? priciest.name : null,
+    priciestTaskWork: priciest ? priciest.workTotal : 0,
     groups,
     chunks,
     activeWarning: null,

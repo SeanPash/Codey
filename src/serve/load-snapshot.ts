@@ -182,6 +182,9 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
       open: s.open,
       lastPromptTs: s.lastPromptTs,
       chunks: snap.chunks,
+      // The full prompt history, so each pane renders as a real single-terminal timeline
+      // (oldest prompt on top, newest below) instead of a single overwriting receipt.
+      groups: snap.groups,
       runningTool,
       acted: s.acted,
       // Live but no tool open: Claude is thinking (before the first tool) or between calls.
