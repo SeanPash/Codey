@@ -18,6 +18,18 @@ describe("hasBannedPhrase", () => {
     }
   });
 
+  it("flags the vague editing and reading fillers the caption builder used to emit", () => {
+    const bad = [
+      "Claude is editing render.ts, changing specific lines in place.",
+      "Claude is reading render.ts to find the part it needs before editing it.",
+      "Claude is reading caption.ts and render.ts to map how they connect before editing them.",
+      "Claude is checking several files to get oriented.",
+    ];
+    for (const line of bad) {
+      expect(hasBannedPhrase(line)).toBe(true);
+    }
+  });
+
   it("passes real, grounded captions", () => {
     const good = [
       "Claude is reading index.html to find the token breakdown, saver buttons, and active terminal rendering.",

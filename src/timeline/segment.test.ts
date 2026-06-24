@@ -33,8 +33,8 @@ describe("naiveSegment", () => {
     expect(chunks[0].narration).toMatch(/compose\.ts/);
     expect(chunks[0].narration).toMatch(/render\.ts/);
     // Deep wording carries the relationship, not just "Claude is reading ...".
-    expect(chunks[0].narration).toMatch(/to map how they connect/);
-    expect(chunks[0].narration).not.toMatch(/several files|see how the pieces fit together/i);
+    expect(chunks[0].narration).toMatch(/to trace how they work together/);
+    expect(chunks[0].narration).not.toMatch(/several files|see how the pieces fit together|map how they connect/i);
   });
 
   it("splits when the work phase changes", () => {

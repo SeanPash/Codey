@@ -2,6 +2,7 @@ import type { ToolEvent } from "../types.js";
 import { actionLabel, rawTarget, shortTarget } from "../statusline/labels.js";
 import { classifyStage, type Stage } from "./stage.js";
 import { describeShellIntent } from "./shell.js";
+import { extractSymbols } from "./evidence.js";
 
 // One meaningful run of work: a stretch of tool calls that all belong to the same stage,
 // summarized once. This is the unit every surface renders, instead of a row per tool call.
@@ -13,6 +14,7 @@ export interface WorkChunk {
   tool: string;       // the first action's tool, a representative
   targets: string[];  // plain short names of files touched, in order ("a.ts", "the tests")
   searches: string[]; // literal search patterns looked for in this run ("Active Terminal")
+  symbols: string[];  // names a change added: functions, test names, called symbols ("mean")
   raw: string | null; // the first action's raw detail, revealed only when truly useful
   startTs: number;
   endTs: number;
@@ -89,6 +91,7 @@ export function chunkEvents(events: ToolEvent[]): WorkChunk[] {
     // a "grep X then read Y" run can say "searching Y for X" instead of muddling both together.
     const searchLiteral = isSearch ? rawTarget(e.tool, e.input) : null;
     const name = shortName(e.tool, e.input);
+    const symbols = extractSymbols(e.tool, e.input);
     const last = built[built.length - 1];
 
     // A chunk continues while the stage holds and the gap stays short. Editing and
@@ -106,6 +109,9 @@ export function chunkEvents(events: ToolEvent[]): WorkChunk[] {
         if (!last.searches.includes(searchLiteral) && last.searches.length < 6) last.searches.push(searchLiteral);
       } else if (last.targets.length < 6) {
         last.targets.push(name);
+      }
+      for (const s of symbols) {
+        if (!last.symbols.includes(s) && last.symbols.length < 4) last.symbols.push(s);
       }
       last.endTs = e.timestamp;
       last.tools.push(e.tool);
@@ -126,6 +132,7 @@ export function chunkEvents(events: ToolEvent[]): WorkChunk[] {
         tool: e.tool,
         targets: searchLiteral ? [] : [name],
         searches: searchLiteral ? [searchLiteral] : [],
+        symbols,
         raw: rawTarget(e.tool, e.input),
         startTs: e.timestamp,
         endTs: e.timestamp,
