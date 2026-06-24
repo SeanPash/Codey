@@ -83,6 +83,20 @@ describe("renderStatus", () => {
     expect(renderStatus({ ...base, mode: "simple" })).not.toEqual(renderStatus({ ...base, mode: "deep" }));
   });
 
+  it("clips a long stage chip at a word boundary so the header stays tidy", () => {
+    const longStage = "Updating the math tests to cover the brand new edge-case behavior";
+    const lines = plain(renderStatus({ ...base, stage: longStage })).split("\n");
+    // The chip keeps the opening words, ends in an ellipsis, and drops the tail.
+    expect(lines[0]).toContain("Updating the math tests");
+    expect(lines[0]).toContain("…");
+    expect(lines[0]).not.toContain("edge-case behavior");
+    // It cuts on a space, so the last visible word is whole ("cover", not "cove").
+    expect(lines[0]).toContain("cover…");
+    // A short stage is left exactly as-is.
+    expect(plain(renderStatus({ ...base, stage: "Editing" })).split("\n")[0]).toContain("Editing");
+    expect(plain(renderStatus({ ...base, stage: "Editing" }))).not.toContain("…");
+  });
+
   it("wraps a long sentence instead of spilling past the width", () => {
     const long = "Claude is working through " + "several connected files ".repeat(8) + "to finish the change.";
     const lines = plain(renderStatus({ ...base, sentence: long }, 60)).split("\n");

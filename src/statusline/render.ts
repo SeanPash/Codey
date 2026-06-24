@@ -32,6 +32,17 @@ function modeLabel(mode: Mode): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
 }
 
+// Keep the line-one stage chip tidy: a long purpose ("Updating the math tests to cover the new
+// behavior") would push the timer off the edge, so clip it at a word boundary and add an
+// ellipsis. The full sentence still says everything on line two.
+const STAGE_MAX = 34;
+function clipStage(stage: string): string {
+  if (stage.length <= STAGE_MAX) return stage;
+  const cut = stage.slice(0, STAGE_MAX);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > STAGE_MAX * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "…";
+}
+
 const SEP = `${DIM}│${RESET}`;
 
 // Visible width ignoring color codes, so wrapping counts real characters.
@@ -64,7 +75,7 @@ function statusBar(view: StatusView): string {
   const accent = stageColor(view.state, view.mode);
   const parts = [`${BOLD}${BRAND}Codey${RESET}`];
   if (view.state !== "done") parts.push(`${MODE_COLOR[view.mode] ?? MODE_COLOR.simple}${modeLabel(view.mode)}${RESET}`);
-  parts.push(`${BOLD}${accent}${view.stage}${RESET}`);
+  parts.push(`${BOLD}${accent}${clipStage(view.stage)}${RESET}`);
   if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
   const budget = view.budgetLeft ? ` ${DIM}· ${view.budgetLeft}${RESET}` : "";
   return parts.join(` ${SEP} `) + budget;

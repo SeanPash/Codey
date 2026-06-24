@@ -88,6 +88,20 @@ describe("buildNowView", () => {
     expect(buildNowView(events, status({}), 61_500).live).toBe(false);
   });
 
+  it("stays live mid-turn when Claude is reasoning between tools, past the short gap window", () => {
+    // A tool ran, then a long pause while Claude thinks before the next one. No open call, the
+    // last activity is well past the 15s gap window, but the turn is still in flight (prompt
+    // newer than the last Stop). The strip must stay lit so it matches the page's "Working now".
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 }),
+      ev({ phase: "post", tool: "Read", timestamp: 1500 }),
+    ];
+    const v = buildNowView(events, status({ promptAt: 1000 }), 40_000);
+    expect(v.live).toBe(true);
+    expect(v.action).toBeNull();
+    expect(v.thinking).toBe(false);
+  });
+
   it("goes quiet the instant Claude finishes the turn, not after the window", () => {
     const events: ToolEvent[] = [
       ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 1000 }),
