@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hasBannedPhrase, firstBannedPhrase } from "./banned.js";
+import { hasBannedPhrase, firstBannedPhrase, isVacuousExplanation } from "./banned.js";
 
 describe("hasBannedPhrase", () => {
   it("flags the generic filler phrases Codey must never show", () => {
@@ -45,6 +45,18 @@ describe("hasBannedPhrase", () => {
     }
   });
 
+  it("flags the empty thinking-row fillers this pass removes", () => {
+    const bad = [
+      "Thinking it through",
+      "Working through the approach before acting.",
+      "Claude is checking git state and git state to trace how they work together.",
+      "It will figure out what the right next step should be.",
+    ];
+    for (const line of bad) {
+      expect(hasBannedPhrase(line)).toBe(true);
+    }
+  });
+
   it("passes real, grounded captions", () => {
     const good = [
       "Claude is reading index.html to find the token breakdown, saver buttons, and active terminal rendering.",
@@ -60,5 +72,23 @@ describe("hasBannedPhrase", () => {
   it("names the offending phrase so a test failure is readable", () => {
     expect(firstBannedPhrase("Claude is checking several files.")).toMatch(/several files/i);
     expect(firstBannedPhrase("a perfectly fine sentence")).toBeNull();
+  });
+});
+
+describe("isVacuousExplanation", () => {
+  it("suppresses an explanation that just narrates the agent pausing or reflecting", () => {
+    const vacuous = [
+      "The agent paused and reflected before continuing.",
+      "Claude paused to think about what to do next.",
+      "It reflected on its options here.",
+      "There is no specific reason given for this step.",
+      "Nothing concrete to say about this one.",
+    ];
+    for (const t of vacuous) expect(isVacuousExplanation(t)).toBe(true);
+  });
+
+  it("keeps a real, grounded explanation", () => {
+    const good = "Claude reread render.ts so the new clipStage helper would line up with the existing status bar layout.";
+    expect(isVacuousExplanation(good)).toBe(false);
   });
 });

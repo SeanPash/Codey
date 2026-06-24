@@ -8,6 +8,14 @@ export const BANNED_PHRASES: RegExp[] = [
   /follow how it works/i,
   /adjust how it works/i,
   /see how the pieces fit together/i,
+  // Empty "thinking" filler: a row or explanation that says the agent thought without saying
+  // about what. These are the exact strings the old timeline emitted for a bare thinking turn.
+  /thinking it through/i,
+  /working through the approach before acting/i,
+  /paused and reflected/i,
+  /figure out what the right next step should be/i,
+  // A status line once collapsed two git reads into "git state and git state"; never again.
+  /git state and git state/i,
   /\bbefore changing anything\b/i,
   /\bchanging specific lines\b/i,
   /\bchanging files in place\b/i,
@@ -44,4 +52,22 @@ export function firstBannedPhrase(text: string): string | null {
 
 export function hasBannedPhrase(text: string): boolean {
   return firstBannedPhrase(text) !== null;
+}
+
+// Filler that only a generated explanation produces: the model hedging that a step (usually a
+// bare thinking turn) had no real content, then narrating the hedge instead of the work. An
+// explanation that trips this says nothing, so the caller suppresses it and shows no panel
+// rather than print "the agent paused and reflected" in front of the user.
+const VACUOUS_EXPLANATION: RegExp[] = [
+  /\bpaused (to|and) (think|reflect)/i,
+  /\b(the agent|claude) (paused|stopped) (to|and)\b/i,
+  /\breflected on (its|the|what)/i,
+  /\bno (specific|concrete|clear|particular) (reason|detail|information|context)\b/i,
+  /\bnothing (specific|concrete|particular) (to (say|add|explain)|here)\b/i,
+];
+
+// True when a generated explanation is empty filler and should not be shown.
+export function isVacuousExplanation(text: string): boolean {
+  if (hasBannedPhrase(text)) return true;
+  return VACUOUS_EXPLANATION.some((re) => re.test(text));
 }

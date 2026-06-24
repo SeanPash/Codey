@@ -3411,12 +3411,12 @@ function summarizeEvent(e) {
 }
 function buildNarrationPrompt(events, mode) {
   const lines = events.map(summarizeEvent).join("\n");
-  const instruction2 = mode === "teach" ? "In a few plain-English sentences for someone learning to code, explain what Claude is doing and why, then briefly teach the key concept involved (define any technical term you use). Do not list the tools; describe the goal." : mode === "deep" ? "In 2-3 plain-English sentences for a non-technical person, explain what Claude is doing, why it matters, and how this change actually addresses the problem. Do not list the tools; describe the goal." : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Do not list the tools; describe the goal.";
+  const instruction2 = mode === "teach" ? "In two or three plain-English sentences for someone learning to code, first say what Claude is doing and the specific thing it is trying to verify, change, or protect, then teach the key concept behind this step and define any technical term you use. The concept sentence must add an idea, not just restate the what." : mode === "deep" ? "In one or two compact but rich plain-English sentences for a non-technical person, say what Claude is doing and, specifically, the purpose or relationship it is verifying, changing, or protecting, and how that connects to the request it is working on. Go beyond a bare description of the action: a reader should learn why this step matters here, not just that it happened." : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Keep it to a single concrete sentence.";
   return `These are the most recent actions an AI coding agent took:
 ${lines}
 
 ${instruction2}
-Be specific and concrete: name the actual files, search terms, or commands involved so the reader knows exactly what is happening. Avoid vague filler like "several files" or "the code" when the actions name a real file or term. Write plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
+Do not list the tools; describe the goal. Be specific and concrete: name the actual files, search terms, or commands involved so the reader knows exactly what is happening. Avoid vague filler like "several files", "the code", "running shell commands", "checking the code", or "thinking it through" when the actions name a real file, term, or purpose. Write plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }
 
 // src/narration/throttle.ts
@@ -3550,9 +3550,13 @@ function purposeTitle(tool, stage, subject, count) {
       if (many) return adds ? `Adding ${subject} and more` : `Updating ${subject} and more`;
       return adds ? `Adding ${subject}` : `Updating ${subject}`;
     }
-    case "inspecting":
+    case "inspecting": {
+      if (subject === "the code") {
+        return tool === "Grep" || tool === "Glob" ? "Searching the project" : "Checking the project";
+      }
       if (many) return `Checking ${subject} and more`;
       return `Checking ${subject}`;
+    }
     case "testing":
       return `Verifying ${subject}`;
     case "debugging":
@@ -3844,8 +3848,17 @@ function classifyStage(tool, input, isError = false) {
 }
 
 // src/caption/shell.ts
-function intent(subject, title, sentence) {
-  return { subject, title, sentence };
+function stem(sentence) {
+  return sentence.replace(/\.\s*$/, "");
+}
+function defaultDeep(sentence, subject) {
+  return `${stem(sentence)} to confirm ${subject} is in the state the next step needs.`;
+}
+var DEFAULT_CONCEPT = "A shell command runs a program in the project, so Claude can inspect or change things the editor itself cannot.";
+function intent(subject, title, sentence, deep, teach) {
+  const d = deep ?? defaultDeep(sentence, subject);
+  const t = teach ?? `${d} ${DEFAULT_CONCEPT}`;
+  return { subject, title, sentence, deep: d, teach: t };
 }
 function firstWord2(cmd) {
   return (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
@@ -3858,36 +3871,81 @@ var GIT_READ = /* @__PURE__ */ new Set(["status", "diff", "log", "show", "branch
 function commandIntent(cmd) {
   const word = firstWord2(cmd);
   const tail = rest(cmd);
-  if (/\b(vitest|jest|mocha|pytest|phpunit)\b/.test(cmd)) {
-    return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
-  }
+  const TEST = intent(
+    "the tests",
+    "Running the tests",
+    "Claude is running the tests to check the work.",
+    "Claude is running the tests to confirm the latest changes pass and nothing else broke.",
+    "Claude is running the tests to confirm the latest changes pass and nothing else broke. A test is a small program that exercises the real code, so a regression shows up immediately instead of in front of a user."
+  );
+  if (/\b(vitest|jest|mocha|pytest|phpunit)\b/.test(cmd)) return TEST;
   if (word === "npm" || word === "pnpm" || word === "yarn" || word === "npx") {
-    if (/\btest\b/.test(tail)) {
-      return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
-    }
+    if (/\btest\b/.test(tail)) return TEST;
     if (/\bbuild\b/.test(tail)) {
-      return intent("the build", "Rebuilding the project", "Claude is rebuilding the project so the latest code takes effect.");
+      return intent(
+        "the build",
+        "Rebuilding the project",
+        "Claude is rebuilding the project so the latest code takes effect.",
+        "Claude is rebuilding the project so the source changes are compiled into the files that actually run.",
+        "Claude is rebuilding the project so the source changes are compiled into the files that actually run. The code Claude edits is not what runs until a build turns it into the shipped output."
+      );
     }
     if (/\b(install|ci)\b|^\s*i\b/.test(tail)) {
-      return intent("the dependencies", "Installing dependencies", "Claude is installing the project's dependencies.");
+      return intent(
+        "the dependencies",
+        "Installing dependencies",
+        "Claude is installing the project's dependencies.",
+        "Claude is installing the project's dependencies so the libraries the code imports are present before it runs.",
+        "Claude is installing the project's dependencies so the libraries the code imports are present before it runs. Dependencies are third-party packages the project relies on; without them the code cannot start."
+      );
     }
     if (/\b(typecheck|tsc|lint|eslint)\b/.test(tail)) {
-      return intent("the code", "Checking the code", "Claude is checking the code for type and lint problems.");
+      return intent(
+        "the types",
+        "Type-checking the project",
+        "Claude is type-checking the project for type and lint problems.",
+        "Claude is type-checking the project to catch mismatched values and broken calls before they reach runtime.",
+        "Claude is type-checking the project to catch mismatched values and broken calls before they reach runtime. A type check reads the source without running it and flags places where the data would not fit, which stops a whole class of bugs early."
+      );
     }
     const run = tail.match(/run\s+(\S+)/);
     if (run) return intent(`the ${run[1]} script`, `Running the ${run[1]} script`, `Claude is running the ${run[1]} script.`);
     return intent("the project tasks", "Running a project task", "Claude is running a project task.");
   }
   if (word === "tsc" || word === "eslint" || word === "prettier") {
-    return intent("the code", "Checking the code", "Claude is checking the code for problems.");
+    return intent(
+      "the types and style",
+      "Checking types and style",
+      "Claude is checking the project for type and style problems.",
+      "Claude is checking the project for type and style problems before relying on it.",
+      "Claude is checking the project for type and style problems before relying on it. These checks read the source without running it, so mistakes surface early rather than at runtime."
+    );
   }
   if (word === "git") {
     const sub = (tail.trim().split(/\s+/)[0] || "").toLowerCase();
     if (GIT_READ.has(sub)) {
-      return intent("the local changes", "Checking local changes", "Claude is checking the local changes in the repository.");
+      return intent(
+        "the local changes",
+        "Checking local changes",
+        "Claude is checking the local changes in the repository.",
+        "Claude is checking the repository's local changes to see exactly what is modified, staged, or still uncommitted before the next step.",
+        "Claude is checking the repository's local changes to see exactly what is modified, staged, or still uncommitted before the next step. Git tracks the working tree against the last commit, so a status or diff shows precisely what a commit would include."
+      );
     }
-    if (sub === "commit") return intent("the changes", "Committing the changes", "Claude is committing the changes.");
-    if (sub === "push") return intent("the changes", "Pushing the changes", "Claude is pushing the changes to the remote.");
+    if (sub === "commit") return intent(
+      "the changes",
+      "Committing the changes",
+      "Claude is committing the changes.",
+      "Claude is committing the changes to record this work as a saved point in the project's history.",
+      "Claude is committing the changes to record this work as a saved point in the project's history. A commit is a labelled snapshot you can return to, which is what makes the change reviewable and reversible."
+    );
+    if (sub === "push") return intent(
+      "the changes",
+      "Pushing the changes",
+      "Claude is pushing the changes to the remote.",
+      "Claude is pushing the local commits to the remote so the saved work is shared and backed up off this machine.",
+      "Claude is pushing the local commits to the remote so the saved work is shared and backed up off this machine. A push uploads commits that so far exist only locally to the shared repository."
+    );
     if (sub === "add") return intent("the changes", "Staging the changes", "Claude is staging the changes for a commit.");
     if (sub === "checkout" || sub === "switch") return intent("a branch", "Switching branches", "Claude is switching to another branch.");
     if (sub) return intent(`the ${sub} step`, `Running git ${sub}`, `Claude is running git ${sub}.`);
@@ -3990,9 +4048,11 @@ function descriptionIntent(desc) {
     const verb = GERUND[m[1].toLowerCase()];
     const tail = m[2].trim();
     const sentence = tail ? `Claude is ${verb} ${tail}.` : `Claude is ${verb} something.`;
-    return intent(tail || clean, title, sentence);
+    const deep = `${stem(sentence)} to confirm the result before moving on.`;
+    return intent(tail || clean, title, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
   }
-  return intent(clean, title, `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`);
+  const fallback = `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
+  return intent(clean, title, fallback);
 }
 function describeShellIntent(command2, description) {
   const cmd = (command2 ?? "").trim();
@@ -4218,7 +4278,7 @@ function testModule(chunk) {
 function describe(chunk) {
   if ((chunk.tool === "Bash" || chunk.tool === "PowerShell") && chunk.count === 1 && chunk.raw) {
     const intent2 = describeShellIntent(chunk.raw);
-    return { title: intent2.title, simple: intent2.sentence, deep: intent2.sentence, teach: intent2.sentence };
+    return { title: intent2.title, simple: intent2.sentence, deep: intent2.deep, teach: intent2.teach };
   }
   const subject = subjectOf(chunk);
   const names = namedTargets(chunk);
@@ -5452,6 +5512,65 @@ function buildIdFrom(entryPath) {
 import { statSync as statSync2 } from "node:fs";
 import { join as join15 } from "node:path";
 
+// src/caption/banned.ts
+var BANNED_PHRASES = [
+  /see how it works/i,
+  /follow how it works/i,
+  /adjust how it works/i,
+  /see how the pieces fit together/i,
+  // Empty "thinking" filler: a row or explanation that says the agent thought without saying
+  // about what. These are the exact strings the old timeline emitted for a bare thinking turn.
+  /thinking it through/i,
+  /working through the approach before acting/i,
+  /paused and reflected/i,
+  /figure out what the right next step should be/i,
+  // A status line once collapsed two git reads into "git state and git state"; never again.
+  /git state and git state/i,
+  /\bbefore changing anything\b/i,
+  /\bchanging specific lines\b/i,
+  /\bchanging files in place\b/i,
+  /\bfind the part it needs\b/i,
+  /\bmap how they connect\b/i,
+  /\bchecking the code\b/i,
+  /\bsearching the project for the code\b/i,
+  /\breading files to understand them\b/i,
+  /\bseveral files\b/i,
+  /\ba few files\b/i,
+  /\bvarious files\b/i,
+  /\bseveral related files\b/i,
+  /\brelated project files\b/i,
+  /\bin one change\b/i,
+  /\brunning shell commands\b/i,
+  /\bchecking shell commands\b/i,
+  /\ba few shell commands\b/i,
+  /\bediting files\b/i,
+  /\bupdating files\b/i,
+  /\bmaking changes\b/i,
+  /\bimproving the implementation\b/i,
+  /\bworking on the task\b/i
+];
+function firstBannedPhrase(text) {
+  for (const re of BANNED_PHRASES) {
+    const m = re.exec(text);
+    if (m) return m[0];
+  }
+  return null;
+}
+function hasBannedPhrase(text) {
+  return firstBannedPhrase(text) !== null;
+}
+var VACUOUS_EXPLANATION = [
+  /\bpaused (to|and) (think|reflect)/i,
+  /\b(the agent|claude) (paused|stopped) (to|and)\b/i,
+  /\breflected on (its|the|what)/i,
+  /\bno (specific|concrete|clear|particular) (reason|detail|information|context)\b/i,
+  /\bnothing (specific|concrete|particular) (to (say|add|explain)|here)\b/i
+];
+function isVacuousExplanation(text) {
+  if (hasBannedPhrase(text)) return true;
+  return VACUOUS_EXPLANATION.some((re) => re.test(text));
+}
+
 // src/timeline/attribution.ts
 function basename4(p) {
   const parts = p.split(/[\\/]/);
@@ -5506,8 +5625,20 @@ function prettify(s) {
   const words = s.replace(/_/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
-function describeAction(tool, input) {
-  if (!tool || tool === "thinking") return "Thinking it through";
+function decisionText(text) {
+  if (!text) return null;
+  const one = text.replace(/\s+/g, " ").trim();
+  if (!one) return null;
+  const firstSentence = (one.split(/(?<=[.!?])\s+/)[0] || one).trim();
+  const clamped = firstSentence.length > 140 ? firstSentence.slice(0, 137).trimEnd() + "\u2026" : firstSentence;
+  if (hasBannedPhrase(clamped)) return null;
+  return /[.!?…]$/.test(clamped) ? clamped : clamped + ".";
+}
+function thinkingSubtitle(text) {
+  return decisionText(text) ?? "Claude weighed the next step before continuing.";
+}
+function describeAction(tool, input, text) {
+  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
   const file7 = fileFrom(input);
   switch (tool) {
     case "Write":
@@ -5536,21 +5667,21 @@ function actionSubject(tool, input) {
   if (file7) return humanFile(file7);
   return humanFile(shortTarget(actionLabel(tool, input).target)) || "the code";
 }
-function actionTitle(tool, input) {
-  if (!tool || tool === "thinking") return "Thinking it through";
+function actionTitle(tool, input, text) {
+  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd, descFrom(input)).title;
   }
   return purposeTitle(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
-function actionSubtitle(tool, input) {
-  if (!tool || tool === "thinking") return "Working through the approach before acting.";
-  const desc = descFrom(input);
-  if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
+function actionSubtitle(tool, input, text) {
+  if (!tool || tool === "thinking") return thinkingSubtitle(text);
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
-    if (cmd) return describeShellIntent(cmd).sentence;
+    if (cmd) return describeShellIntent(cmd, descFrom(input)).sentence;
+    const desc = descFrom(input);
+    if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
   }
   return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1, folderArea(input));
 }
@@ -5586,10 +5717,11 @@ function attributeChunk(turns, startTs, endTs) {
     if (t.outputTokens <= 0 && !t.tool) continue;
     workTotal += t.outputTokens;
     const isFail = !!(t.tool && t.tool !== "thinking" && t.isError);
+    const thinking = !t.tool || t.tool === "thinking";
     workLines.push({
-      label: describeAction(t.tool, t.input),
-      title: actionTitle(t.tool, t.input),
-      subtitle: actionSubtitle(t.tool, t.input),
+      label: describeAction(t.tool, t.input, t.assistantText),
+      title: actionTitle(t.tool, t.input, t.assistantText),
+      subtitle: actionSubtitle(t.tool, t.input, t.assistantText),
       tool: t.tool ?? "thinking",
       tokens: t.outputTokens,
       status: t.tool && t.tool !== "thinking" ? t.isError ? "fail" : "ok" : "none",
@@ -5599,7 +5731,10 @@ function attributeChunk(turns, startTs, endTs) {
       why: t.assistantText ?? null,
       failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
       ts: t.ts,
-      thoughtFirst: false
+      thoughtFirst: false,
+      // A real action always has something to explain; a thinking turn only does when it left
+      // decision text behind. An evidence-less thinking row gets no "explain this step" button.
+      explainable: thinking ? decisionText(t.assistantText) !== null : true
     });
   }
   markResolved(workLines);
@@ -5618,44 +5753,46 @@ function sessionTotals(turns) {
 }
 
 // src/timeline/grouping.ts
-function loneThinkRow(tokens, ts) {
+function loneThinkRow(run) {
+  const tokens = run.reduce((sum, l) => sum + l.tokens, 0);
+  const last = run[run.length - 1];
+  if (last && last.explainable !== false && last.why) {
+    return { ...last, tokens, thoughtFirst: false };
+  }
   return {
-    label: "Thought about what to do next.",
-    title: "Thinking it through",
-    subtitle: "Working through the approach before acting.",
+    label: "Thought about the next step.",
+    title: "Planning the next step",
+    subtitle: "Claude weighed the next step before continuing.",
     tool: "thinking",
     tokens,
     status: "none",
     errorText: null,
     resolved: false,
     raw: null,
-    why: null,
+    why: last?.why ?? null,
     failSummary: null,
-    ts,
-    thoughtFirst: false
+    ts: run[0]?.ts ?? 0,
+    thoughtFirst: false,
+    explainable: false
   };
 }
 function groupThinking(lines) {
   const out = [];
-  let runTokens = 0;
-  let runTs = 0;
-  let inRun = false;
+  let run = [];
   for (const l of lines) {
     if (l.status === "none") {
-      if (!inRun) runTs = l.ts;
-      runTokens += l.tokens;
-      inRun = true;
+      run.push(l);
       continue;
     }
-    if (inRun) {
+    if (run.length) {
+      const runTokens = run.reduce((sum, r) => sum + r.tokens, 0);
       out.push({ ...l, tokens: l.tokens + runTokens, thoughtFirst: true });
-      runTokens = 0;
-      inRun = false;
+      run = [];
       continue;
     }
     out.push(l);
   }
-  if (inRun) out.push(loneThinkRow(runTokens, runTs));
+  if (run.length) out.push(loneThinkRow(run));
   return out;
 }
 
@@ -5869,12 +6006,13 @@ function buildTaskExplainPrompt(taskName, lines, depth) {
   ].join("\n");
 }
 function buildActionExplainPrompt(line, depth) {
-  const intro = line.tool === "thinking" ? "An AI coding agent paused to reason before its next action. This is that thinking step, with the agent's own words:" : "An AI coding agent took this single step, with its own reasoning:";
+  const intro = line.tool === "thinking" ? "An AI coding agent was deciding what to do next. This is that decision point, with the agent's own words:" : "An AI coding agent took this single step, with its own reasoning:";
+  const decisionRule = line.tool === "thinking" ? " Explain the specific decision the agent was making and what it chose to do next, grounded in its words above. Do not say the agent paused, reflected, or thought; name the actual choice." : "";
   return [
     intro,
     actionContext(line),
     "",
-    `${actionInstruction(depth)} ${SELF_CONTAINED} ${TAIL}`
+    `${actionInstruction(depth)}${decisionRule} ${SELF_CONTAINED} ${TAIL}`
   ].join("\n");
 }
 
@@ -6069,6 +6207,7 @@ async function explain(snap, req, deps) {
   if (!res || !res.text.trim()) return { text: null, cached: false, paused: false };
   addSpend(deps.sessionDir, res.tokens);
   const text = stripDashes(res.text.trim());
+  if (isVacuousExplanation(text)) return { text: null, cached: false, paused: false };
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
   return { text, cached: false, paused: false };
 }

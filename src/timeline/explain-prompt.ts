@@ -59,12 +59,17 @@ export function buildTaskExplainPrompt(taskName: string, lines: ReceiptLine[], d
 // all (often just "Thought it through"), so the self-contained rules matter most here.
 export function buildActionExplainPrompt(line: ReceiptLine, depth: ExplainDepth): string {
   const intro = line.tool === "thinking"
-    ? "An AI coding agent paused to reason before its next action. This is that thinking step, with the agent's own words:"
+    ? "An AI coding agent was deciding what to do next. This is that decision point, with the agent's own words:"
     : "An AI coding agent took this single step, with its own reasoning:";
+  // For a decision step, the explanation must name the actual choice from the agent's words, not
+  // narrate that it "paused and reflected". That filler says nothing and is explicitly unwanted.
+  const decisionRule = line.tool === "thinking"
+    ? " Explain the specific decision the agent was making and what it chose to do next, grounded in its words above. Do not say the agent paused, reflected, or thought; name the actual choice."
+    : "";
   return [
     intro,
     actionContext(line),
     "",
-    `${actionInstruction(depth)} ${SELF_CONTAINED} ${TAIL}`,
+    `${actionInstruction(depth)}${decisionRule} ${SELF_CONTAINED} ${TAIL}`,
   ].join("\n");
 }

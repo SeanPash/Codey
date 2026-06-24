@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { composeView, cardsFromEvents } from "./compose.js";
+import { hasBannedPhrase } from "../caption/banned.js";
 import type { ToolEvent } from "../types.js";
 import type { StatusSnapshot } from "./state.js";
 
@@ -197,6 +198,27 @@ describe("composeView live phase", () => {
     expect(view.sentence).not.toBe("an AI why");
     expect(view.sentence).toContain("Claude is reading");
     expect(view.hint).toBe("/codey:explain for the why");
+  });
+
+  it("makes deep mode meaningfully richer than simple for the same step, with no AI why", () => {
+    const events = [pre("a", "Bash", { command: "git status" }, 0)];
+    const simple = composeView(events, snap({ mode: "simple", why: null }), 1000, []);
+    const deep = composeView(events, snap({ mode: "deep", why: null }), 1000, []);
+    // Deep is not simple with a longer tail; it is a different, fuller sentence.
+    expect(deep.sentence).not.toBe(simple.sentence);
+    expect(deep.sentence.length).toBeGreaterThan(simple.sentence.length);
+    // And it stays a complete thought: never cut off mid-sentence, never banned filler.
+    expect(deep.sentence).not.toMatch(/…$/);
+    expect(hasBannedPhrase(deep.sentence)).toBe(false);
+    expect(hasBannedPhrase(simple.sentence)).toBe(false);
+  });
+
+  it("teach mode adds more than deep for the same step", () => {
+    const events = [pre("a", "Bash", { command: "npm test" }, 0)];
+    const deep = composeView(events, snap({ mode: "deep", why: null }), 1000, []);
+    const teach = composeView(events, snap({ mode: "teach", why: null }), 1000, []);
+    expect(teach.sentence.length).toBeGreaterThanOrEqual(deep.sentence.length);
+    expect(hasBannedPhrase(teach.sentence)).toBe(false);
   });
 
   it("threads the budget-left label and stops spending the why when the cap is reached", () => {

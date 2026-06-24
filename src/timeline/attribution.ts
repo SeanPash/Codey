@@ -4,6 +4,7 @@ import { classifyStage } from "../caption/stage.js";
 import { humanFile, phrasePattern, purposeTitle, purposeSentence } from "../caption/subject.js";
 import { describeShellIntent } from "../caption/shell.js";
 import { actionLabel, shortTarget } from "../statusline/labels.js";
+import { hasBannedPhrase } from "../caption/banned.js";
 
 function basename(p: string): string {
   const parts = p.split(/[\\/]/);
@@ -72,10 +73,31 @@ function prettify(s: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+// A thinking turn carries Claude's own reasoning text. Cleaned up, that text is the decision the
+// row is about, which is far better than a generic "thinking" label. We collapse whitespace,
+// keep the first sentence, clamp it, and reject anything that trips the banned-filler guard so a
+// vague thought never becomes a vague caption. Null when there is no usable decision text.
+export function decisionText(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const one = text.replace(/\s+/g, " ").trim();
+  if (!one) return null;
+  const firstSentence = (one.split(/(?<=[.!?])\s+/)[0] || one).trim();
+  const clamped = firstSentence.length > 140 ? firstSentence.slice(0, 137).trimEnd() + "…" : firstSentence;
+  if (hasBannedPhrase(clamped)) return null;
+  return /[.!?…]$/.test(clamped) ? clamped : clamped + ".";
+}
+
+// The decision sentence for a thinking row's subtitle: Claude's own words when they say something,
+// otherwise an honest, non-banned marker that this was a planning beat.
+function thinkingSubtitle(text: string | null | undefined): string {
+  return decisionText(text) ?? "Claude weighed the next step before continuing.";
+}
+
 // Plain-English label for one action. Stays short and readable: the full command or path
-// lives in `raw` (shown when the row expands), never crammed into the label.
-export function describeAction(tool: string | null, input: unknown): string {
-  if (!tool || tool === "thinking") return "Thinking it through";
+// lives in `raw` (shown when the row expands), never crammed into the label. A thinking turn is
+// labelled by the planning beat it is, never with the old "thinking it through" filler.
+export function describeAction(tool: string | null, input: unknown, text?: string | null): string {
+  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
   const file = fileFrom(input);
   switch (tool) {
     case "Write": return file ? `Writing ${file}` : "Writing a file";
@@ -104,9 +126,10 @@ function actionSubject(tool: string, input: unknown): string {
   return humanFile(shortTarget(actionLabel(tool, input).target)) || "the code";
 }
 
-// The collapsed-card headline for one action: a stable purpose label, never the raw tool.
-export function actionTitle(tool: string | null, input: unknown): string {
-  if (!tool || tool === "thinking") return "Thinking it through";
+// The collapsed-card headline for one action: a stable purpose label, never the raw tool. A
+// thinking row is titled by the planning beat, so a viewer reads a purpose rather than "thinking".
+export function actionTitle(tool: string | null, input: unknown, text?: string | null): string {
+  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd, descFrom(input)).title;
@@ -114,15 +137,16 @@ export function actionTitle(tool: string | null, input: unknown): string {
   return purposeTitle(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 
-// One plain sentence under the title. A shell command carries Claude's own description, the
-// best sentence available; everything else gets a purpose sentence built from the subject.
-export function actionSubtitle(tool: string | null, input: unknown): string {
-  if (!tool || tool === "thinking") return "Working through the approach before acting.";
-  const desc = descFrom(input);
-  if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
+// One plain sentence under the title, always distinct from the title. A shell command is described
+// by its intent sentence ("Claude is checking ...") rather than echoing the raw description, so the
+// subtitle never repeats the title verbatim. A thinking row uses Claude's own decision text.
+export function actionSubtitle(tool: string | null, input: unknown, text?: string | null): string {
+  if (!tool || tool === "thinking") return thinkingSubtitle(text);
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
-    if (cmd) return describeShellIntent(cmd).sentence;
+    if (cmd) return describeShellIntent(cmd, descFrom(input)).sentence;
+    const desc = descFrom(input);
+    if (desc) return /[.!?]$/.test(desc) ? desc : `${desc}.`;
   }
   return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1, folderArea(input));
 }
@@ -169,10 +193,11 @@ export function attributeChunk(turns: AssistantTurn[], startTs: number, endTs: n
     if (t.outputTokens <= 0 && !t.tool) continue;
     workTotal += t.outputTokens;
     const isFail = !!(t.tool && t.tool !== "thinking" && t.isError);
+    const thinking = !t.tool || t.tool === "thinking";
     workLines.push({
-      label: describeAction(t.tool, t.input),
-      title: actionTitle(t.tool, t.input),
-      subtitle: actionSubtitle(t.tool, t.input),
+      label: describeAction(t.tool, t.input, t.assistantText),
+      title: actionTitle(t.tool, t.input, t.assistantText),
+      subtitle: actionSubtitle(t.tool, t.input, t.assistantText),
       tool: t.tool ?? "thinking",
       tokens: t.outputTokens,
       status: t.tool && t.tool !== "thinking" ? (t.isError ? "fail" : "ok") : "none",
@@ -183,6 +208,9 @@ export function attributeChunk(turns: AssistantTurn[], startTs: number, endTs: n
       failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
       ts: t.ts,
       thoughtFirst: false,
+      // A real action always has something to explain; a thinking turn only does when it left
+      // decision text behind. An evidence-less thinking row gets no "explain this step" button.
+      explainable: thinking ? decisionText(t.assistantText) !== null : true,
     });
   }
   markResolved(workLines);

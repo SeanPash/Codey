@@ -47,6 +47,10 @@ export interface ReceiptLine {
   failSummary: string | null;    // plain-English failure sentence shown inline on a fail
   ts: number;                    // when this action happened (ms since epoch)
   thoughtFirst: boolean;         // a run of thinking was folded into this action row
+  // Whether an "explain this step" panel would add anything. False for a bare thinking row with
+  // no concrete decision text, so the browser hides the button instead of generating filler.
+  // Undefined counts as explainable; only the evidence-less case sets it false.
+  explainable?: boolean;
 }
 
 export interface TokenBreakdown {

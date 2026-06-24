@@ -84,8 +84,12 @@ describe("buildActionExplainPrompt", () => {
     expect(buildActionExplainPrompt(line(), "deep").toLowerCase()).toContain("never ask the user");
   });
 
-  it("frames a thinking step as reasoning, not a command, so it never asks what ran", () => {
+  it("frames a thinking step as a decision and forbids the 'paused and reflected' filler", () => {
     const p = buildActionExplainPrompt(line({ tool: "thinking", label: "Thought it through, then ran a command", raw: null }), "deep");
-    expect(p.toLowerCase()).toContain("paused to reason");
+    const low = p.toLowerCase();
+    expect(low).toContain("deciding what to do next");
+    // It must steer the model toward the real choice and away from empty hedging.
+    expect(low).toContain("name the actual choice");
+    expect(low).toMatch(/do not say the agent paused/);
   });
 });

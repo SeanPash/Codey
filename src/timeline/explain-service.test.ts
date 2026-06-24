@@ -77,6 +77,18 @@ describe("explain", () => {
     expect(narrate).not.toHaveBeenCalled();
   });
 
+  it("suppresses a vacuous 'paused and reflected' generation instead of showing it", async () => {
+    narrate.mockResolvedValueOnce({ text: "The agent paused and reflected before its next action.", tokens: 12 });
+    const snap = snapshot();
+    const r = await explain(snap, { sessionId: "s1", scope: "action", id: "c0#0", depth: "deep" }, deps);
+    expect(r.text).toBeNull();
+    expect(r.cached).toBe(false);
+    // Nothing usable was produced, so a later retry is free to generate again (not cached).
+    narrate.mockResolvedValueOnce({ text: "Reread a.ts to line up the new helper.", tokens: 12 });
+    const retry = await explain(snap, { sessionId: "s1", scope: "action", id: "c0#0", depth: "deep" }, deps);
+    expect(retry.text).toBe("Reread a.ts to line up the new helper.");
+  });
+
   it("returns null text for an unknown id", async () => {
     const r = await explain(snapshot(), { sessionId: "s1", scope: "task", id: "nope", depth: "deep" }, deps);
     expect(r.text).toBeNull();

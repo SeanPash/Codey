@@ -25,9 +25,13 @@ describe("describeAction", () => {
   it("names an mcp action by action + server", () => {
     expect(describeAction("mcp__unity__execute_menu_item", { menu: "x" })).toBe("Execute menu item via unity");
   });
-  it("labels a non-tool / thinking turn", () => {
-    expect(describeAction(null, null)).toBe("Thinking it through");
-    expect(describeAction("thinking", null)).toBe("Thinking it through");
+  it("labels a thinking turn by the planning beat, never the banned filler", () => {
+    expect(describeAction(null, null)).toBe("Planning the next step");
+    expect(describeAction("thinking", null)).toBe("Planning the next step");
+    expect(hasBannedPhrase(describeAction("thinking", null))).toBe(false);
+  });
+  it("labels a thinking turn with real decision text as a decision", () => {
+    expect(describeAction("thinking", null, "I should inspect the session files first.")).toBe("Deciding the next step");
   });
   it("phrases a search pattern instead of a flat 'searched the code'", () => {
     expect(describeAction("Grep", { pattern: "validateUser" })).toBe("Searched for validateUser");
@@ -49,16 +53,42 @@ describe("actionTitle", () => {
     expect(actionTitle("Bash", { command: "git status" })).toMatch(/change/i);
     expect(actionTitle("Bash", { command: "git status" })).not.toMatch(/ran a command|a command/i);
   });
-  it("calls a thinking turn what it is", () => {
-    expect(actionTitle("thinking", null)).toBe("Thinking it through");
-    expect(actionTitle(null, null)).toBe("Thinking it through");
+  it("titles a thinking turn as a planning beat, never the banned filler", () => {
+    expect(actionTitle("thinking", null)).toBe("Planning the next step");
+    expect(actionTitle(null, null)).toBe("Planning the next step");
+    expect(hasBannedPhrase(actionTitle("thinking", null))).toBe(false);
   });
 });
 
 describe("actionSubtitle", () => {
-  it("uses the command's own description when present", () => {
-    expect(actionSubtitle("Bash", { command: "node test.js", description: "Run the demo math tests" }))
-      .toBe("Run the demo math tests.");
+  it("phrases a shell command as a sentence, distinct from the description-derived title", () => {
+    const input = { command: "node test.js", description: "Run the demo math tests" };
+    const sub = actionSubtitle("Bash", input);
+    expect(sub).toBe("Claude is running the demo math tests.");
+    // The subtitle must not just echo the title back at the reader.
+    expect(sub.toLowerCase()).not.toBe(actionTitle("Bash", input).toLowerCase() + ".");
+  });
+
+  it("never repeats the title verbatim as the subtitle for a described command", () => {
+    // These descriptions used to surface as both the title and the subtitle, word for word.
+    const cmds = [
+      { command: "node dist/cli/index.js feed", description: "Check live now endpoint and statusline output" },
+      { command: "ls ~/.codey/sessions", description: "List codey session storage" },
+      { command: "node dist/cli/index.js status", description: "Inspect current session narration state" },
+    ];
+    for (const input of cmds) {
+      const title = actionTitle("Bash", input).toLowerCase().replace(/[.\s]+$/, "");
+      const sub = actionSubtitle("Bash", input).toLowerCase().replace(/[.\s]+$/, "");
+      expect(sub).not.toBe(title);
+      expect(hasBannedPhrase(sub)).toBe(false);
+    }
+  });
+
+  it("titles a thinking turn and subtitles it without the banned 'working through the approach' filler", () => {
+    const sub = actionSubtitle("thinking", null);
+    expect(hasBannedPhrase(sub)).toBe(false);
+    expect(actionSubtitle("thinking", null, "Let me check the session files before editing the statusline."))
+      .toMatch(/session files/i);
   });
   it("names the real subject for a file or search", () => {
     expect(actionSubtitle("Read", { file_path: "/p/render.ts" })).toMatch(/render\.ts/);
@@ -162,5 +192,21 @@ describe("attributeChunk", () => {
     const t = [turn({ ts: 100, outputTokens: 50, tool: "Read", input: { file_path: "/x.ts" }, assistantText: null })];
     const b = attributeChunk(t, 0, 200);
     expect(b.workLines[0].why).toBeNull();
+  });
+
+  it("marks a thinking turn explainable only when it left real decision text", () => {
+    const withText = attributeChunk(
+      [turn({ ts: 1, outputTokens: 80, tool: "thinking", assistantText: "I should rebuild before testing the statusline." })], 0, 10);
+    expect(withText.workLines[0].explainable).toBe(true);
+
+    const noText = attributeChunk([turn({ ts: 1, outputTokens: 80, tool: "thinking", assistantText: null })], 0, 10);
+    expect(noText.workLines[0].explainable).toBe(false);
+    expect(hasBannedPhrase(noText.workLines[0].title)).toBe(false);
+    expect(hasBannedPhrase(noText.workLines[0].subtitle)).toBe(false);
+  });
+
+  it("keeps a real action explainable", () => {
+    const b = attributeChunk([turn({ ts: 1, outputTokens: 40, tool: "Read", input: { file_path: "/x.ts" } })], 0, 10);
+    expect(b.workLines[0].explainable).not.toBe(false);
   });
 });

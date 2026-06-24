@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { groupThinking } from "./grouping.js";
+import { hasBannedPhrase } from "../caption/banned.js";
 import type { ReceiptLine } from "../types.js";
 
 function line(p: Partial<ReceiptLine>): ReceiptLine {
-  return { label: "", title: "Thinking it through", subtitle: "Working through the approach before acting.",
+  return { label: "Thought about the next step.", title: "Planning the next step",
+    subtitle: "Claude weighed the next step before continuing.",
     tool: "thinking", tokens: 0, status: "none", errorText: null, resolved: false,
     raw: null, why: null, failSummary: null, ts: 0, thoughtFirst: false, ...p };
 }
@@ -32,11 +34,24 @@ describe("groupThinking", () => {
     expect(out[0].thoughtFirst).toBe(true);
   });
 
-  it("keeps a trailing thinking run as its own plain row when no action follows", () => {
+  it("keeps a trailing thinking run as a non-explainable, non-banned planning marker", () => {
     const out = groupThinking([line({ tokens: 7 }), line({ tokens: 3 })]);
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ tokens: 10, tool: "thinking", thoughtFirst: false });
+    expect(out[0]).toMatchObject({ tokens: 10, tool: "thinking", thoughtFirst: false, explainable: false });
     expect(out[0].label.toLowerCase()).toContain("thought");
+    expect(hasBannedPhrase(out[0].title)).toBe(false);
+    expect(hasBannedPhrase(out[0].subtitle)).toBe(false);
+  });
+
+  it("preserves a real decision in a trailing thinking row, keeping it explainable", () => {
+    const decision = line({ tokens: 5, why: "Inspect the session files before changing the statusline.",
+      title: "Deciding the next step", subtitle: "Inspect the session files before changing the statusline.",
+      explainable: true });
+    const out = groupThinking([line({ tokens: 4 }), decision]);
+    expect(out).toHaveLength(1);
+    expect(out[0].tokens).toBe(9);
+    expect(out[0].explainable).toBe(true);
+    expect(out[0].subtitle).toMatch(/session files/i);
   });
 
   it("leaves non-thinking lines untouched", () => {

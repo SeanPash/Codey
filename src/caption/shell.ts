@@ -7,11 +7,32 @@
 export interface ShellIntent {
   subject: string;   // a plain noun phrase: "the installed plugin config", "the project tests"
   title: string;     // a short purpose headline: "Checking installed plugin config"
-  sentence: string;  // one sentence, always starting "Claude is ...": what Claude is doing
+  sentence: string;  // one sentence, always starting "Claude is ...": the simple "what"
+  deep: string;      // the sentence plus the why: what this step verifies, changes, or protects
+  teach: string;     // the deep line plus one sentence teaching the concept behind it
 }
 
-function intent(subject: string, title: string, sentence: string): ShellIntent {
-  return { subject, title, sentence };
+// Strip the trailing period so a why clause can be appended cleanly.
+function stem(sentence: string): string {
+  return sentence.replace(/\.\s*$/, "");
+}
+
+// A deep line that is always richer than the simple sentence: it adds why the step is being run.
+// Specific intents pass their own; this is the safe floor for commands we did not special-case,
+// so deep never reads identical to simple even for an unrecognised command.
+function defaultDeep(sentence: string, subject: string): string {
+  return `${stem(sentence)} to confirm ${subject} is in the state the next step needs.`;
+}
+
+// The concept floor for teach: one plain sentence about what a shell step is for. Specific
+// intents teach their own concept (what a build does, what a test proves); this backs the rest.
+const DEFAULT_CONCEPT =
+  "A shell command runs a program in the project, so Claude can inspect or change things the editor itself cannot.";
+
+function intent(subject: string, title: string, sentence: string, deep?: string, teach?: string): ShellIntent {
+  const d = deep ?? defaultDeep(sentence, subject);
+  const t = teach ?? `${d} ${DEFAULT_CONCEPT}`;
+  return { subject, title, sentence, deep: d, teach: t };
 }
 
 function firstWord(cmd: string): string {
@@ -36,38 +57,51 @@ function commandIntent(cmd: string): ShellIntent | null {
   const tail = rest(cmd);
 
   // Test runners, builds, and checks, however they are invoked.
-  if (/\b(vitest|jest|mocha|pytest|phpunit)\b/.test(cmd)) {
-    return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
-  }
+  const TEST = intent("the tests", "Running the tests", "Claude is running the tests to check the work.",
+    "Claude is running the tests to confirm the latest changes pass and nothing else broke.",
+    "Claude is running the tests to confirm the latest changes pass and nothing else broke. A test is a small program that exercises the real code, so a regression shows up immediately instead of in front of a user.");
+  if (/\b(vitest|jest|mocha|pytest|phpunit)\b/.test(cmd)) return TEST;
   if (word === "npm" || word === "pnpm" || word === "yarn" || word === "npx") {
-    if (/\btest\b/.test(tail)) {
-      return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
-    }
+    if (/\btest\b/.test(tail)) return TEST;
     if (/\bbuild\b/.test(tail)) {
-      return intent("the build", "Rebuilding the project", "Claude is rebuilding the project so the latest code takes effect.");
+      return intent("the build", "Rebuilding the project", "Claude is rebuilding the project so the latest code takes effect.",
+        "Claude is rebuilding the project so the source changes are compiled into the files that actually run.",
+        "Claude is rebuilding the project so the source changes are compiled into the files that actually run. The code Claude edits is not what runs until a build turns it into the shipped output.");
     }
     if (/\b(install|ci)\b|^\s*i\b/.test(tail)) {
-      return intent("the dependencies", "Installing dependencies", "Claude is installing the project's dependencies.");
+      return intent("the dependencies", "Installing dependencies", "Claude is installing the project's dependencies.",
+        "Claude is installing the project's dependencies so the libraries the code imports are present before it runs.",
+        "Claude is installing the project's dependencies so the libraries the code imports are present before it runs. Dependencies are third-party packages the project relies on; without them the code cannot start.");
     }
     if (/\b(typecheck|tsc|lint|eslint)\b/.test(tail)) {
-      return intent("the code", "Checking the code", "Claude is checking the code for type and lint problems.");
+      return intent("the types", "Type-checking the project", "Claude is type-checking the project for type and lint problems.",
+        "Claude is type-checking the project to catch mismatched values and broken calls before they reach runtime.",
+        "Claude is type-checking the project to catch mismatched values and broken calls before they reach runtime. A type check reads the source without running it and flags places where the data would not fit, which stops a whole class of bugs early.");
     }
     const run = tail.match(/run\s+(\S+)/);
     if (run) return intent(`the ${run[1]} script`, `Running the ${run[1]} script`, `Claude is running the ${run[1]} script.`);
     return intent("the project tasks", "Running a project task", "Claude is running a project task.");
   }
   if (word === "tsc" || word === "eslint" || word === "prettier") {
-    return intent("the code", "Checking the code", "Claude is checking the code for problems.");
+    return intent("the types and style", "Checking types and style", "Claude is checking the project for type and style problems.",
+      "Claude is checking the project for type and style problems before relying on it.",
+      "Claude is checking the project for type and style problems before relying on it. These checks read the source without running it, so mistakes surface early rather than at runtime.");
   }
 
   // Git: reporting versus changing the repo.
   if (word === "git") {
     const sub = (tail.trim().split(/\s+/)[0] || "").toLowerCase();
     if (GIT_READ.has(sub)) {
-      return intent("the local changes", "Checking local changes", "Claude is checking the local changes in the repository.");
+      return intent("the local changes", "Checking local changes", "Claude is checking the local changes in the repository.",
+        "Claude is checking the repository's local changes to see exactly what is modified, staged, or still uncommitted before the next step.",
+        "Claude is checking the repository's local changes to see exactly what is modified, staged, or still uncommitted before the next step. Git tracks the working tree against the last commit, so a status or diff shows precisely what a commit would include.");
     }
-    if (sub === "commit") return intent("the changes", "Committing the changes", "Claude is committing the changes.");
-    if (sub === "push") return intent("the changes", "Pushing the changes", "Claude is pushing the changes to the remote.");
+    if (sub === "commit") return intent("the changes", "Committing the changes", "Claude is committing the changes.",
+      "Claude is committing the changes to record this work as a saved point in the project's history.",
+      "Claude is committing the changes to record this work as a saved point in the project's history. A commit is a labelled snapshot you can return to, which is what makes the change reviewable and reversible.");
+    if (sub === "push") return intent("the changes", "Pushing the changes", "Claude is pushing the changes to the remote.",
+      "Claude is pushing the local commits to the remote so the saved work is shared and backed up off this machine.",
+      "Claude is pushing the local commits to the remote so the saved work is shared and backed up off this machine. A push uploads commits that so far exist only locally to the shared repository.");
     if (sub === "add") return intent("the changes", "Staging the changes", "Claude is staging the changes for a commit.");
     if (sub === "checkout" || sub === "switch") return intent("a branch", "Switching branches", "Claude is switching to another branch.");
     if (sub) return intent(`the ${sub} step`, `Running git ${sub}`, `Claude is running git ${sub}.`);
@@ -164,10 +198,14 @@ function descriptionIntent(desc: string): ShellIntent {
     const verb = GERUND[m[1].toLowerCase()];
     const tail = m[2].trim();
     const sentence = tail ? `Claude is ${verb} ${tail}.` : `Claude is ${verb} something.`;
-    return intent(tail || clean, title, sentence);
+    // The deep line keeps the description's own subject but reframes the verb as a purpose, so it
+    // never reads as the title repeated back. The teach line adds the shell concept on top.
+    const deep = `${stem(sentence)} to confirm the result before moving on.`;
+    return intent(tail || clean, title, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
   }
   // Unknown leading verb: keep the description as a faithful sentence rather than guessing.
-  return intent(clean, title, `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`);
+  const fallback = `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
+  return intent(clean, title, fallback);
 }
 
 // The one entry point. Description first (it is Claude's own intent), then the command's obvious
