@@ -45,6 +45,19 @@ function namedSearches(chunk: WorkChunk): string {
   return joinNames(phrases);
 }
 
+// The names a change introduced ("mean", "clipStage and DONE_FOOTER"), the strongest evidence
+// an editing caption has. Empty when the change added nothing nameable.
+function namedSymbols(chunk: WorkChunk, max = 2): string {
+  return joinNames(chunk.symbols ?? [], max);
+}
+
+// When the first file touched is a test, its module name ("math" from "math.test.js"), so a
+// caption can say "the math tests" instead of repeating the filename. Null for non-test files.
+function testModule(chunk: WorkChunk): string | null {
+  const m = /^(.+)\.(test|spec)\.[jt]sx?$/.exec(chunk.targets[0] ?? "");
+  return m ? m[1] : null;
+}
+
 function describe(chunk: WorkChunk): Described {
   // A single shell command knows its own purpose better than any stage template can phrase it,
   // so use the shell intent's title and sentence directly instead of "reading X to understand
@@ -91,21 +104,32 @@ function describe(chunk: WorkChunk): Described {
         return {
           title,
           simple: `Claude is reading ${names}.`,
-          deep: `Claude is reading ${names} to find the part it needs before editing it.`,
-          teach: `Claude is reading ${names} to find the part it needs before editing it. Reading the existing code first is how you avoid breaking something you did not know was there.`,
+          deep: `Claude is reading ${names} to see what it does before changing it.`,
+          teach: `Claude is reading ${names} to see what it does before changing it. Reading the existing code first is how you avoid breaking something you did not know was there.`,
         };
       }
       return {
         title,
         simple: `Claude is reading ${names}.`,
-        deep: `Claude is reading ${names} to map how they connect before editing them.`,
-        teach: `Claude is reading ${names} to map how they connect before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`,
+        deep: `Claude is reading ${names} to trace how they work together before editing them.`,
+        teach: `Claude is reading ${names} to trace how they work together before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`,
       };
     }
     case "editing": {
       const adds = chunk.tool === "Write" || chunk.tool === "NotebookEdit";
+      const sym = (chunk.symbols ?? [])[0] ?? null;
+      const syms = namedSymbols(chunk);
+      const mod = testModule(chunk);
       if (single) {
         if (adds) {
+          if (sym) {
+            return {
+              title,
+              simple: `Claude is creating ${names}, starting with ${sym}.`,
+              deep: `Claude is creating ${names} and writing ${sym} into it.`,
+              teach: `Claude is creating ${names} and writing ${sym} into it. A new file does nothing until something imports or runs it.`,
+            };
+          }
           return {
             title,
             simple: `Claude is creating ${names}.`,
@@ -113,11 +137,28 @@ function describe(chunk: WorkChunk): Described {
             teach: `Claude is creating ${names} and writing its initial contents. A new file does nothing until something imports or runs it.`,
           };
         }
+        // A change to a test file is best described by the behavior it now covers.
+        if (sym && mod) {
+          return {
+            title,
+            simple: `Claude is adding a ${sym} test to the ${mod} tests.`,
+            deep: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}.`,
+            teach: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}. A test is a small program that checks the real code, so a problem with ${sym} shows up right away.`,
+          };
+        }
+        if (sym) {
+          return {
+            title,
+            simple: `Claude is updating ${sym} in ${names}.`,
+            deep: `Claude is updating ${sym} in ${names} to change how it behaves.`,
+            teach: `Claude is updating ${sym} in ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`,
+          };
+        }
         return {
           title,
           simple: `Claude is updating ${names}.`,
-          deep: `Claude is editing ${names}, changing specific lines in place.`,
-          teach: `Claude is editing ${names}, changing specific lines in place. An edit only takes effect once the code runs or is rebuilt.`,
+          deep: `Claude is updating ${names} to change how it behaves.`,
+          teach: `Claude is updating ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`,
         };
       }
       if (adds) {
@@ -126,6 +167,14 @@ function describe(chunk: WorkChunk): Described {
           simple: `Claude is creating ${names}.`,
           deep: `Claude is creating ${names} as a set of new files for one piece of work.`,
           teach: `Claude is creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`,
+        };
+      }
+      if (syms) {
+        return {
+          title,
+          simple: `Claude is updating ${names} around ${syms}.`,
+          deep: `Claude is updating ${names} together so ${syms} stay consistent.`,
+          teach: `Claude is updating ${names} together so ${syms} stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`,
         };
       }
       return {

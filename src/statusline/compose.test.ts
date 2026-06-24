@@ -85,21 +85,24 @@ describe("composeView thinking", () => {
 });
 
 describe("composeView done", () => {
-  it("shows the AI recap as the done sentence and points at the fuller views", () => {
-    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
-    const view = composeView(events, snap({ doneAt: 200, why: "Wired the summary section." }), 10000);
+  it("recaps the finished prompt from its own events, not Claude's chat reply", () => {
+    const events = [pre("a", "Edit", { file_path: "render.ts" }, 0)];
+    const view = composeView(events, snap({ doneAt: 200, why: "Some chatty closing message." }), 10000);
     expect(view.state).toBe("done");
     expect(view.stage).toBe("Done");
-    expect(view.sentence).toBe("Wired the summary section.");
-    // The closing footer sits beneath the recap on every finished prompt.
-    expect(view.hint).toBe("Finished this prompt. Run /codey:timeline to see the full breakdown.");
+    expect(view.sentence).toMatch(/^Updated/);
+    expect(view.sentence).toMatch(/render\.ts/);
+    expect(view.sentence).not.toBe("Some chatty closing message.");
+    // The closing footer always sits beneath the recap on a finished prompt.
+    expect(view.hint).toBe("Run /codey:timeline for the full breakdown.");
   });
 
-  it("falls back to the closing footer as the line itself when there is no recap", () => {
-    const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
+  it("recaps an investigate-only turn honestly, without claiming a change", () => {
+    const events = [pre("a", "Read", { file_path: "index.html" }, 0)];
     const view = composeView(events, snap({ doneAt: 200, why: null }), 10000);
-    expect(view.sentence).toBe("Finished this prompt. Run /codey:timeline to see the full breakdown.");
-    expect(view.hint).toBe(null);
+    expect(view.sentence).toMatch(/inspected/i);
+    expect(view.sentence).not.toMatch(/updated|fixed/i);
+    expect(view.hint).toBe("Run /codey:timeline for the full breakdown.");
   });
 
   it("snaps to done even before any reveal would have caught up", () => {

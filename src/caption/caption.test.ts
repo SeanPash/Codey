@@ -11,6 +11,7 @@ const chunk = (over: Partial<WorkChunk> = {}): WorkChunk => ({
   tool: "Read",
   targets: ["render.ts"],
   searches: [],
+  symbols: [],
   raw: null,
   startTs: 0,
   endTs: 0,
@@ -98,6 +99,33 @@ describe("buildCaption", () => {
     expect(c.simple).toMatch(/caption tests/);
     expect(c.simple).toMatch(/caption\.ts/);
     expect(hasBannedPhrase(c.simple)).toBe(false);
+  });
+
+  it("names the symbol an edit added so a test edit mentions the behavior, not just the file", () => {
+    const c = buildCaption(
+      chunk({ stage: "editing", tool: "Edit", targets: ["math.test.js"], symbols: ["mean"] }),
+      "deep",
+    );
+    expect(c.simple).toMatch(/mean/i);
+    expect(c.deep).toMatch(/mean|average/i);
+    expect(hasBannedPhrase(c.simple)).toBe(false);
+    expect(hasBannedPhrase(c.deep!)).toBe(false);
+  });
+
+  it("names the symbol a source edit added, not 'changing specific lines in place'", () => {
+    const c = buildCaption(
+      chunk({ stage: "editing", tool: "Edit", targets: ["render.ts"], symbols: ["clipStage"] }),
+      "deep",
+    );
+    expect(c.deep).toMatch(/clipStage/);
+    expect(c.deep).not.toMatch(/changing specific lines/);
+  });
+
+  it("reads a single file without the banned 'find the part it needs' filler", () => {
+    const c = buildCaption(chunk({ stage: "inspecting", count: 1, targets: ["index.html"] }), "teach");
+    expect(c.deep).toMatch(/index\.html/);
+    expect(hasBannedPhrase(c.deep!)).toBe(false);
+    expect(hasBannedPhrase(c.teach!)).toBe(false);
   });
 
   it("gives deep mode more context than simple mode for a multi-file read", () => {

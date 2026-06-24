@@ -11,6 +11,14 @@ function line(why: string): ReceiptLine {
   };
 }
 
+function bashLine(command: string): ReceiptLine {
+  return {
+    label: "Running the tests", title: "Verifying the tests", subtitle: "Running the tests to check it passes.",
+    tool: "Bash", tokens: 10, status: "ok", errorText: null,
+    resolved: false, raw: command, why: "checking the work", failSummary: null, ts: 2, thoughtFirst: false,
+  };
+}
+
 const tasks: SummaryTask[] = [
   { name: "Add the explain endpoint", lines: [line("wiring the route")] },
   { name: "Cache the results", lines: [line("avoid paying twice")] },
@@ -35,5 +43,32 @@ describe("buildSummaryPrompt", () => {
     const out = DEPTHS.map((d) => buildSummaryPrompt("p", tasks, d));
     expect(out[0]).not.toEqual(out[1]);
     for (const p of out) expect(p).not.toContain("—");
+  });
+
+  it("grounds the recap in the real files that were changed", () => {
+    const p = buildSummaryPrompt("do the thing", tasks, "deep");
+    expect(p).toContain("budget.ts");
+    expect(p.toLowerCase()).toContain("files touched");
+  });
+
+  it("asks deep and teach for honest sections, but keeps simple to one sentence", () => {
+    const deep = buildSummaryPrompt("p", tasks, "deep");
+    expect(deep).toContain("What changed");
+    expect(deep).toContain("Files touched");
+    expect(deep).toContain("Verification");
+    const simple = buildSummaryPrompt("p", tasks, "simple");
+    expect(simple).not.toContain("What changed");
+  });
+
+  it("only offers verification as grounding when a check actually ran", () => {
+    const verified: SummaryTask[] = [
+      { name: "Fix the recap", lines: [line("the change"), bashLine("npx vitest run")] },
+    ];
+    const withCheck = buildSummaryPrompt("p", verified, "deep");
+    expect(withCheck.toLowerCase()).toMatch(/the tests/);
+
+    const noCheck = buildSummaryPrompt("p", tasks, "deep");
+    // With no check in the evidence, the prompt tells the model not to invent one.
+    expect(noCheck.toLowerCase()).toContain("only");
   });
 });

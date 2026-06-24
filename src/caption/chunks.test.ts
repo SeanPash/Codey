@@ -96,6 +96,18 @@ describe("chunkEvents", () => {
     expect(chunks).toHaveLength(2);
   });
 
+  it("collects the symbols an editing chunk added, for a specific caption", () => {
+    const chunks = chunkEvents([
+      pre("Edit", { file_path: "math.test.js", new_string: 'console.assert(mean([2, 4, 6, 8]) === 5, "mean works");' }, 0),
+    ]);
+    expect(chunks[0].symbols).toContain("mean");
+  });
+
+  it("leaves symbols empty for a read chunk that changed nothing", () => {
+    const chunks = chunkEvents([pre("Read", { file_path: "a.ts" }, 0)]);
+    expect(chunks[0].symbols).toEqual([]);
+  });
+
   it("returns nothing for an empty event list", () => {
     expect(chunkEvents([])).toEqual([]);
   });

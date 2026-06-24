@@ -9,7 +9,7 @@ import type { WhyEntry } from "../narration/history.js";
 import { budgetLeftLabel, budgetPausedMessage, type Budget } from "../budget/budget.js";
 import { chunkEvents } from "../caption/chunks.js";
 import { buildCaption, type LiveCaption } from "../caption/caption.js";
-import { stripDashes } from "../util/text.js";
+import { buildRecap } from "../caption/recap.js";
 
 // A run of the same kind of action that lands faster than this is treated as one
 // burst. It keeps the /explain card numbering from fragmenting when Claude reads ten
@@ -79,7 +79,7 @@ function pickSentence(caption: LiveCaption, mode: Mode): string {
 
 // The closing footer, shown at the bottom of every finished prompt so there is always a clear
 // "this turn is done, here is where to see more" line, whether or not a recap was generated.
-const DONE_FOOTER = "Finished this prompt. Run /codey:timeline to see the full breakdown.";
+const DONE_FOOTER = "Run /codey:timeline for the full breakdown.";
 
 export function composeView(
   events: ToolEvent[],
@@ -113,11 +113,12 @@ export function composeView(
   }
 
   if (done) {
-    // Keep the AI recap when there is one, since it says what the turn actually accomplished, and
-    // put the closing footer beneath it. With no recap the footer becomes the line itself, so a
-    // finished prompt always ends with "Finished this prompt. Run /codey:timeline..." at the bottom.
-    const recap = snap.why && snap.why.trim() ? stripDashes(snap.why) : null;
-    return { ...base, state: "done", stage: "Done", sentence: recap ?? DONE_FOOTER, warning: null, hint: recap ? DONE_FOOTER : null };
+    // The close is recapped from the turn's own events, not Claude's chat reply, so it stays
+    // honest: "Updated" only when an edit ran, "verified" only when a test or build ran. The
+    // footer always sits beneath it, pointing at the fuller browser breakdown.
+    const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+    const recap = buildRecap(events.filter((e) => e.timestamp >= turnStart));
+    return { ...base, state: "done", stage: "Done", sentence: recap.sentence, warning: null, hint: DONE_FOOTER };
   }
 
   // The live phase is scoped to the current turn so it resets cleanly on each new prompt.
