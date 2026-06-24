@@ -4989,7 +4989,7 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
 }
 
 // src/statusline/active-mode.ts
-import { readFileSync as readFileSync12, writeFileSync as writeFileSync6, existsSync as existsSync13, rmSync as rmSync3, mkdirSync as mkdirSync6, readdirSync as readdirSync2, statSync as statSync2 } from "node:fs";
+import { readFileSync as readFileSync12, writeFileSync as writeFileSync6, existsSync as existsSync13, rmSync as rmSync3, mkdirSync as mkdirSync6, readdirSync as readdirSync2 } from "node:fs";
 import { join as join10 } from "node:path";
 function modeFile(sessionDir) {
   return join10(sessionDir, "mode");
@@ -5007,7 +5007,6 @@ function readSessionMode(sessionDir) {
   const raw = readFileSync12(p, "utf8").trim();
   return raw === "simple" || raw === "deep" || raw === "teach" || raw === "ask" ? raw : null;
 }
-var INHERIT_WINDOW_MS = 10 * 6e4;
 function anyActiveSession(root) {
   if (!existsSync13(root)) return false;
   for (const name of readdirSync2(root)) {
@@ -5043,11 +5042,18 @@ function sessionFromPayload(payload) {
     return null;
   }
 }
+var RESET2 = "\x1B[0m";
+var BOLD2 = "\x1B[1m";
+var BRAND2 = "\x1B[38;5;75m";
+var DIM2 = "\x1B[38;5;244m";
+function offHint() {
+  return `${BOLD2}${BRAND2}Codey${RESET2} ${DIM2}off \xB7 run ${RESET2}${BRAND2}/codey:simple${RESET2}${DIM2} or ${RESET2}${BRAND2}/codey:deep${RESET2}${DIM2} to narrate this session${RESET2}`;
+}
 function lineForSession(session, root, now) {
   if (!session) return "";
   const dir = join11(root, session);
   const mode = readSessionMode(dir);
-  if (!mode) return "";
+  if (!mode) return offHint();
   return statusLineFor(dir, now, mode);
 }
 function runStatusLine() {
@@ -5205,7 +5211,7 @@ function buildIdFrom(entryPath) {
 }
 
 // src/serve/load-snapshot.ts
-import { statSync as statSync3 } from "node:fs";
+import { statSync as statSync2 } from "node:fs";
 import { join as join15 } from "node:path";
 
 // src/timeline/attribution.ts
@@ -5889,7 +5895,7 @@ function restore(root, id) {
 function isRunning(dir, now, cancelledAt = 0) {
   let evMtime = 0;
   try {
-    evMtime = statSync3(join15(dir, "events.jsonl")).mtimeMs;
+    evMtime = statSync2(join15(dir, "events.jsonl")).mtimeMs;
   } catch {
     evMtime = 0;
   }
@@ -5921,7 +5927,7 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
   const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex });
   let mtimeMs = 0;
   try {
-    mtimeMs = statSync3(store.path).mtimeMs;
+    mtimeMs = statSync2(store.path).mtimeMs;
   } catch {
     mtimeMs = 0;
   }
@@ -6058,10 +6064,10 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 }
 
 // src/store/session-prune.ts
-import { readdirSync as readdirSync3, statSync as statSync4, existsSync as existsSync18, rmSync as rmSync5 } from "node:fs";
+import { readdirSync as readdirSync3, statSync as statSync3, existsSync as existsSync18, rmSync as rmSync5 } from "node:fs";
 import { join as join17 } from "node:path";
 function newestMtime(dir) {
-  let newest = statSync4(dir).mtimeMs;
+  let newest = statSync3(dir).mtimeMs;
   let entries;
   try {
     entries = readdirSync3(dir);
@@ -6070,7 +6076,7 @@ function newestMtime(dir) {
   }
   for (const name of entries) {
     try {
-      const ms = statSync4(join17(dir, name)).mtimeMs;
+      const ms = statSync3(join17(dir, name)).mtimeMs;
       if (ms > newest) newest = ms;
     } catch {
     }
@@ -6089,7 +6095,7 @@ function pruneEventless(root, now, maxAgeMs) {
   for (const name of entries) {
     const dir = join17(root, name);
     try {
-      if (!statSync4(dir).isDirectory()) continue;
+      if (!statSync3(dir).isDirectory()) continue;
       if (existsSync18(join17(dir, "events.jsonl"))) continue;
       const age = now - newestMtime(dir);
       if (age < maxAgeMs) continue;
@@ -6177,10 +6183,10 @@ import { existsSync as existsSync19, watchFile as watchFile3 } from "node:fs";
 import { join as join19 } from "node:path";
 
 // src/feed/render.ts
-var RESET2 = "\x1B[0m";
-var BOLD2 = "\x1B[1m";
-var DIM2 = "\x1B[2m";
-var BRAND2 = "\x1B[38;5;75m";
+var RESET3 = "\x1B[0m";
+var BOLD3 = "\x1B[1m";
+var DIM3 = "\x1B[2m";
+var BRAND3 = "\x1B[38;5;75m";
 var NUM = "\x1B[38;5;220m";
 var TITLE = "\x1B[38;5;253m";
 var BODY = "\x1B[38;5;250m";
@@ -6221,24 +6227,24 @@ function turnHeader(turn, prompts) {
   const when = ts ? new Date(ts).toTimeString().slice(0, 5) : "";
   const label = when ? `Prompt ${turn} \xB7 ${when}` : `Before the first prompt`;
   return `
-${BOLD2}${BRAND2}\u2550\u2550 ${label} \u2550\u2550${RESET2}`;
+${BOLD3}${BRAND3}\u2550\u2550 ${label} \u2550\u2550${RESET3}`;
 }
 function chunkBlock(c) {
   const cap2 = c.caption;
   const sentence = cap2.teach ?? cap2.deep ?? cap2.simple;
   const lines = [
-    `${RULE}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500${RESET2}`,
-    `${BOLD2}${NUM}${c.step}.${RESET2} ${TITLE}${cap2.title}${RESET2}`,
-    `   ${BODY}${sentence}${RESET2}`
+    `${RULE}\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500${RESET3}`,
+    `${BOLD3}${NUM}${c.step}.${RESET3} ${TITLE}${cap2.title}${RESET3}`,
+    `   ${BODY}${sentence}${RESET3}`
   ];
   if (cap2.outcome) {
     const tone = cap2.stage === "debugging" && !/recover/i.test(cap2.outcome) ? RED2 : LAV;
-    lines.push(`   ${tone}${cap2.outcome}${RESET2}`);
+    lines.push(`   ${tone}${cap2.outcome}${RESET3}`);
   }
   return lines.join("\n");
 }
 function renderFeedHeader() {
-  return `${BOLD2}${BRAND2}codey${RESET2} ${DIM2}\xB7 session work log${RESET2}`;
+  return `${BOLD3}${BRAND3}codey${RESET3} ${DIM3}\xB7 session work log${RESET3}`;
 }
 function advanceFeed(chunks, cursor, sealAll = false) {
   const parts = [];
@@ -6324,6 +6330,10 @@ function writeSettings(s) {
 }
 function statusLineCommand(self) {
   return `node "${self}" statusline`;
+}
+function ensureStatusLine(self) {
+  const s = readSettings();
+  if (!s.statusLine) writeSettings(withStatusLine(s, statusLineCommand(self)));
 }
 function pidPath(sessionDir) {
   return join20(sessionDir, "narrator.pid");
@@ -6669,6 +6679,7 @@ async function runTimeline() {
   }
   const root = defaultRoot();
   const currentBuild = buildIdFrom(process.argv[1]);
+  ensureStatusLine(process.argv[1]);
   const lock = readLock(root);
   let probed = { up: false, build: null };
   if (lock) {

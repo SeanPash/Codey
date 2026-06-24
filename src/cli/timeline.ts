@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { defaultRoot } from "../store/session-store.js";
 import { buildIdFrom } from "../serve/build-id.js";
 import { latestSessionId } from "./sessions.js";
+import { ensureStatusLine } from "./toggle.js";
 
 const DEFAULT_PORT = 4317;
 
@@ -114,6 +115,11 @@ export async function runTimeline(): Promise<void> {
   if (!session) { console.error("No Codey sessions found yet."); process.exit(1); }
   const root = defaultRoot();
   const currentBuild = buildIdFrom(process.argv[1]);
+
+  // Wire the status line so the HUD shows the "run a mode" nudge even with Codey off. Without
+  // this, a session that never turned a mode on has no status line command installed at all, so
+  // opening the timeline would leave the bottom of the terminal blank.
+  ensureStatusLine(process.argv[1]);
 
   const lock = readLock(root);
   let probed: Probe = { up: false, build: null };

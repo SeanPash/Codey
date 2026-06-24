@@ -3,8 +3,7 @@ import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 import { defaultRoot } from "../store/session-store.js";
 import { patchStatus } from "../statusline/state.js";
-import { writeMetaIfAbsent, readMeta } from "../store/session-meta.js";
-import { readSessionMode, writeSessionMode, inheritedMode } from "../statusline/active-mode.js";
+import { writeMetaIfAbsent } from "../store/session-meta.js";
 import { appendPrompt } from "./prompts.js";
 
 // Records when the user last submitted a prompt so the status line can show a
@@ -25,8 +24,6 @@ export function handlePromptInput(rawJson: string, now = Date.now(), root: strin
   // A prompt can land before any tool has created the session folder.
   const dir = join(root, raw.session_id);
   mkdirSync(dir, { recursive: true });
-  // No meta yet means this is the session's first prompt. Check before writing it below.
-  const firstPrompt = readMeta(raw.session_id, root) === null;
   // A new prompt starts a fresh turn, so drop the last turn's explanation, terse action, warning,
   // and done-stamp. Without this the status line shows the previous turn's recap or "why" next to
   // the new turn's stage (an old explanation under a new task). The narrator refills `why` for this
@@ -39,13 +36,10 @@ export function handlePromptInput(rawJson: string, now = Date.now(), root: strin
     { sessionId: raw.session_id, transcriptPath: raw.transcript_path ?? null, cwd: raw.cwd ?? null },
     root,
   );
-  // Carry Codey's mode across /clear and resume, which spin up a new session id in the same
-  // directory. Only on the first prompt, and only when nothing is set yet, so turning Codey
-  // off in a session is never silently undone.
-  if (firstPrompt && readSessionMode(dir) === null) {
-    const inherit = inheritedMode(raw.cwd ?? null, raw.session_id, root, now);
-    if (inherit) writeSessionMode(inherit, dir);
-  }
+  // Codey stays off in a fresh session (a /clear, a resume, or a brand new tab all start a new
+  // session id) until the user explicitly turns it on with /codey:simple|deep|teach. We never
+  // carry a mode forward on our own, so opening the timeline or any first prompt never lights up
+  // narration the user did not ask for.
 }
 
 function main(): void {

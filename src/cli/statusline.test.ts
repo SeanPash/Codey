@@ -38,10 +38,14 @@ describe("statusLineFor", () => {
 });
 
 describe("lineForSession", () => {
-  it("stays blank for a session that has not turned Codey on", () => {
+  it("nudges toward a mode for a session that has not turned Codey on", () => {
     const dir = seed(); // events + snapshot exist, but no mode marker
     const root = dirname(dir);
-    expect(lineForSession("s1", root, 1000)).toBe("");
+    const out = plain(lineForSession("s1", root, 1000));
+    expect(out).toContain("Codey");
+    expect(out).toContain("off");
+    expect(out).toContain("/codey:simple");
+    expect(out).toContain("/codey:deep");
   });
 
   it("renders once the session has a mode marker", () => {
