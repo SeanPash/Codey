@@ -77,6 +77,50 @@ function pickSentence(caption: LiveCaption, mode: Mode): string {
   return caption.simple;
 }
 
+// How much of the HUD's second line each mode gets. Simple is one short sentence; deep and
+// teach may carry a second. The char caps keep a long AI explanation from running off the
+// line: when even the first sentence overflows, we drop to the shorter deterministic caption
+// rather than truncate mid-thought. The teaching depth lives in the browser timeline instead.
+const SENTENCE_BUDGET: Record<Mode, { sentences: number; chars: number }> = {
+  simple: { sentences: 1, chars: 120 },
+  deep: { sentences: 2, chars: 200 },
+  teach: { sentences: 2, chars: 200 },
+  ask: { sentences: 1, chars: 120 },
+};
+
+// Split on sentence ends, keeping the punctuation, so each piece is a whole thought.
+function splitSentences(text: string): string[] {
+  return text
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Keep whole sentences from `text` up to the mode's budget. Returns "" when not even the first
+// sentence fits within the char cap, so the caller can fall back to a shorter complete line.
+function fitWithin(text: string, sentences: number, chars: number): string {
+  const kept: string[] = [];
+  for (const s of splitSentences(text)) {
+    if (kept.length >= sentences) break;
+    const joined = [...kept, s].join(" ");
+    if (joined.length > chars) break;
+    kept.push(s);
+  }
+  return kept.join(" ");
+}
+
+// The HUD's second line: prefer the AI-grounded sentence, but only as whole sentences within
+// the mode's budget. When it is too long to show complete, use the short deterministic caption
+// instead. Never returns a line cut off mid-thought, so the renderer never has to add an ellipsis.
+function fitSentence(primary: string, fallback: string, mode: Mode): string {
+  const { sentences, chars } = SENTENCE_BUDGET[mode];
+  const fit = fitWithin(primary, sentences, chars);
+  if (fit) return fit;
+  const fb = fitWithin(fallback, sentences, chars);
+  return fb || fallback;
+}
+
 // The closing footer, shown at the bottom of every finished prompt so there is always a clear
 // "this turn is done, here is where to see more" line, whether or not a recap was generated.
 const DONE_FOOTER = "Run /codey:timeline for the full breakdown.";
@@ -140,6 +184,10 @@ export function composeView(
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
   const ai = snap.mode === "ask" || paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
   const caption = buildCaption(current, snap.mode, ai);
+  // The deterministic caption is the fallback when the AI sentence is too long to show whole,
+  // so the line always ends on a complete thought.
+  const plain = ai ? buildCaption(current, snap.mode, null) : caption;
+  const sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
   const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
 
   return {
@@ -148,7 +196,7 @@ export function composeView(
     // HUD says what Claude is working on at a glance.
     state: "live",
     stage: caption.title,
-    sentence: pickSentence(caption, snap.mode),
+    sentence,
     warning: snap.warning,
     hint,
   };

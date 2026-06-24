@@ -104,26 +104,34 @@ export function purposeTitle(tool: string, stage: Stage, subject: string, count:
   }
 }
 
-// One plain, neutral sentence for the subtitle: what Claude did, naming the real subject.
-// This is the deterministic floor; a generated AI sentence replaces it when one exists.
-export function purposeSentence(tool: string, stage: Stage, subject: string, count: number): string {
+// One plain, neutral sentence for the subtitle: what Claude did, naming the real subject and,
+// when we know it, the area of the codebase the file lives in (its folder). This is the
+// deterministic floor; a generated AI sentence replaces it when one exists. It must stay
+// concrete and never reach for the banned filler ("follow how it works", "adjust how it
+// works"): when there is nothing specific to say, it still names the file and a real purpose.
+export function purposeSentence(tool: string, stage: Stage, subject: string, count: number, area?: string): string {
   const many = count > 1;
+  // "the statusline code", or just "it" when we cannot place the file in a folder.
+  const place = area ? `the ${area} code` : "it";
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
       if (many) return adds ? `Adding new files, starting with ${subject}.` : `Updating ${subject} and the files alongside it.`;
-      return adds ? `Creating ${subject}.` : `Changing ${subject} to adjust how it works.`;
+      if (adds) return `Creating ${subject}.`;
+      return area ? `Editing ${subject} to change how ${place} behaves.` : `Editing ${subject} to change what it does.`;
     }
     case "inspecting":
-      if (many) return `Reading ${subject} and the files around it to map how they connect.`;
-      if (tool === "Grep" || tool === "Glob") return `Searching the project for ${subject}.`;
-      return `Reading ${subject} to follow how it works.`;
+      if (many) return `Reading ${subject} and the files alongside it to see how they work together.`;
+      if (tool === "Grep" || tool === "Glob") {
+        return subject === "the code" ? "Searching the project for the relevant code." : `Searching the project for ${subject}.`;
+      }
+      return area ? `Reading ${subject} to see what ${place} does.` : `Reading ${subject} to see what it does.`;
     case "testing":
       return `Running ${subject} to check it passes.`;
     case "debugging":
       return "Reading the error and trying a different approach.";
     case "planning":
-      return "Working out the next step before changing anything.";
+      return "Working out the next step.";
     case "summarizing":
       return "Pulling the work together into a clear recap.";
     case "waiting":

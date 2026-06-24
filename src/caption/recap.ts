@@ -100,7 +100,9 @@ export function buildRecap(events: ToolEvent[]): Recap {
   } else if (inspected.length) {
     sentence = `Inspected ${joinNames(inspected.map(humanFile), 3)}.`;
   } else {
-    sentence = "Finished the request.";
+    // No nameable change, check, or read: the close still reads as a complete thought, and the
+    // done footer ("Run /codey:timeline for the full breakdown.") follows it on the HUD.
+    sentence = "Finished this prompt.";
   }
 
   return { sentence, changed, verified, inspected };

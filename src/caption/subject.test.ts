@@ -139,4 +139,18 @@ describe("purposeSentence", () => {
     expect(s.length).toBeGreaterThan(0);
     expect(s).not.toMatch(/[—–]/);
   });
+
+  it("never reaches for the banned 'follow how it works' / 'adjust how it works' fillers", () => {
+    expect(purposeSentence("Read", "inspecting", "render.ts", 1)).not.toMatch(/follow how it works/i);
+    expect(purposeSentence("Edit", "editing", "banned.ts", 1)).not.toMatch(/adjust how it works/i);
+  });
+
+  it("phrases a no-subject search without the banned 'for the code' tail", () => {
+    expect(purposeSentence("Grep", "inspecting", "the code", 1)).not.toMatch(/searching the project for the code/i);
+  });
+
+  it("grounds the sentence in the folder area when one is given", () => {
+    expect(purposeSentence("Read", "inspecting", "render.ts", 1, "statusline")).toContain("statusline");
+    expect(purposeSentence("Edit", "editing", "costs.ts", 1, "timeline")).toContain("timeline");
+  });
 });

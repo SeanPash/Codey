@@ -3566,24 +3566,28 @@ function purposeTitle(tool, stage, subject, count) {
       return "Getting started";
   }
 }
-function purposeSentence(tool, stage, subject, count) {
+function purposeSentence(tool, stage, subject, count, area) {
   const many = count > 1;
+  const place = area ? `the ${area} code` : "it";
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
       if (many) return adds ? `Adding new files, starting with ${subject}.` : `Updating ${subject} and the files alongside it.`;
-      return adds ? `Creating ${subject}.` : `Changing ${subject} to adjust how it works.`;
+      if (adds) return `Creating ${subject}.`;
+      return area ? `Editing ${subject} to change how ${place} behaves.` : `Editing ${subject} to change what it does.`;
     }
     case "inspecting":
-      if (many) return `Reading ${subject} and the files around it to map how they connect.`;
-      if (tool === "Grep" || tool === "Glob") return `Searching the project for ${subject}.`;
-      return `Reading ${subject} to follow how it works.`;
+      if (many) return `Reading ${subject} and the files alongside it to see how they work together.`;
+      if (tool === "Grep" || tool === "Glob") {
+        return subject === "the code" ? "Searching the project for the relevant code." : `Searching the project for ${subject}.`;
+      }
+      return area ? `Reading ${subject} to see what ${place} does.` : `Reading ${subject} to see what it does.`;
     case "testing":
       return `Running ${subject} to check it passes.`;
     case "debugging":
       return "Reading the error and trying a different approach.";
     case "planning":
-      return "Working out the next step before changing anything.";
+      return "Working out the next step.";
     case "summarizing":
       return "Pulling the work together into a clear recap.";
     case "waiting":
@@ -4743,7 +4747,7 @@ function buildRecap(events) {
   } else if (inspected.length) {
     sentence = `Inspected ${joinNames(inspected.map(humanFile), 3)}.`;
   } else {
-    sentence = "Finished the request.";
+    sentence = "Finished this prompt.";
   }
   return { sentence, changed, verified, inspected };
 }
@@ -4796,6 +4800,32 @@ function pickSentence(caption, mode) {
   if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
   return caption.simple;
 }
+var SENTENCE_BUDGET = {
+  simple: { sentences: 1, chars: 120 },
+  deep: { sentences: 2, chars: 200 },
+  teach: { sentences: 2, chars: 200 },
+  ask: { sentences: 1, chars: 120 }
+};
+function splitSentences(text) {
+  return text.trim().split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+}
+function fitWithin(text, sentences, chars) {
+  const kept = [];
+  for (const s of splitSentences(text)) {
+    if (kept.length >= sentences) break;
+    const joined = [...kept, s].join(" ");
+    if (joined.length > chars) break;
+    kept.push(s);
+  }
+  return kept.join(" ");
+}
+function fitSentence(primary, fallback, mode) {
+  const { sentences, chars } = SENTENCE_BUDGET[mode];
+  const fit = fitWithin(primary, sentences, chars);
+  if (fit) return fit;
+  const fb = fitWithin(fallback, sentences, chars);
+  return fb || fallback;
+}
 var DONE_FOOTER = "Run /codey:timeline for the full breakdown.";
 function composeView(events, snap, now, whys = [], budget = null) {
   const budgetLeft = budgetLeftLabel(budget);
@@ -4826,6 +4856,8 @@ function composeView(events, snap, now, whys = [], budget = null) {
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
   const ai = snap.mode === "ask" || paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
   const caption = buildCaption(current, snap.mode, ai);
+  const plain = ai ? buildCaption(current, snap.mode, null) : caption;
+  const sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
   const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
   return {
     ...base,
@@ -4833,7 +4865,7 @@ function composeView(events, snap, now, whys = [], budget = null) {
     // HUD says what Claude is working on at a glance.
     state: "live",
     stage: caption.title,
-    sentence: pickSentence(caption, snap.mode),
+    sentence,
     warning: snap.warning,
     hint
   };
@@ -4870,31 +4902,25 @@ function clipStage(stage) {
   return (sp > STAGE_MAX * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
 }
 var SEP = `${DIM}\u2502${RESET}`;
-function clipLine(text, width) {
-  const t = text.trim();
-  if (t.length <= width) return t;
-  const cut = t.slice(0, width - 1);
-  const sp = cut.lastIndexOf(" ");
-  return (sp > width * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
-}
 function statusBar(view) {
   const accent = stageColor(view.state, view.mode);
   const parts = [`${BOLD}${BRAND}Codey${RESET}`];
   if (view.state !== "done") parts.push(`${MODE_COLOR[view.mode] ?? MODE_COLOR.simple}${modeLabel(view.mode)}${RESET}`);
   parts.push(`${BOLD}${accent}${clipStage(view.stage)}${RESET}`);
+  if (view.state === "done") parts.push(`${DIM}Summary${RESET}`);
   if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
   const budget = view.budgetLeft ? ` ${DIM}\xB7 ${view.budgetLeft}${RESET}` : "";
   const hint = view.state !== "done" && view.hint ? ` ${DIM}\xB7 ${view.hint}${RESET}` : "";
   return parts.join(` ${SEP} `) + budget + hint;
 }
-function renderStatus(view, width = WRAP) {
+function renderStatus(view, _width = WRAP) {
   const out = [statusBar(view)];
   if (view.warning) {
     out.push(`${BOLD}${RED}${view.warning}${RESET}`);
     return out.join("\n");
   }
   const body = view.state === "done" ? GREEN : TEXT;
-  out.push(`${body}${clipLine(view.sentence, width)}${RESET}`);
+  out.push(`${body}${view.sentence.trim()}${RESET}`);
   if (view.state === "done" && view.hint) out.push(`${DIM}${view.hint}${RESET}`);
   return out.join("\n");
 }
@@ -5082,6 +5108,8 @@ function clamp(s, n) {
 }
 function sessionDisplayName(i) {
   if (i.customName && i.customName.trim()) return clamp(i.customName.trim(), MAX_TITLE);
+  const prompt = i.firstPrompt?.trim() ?? "";
+  if (prompt.startsWith("/")) return clamp(prompt, MAX_TITLE);
   if (i.firstChunkName && !PLACEHOLDER.has(i.firstChunkName)) return clamp(i.firstChunkName, MAX_TITLE);
   if (i.firstPrompt) return clamp(i.firstPrompt, MAX_TITLE);
   return `Session ${i.sessionId.slice(0, 8)}`;
@@ -5466,6 +5494,14 @@ function fullPath(input) {
   }
   return null;
 }
+var GENERIC_FOLDERS = /* @__PURE__ */ new Set(["src", "lib", "dist", "app", "test", "tests", "__tests__", ""]);
+function folderArea(input) {
+  const p = fullPath(input);
+  if (!p) return void 0;
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  const folder = parts[parts.length - 2] ?? "";
+  return GENERIC_FOLDERS.has(folder.toLowerCase()) ? void 0 : folder;
+}
 function prettify(s) {
   const words = s.replace(/_/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
@@ -5516,7 +5552,7 @@ function actionSubtitle(tool, input) {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd).sentence;
   }
-  return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
+  return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1, folderArea(input));
 }
 function rawDetail(tool, input) {
   if (!tool) return null;

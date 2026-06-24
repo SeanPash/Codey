@@ -38,7 +38,7 @@ describe("renderStatus", () => {
     expect(out).not.toMatch(/\btok\b/i);
   });
 
-  it("aligns the done state cleanly: name, Done, final time, then a recap", () => {
+  it("aligns the done state cleanly: name, Done, Summary, final time, then a recap", () => {
     const out = plain(renderStatus({
       ...base,
       state: "done",
@@ -50,6 +50,8 @@ describe("renderStatus", () => {
     const lines = out.split("\n");
     expect(lines[0]).toContain("Codey");
     expect(lines[0]).toContain("Done");
+    // The header says "Summary" so it is clear line two is a completion summary, not live narration.
+    expect(lines[0]).toContain("Summary");
     expect(lines[0]).toContain("2m 14s");
     expect(lines[0]).not.toContain("Deep"); // the mode drops away on the close
     expect(lines[1]).toContain("Finished this prompt.");
@@ -97,17 +99,17 @@ describe("renderStatus", () => {
     expect(plain(renderStatus({ ...base, stage: "Editing" }))).not.toContain("…");
   });
 
-  it("clips a long live sentence to a single line instead of spilling into a paragraph", () => {
-    const long = "Claude is working through " + "several connected files ".repeat(8) + "to finish the change.";
-    const lines = plain(renderStatus({ ...base, sentence: long }, 60)).split("\n");
+  it("prints the sentence whole and never ends it with an ellipsis", () => {
+    // The composer guarantees a complete sentence, so the renderer must not truncate it.
+    const sentence = "Claude is checking how Codey records user prompts before changing timeline captions.";
+    const lines = plain(renderStatus({ ...base, sentence })).split("\n");
     expect(lines).toHaveLength(2);
-    for (const ln of lines) expect(ln.length).toBeLessThanOrEqual(60);
-    expect(lines[1]).toMatch(/…$/);
+    expect(lines[1]).toContain(sentence);
+    expect(lines[1]).not.toMatch(/…$/);
   });
 
-  it("never exceeds two lines for a live HUD, even with a long sentence and a hint", () => {
-    const long = "Claude is updating the caption builder and timeline renderer " + "with more detail ".repeat(10);
-    const lines = plain(renderStatus({ ...base, sentence: long, hint: "/codey:explain for the why", budgetLeft: "3.8k left" })).split("\n");
+  it("keeps the HUD to two logical lines (status bar then sentence)", () => {
+    const lines = plain(renderStatus({ ...base, sentence: "Claude is editing render.ts to change how the statusline behaves.", hint: "/codey:explain for the why", budgetLeft: "3.8k left" })).split("\n");
     expect(lines.length).toBeLessThanOrEqual(2);
   });
 });

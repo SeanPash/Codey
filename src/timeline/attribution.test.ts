@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { describeAction, actionTitle, actionSubtitle, rawDetail, failSummaryFrom, attributeChunk } from "./attribution.js";
+import { hasBannedPhrase } from "../caption/banned.js";
 import type { AssistantTurn } from "./transcript.js";
 
 function turn(over: Partial<AssistantTurn>): AssistantTurn {
@@ -62,6 +63,41 @@ describe("actionSubtitle", () => {
   it("names the real subject for a file or search", () => {
     expect(actionSubtitle("Read", { file_path: "/p/render.ts" })).toMatch(/render\.ts/);
     expect(actionSubtitle("Grep", { pattern: "validateUser" })).toMatch(/validateUser/);
+  });
+
+  it("never falls back to the banned 'follow how it works' / 'adjust how it works' fillers", () => {
+    const files = [
+      "C:/Codey/src/statusline/render.ts",
+      "C:/Codey/src/statusline/view.ts",
+      "C:/Codey/src/statusline/compose.ts",
+      "C:/Codey/src/capture/prompt-mark.ts",
+      "C:/Codey/src/timeline/transcript.ts",
+      "C:/Codey/src/timeline/costs.ts",
+      "C:/Codey/src/serve/index.html",
+      "C:/Codey/src/caption/banned.ts",
+      "C:/Codey/src/caption/banned.test.ts",
+    ];
+    for (const file_path of files) {
+      const read = actionSubtitle("Read", { file_path });
+      const edit = actionSubtitle("Edit", { file_path });
+      // Purpose-based: it names the real file (its stem, since a test file reads as "X tests")
+      // and avoids every banned filler.
+      const stem = file_path.split("/").pop()!.split(".")[0];
+      expect(read).toContain(stem);
+      expect(hasBannedPhrase(read)).toBe(false);
+      expect(hasBannedPhrase(edit)).toBe(false);
+    }
+  });
+
+  it("grounds a caption in the folder area when the path has one", () => {
+    // render.ts under src/statusline reads as "the statusline code", not a generic filler.
+    expect(actionSubtitle("Read", { file_path: "C:/Codey/src/statusline/render.ts" })).toContain("statusline");
+    expect(actionSubtitle("Edit", { file_path: "C:/Codey/src/timeline/costs.ts" })).toContain("timeline");
+  });
+
+  it("phrases a no-subject search without the banned 'for the code' tail", () => {
+    const sub = actionSubtitle("Grep", { pattern: "\\bfoo\\b.*\\[bar\\]" });
+    expect(hasBannedPhrase(sub)).toBe(false);
   });
 });
 

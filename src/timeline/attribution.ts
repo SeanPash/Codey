@@ -55,6 +55,18 @@ function fullPath(input: unknown): string | null {
   return null;
 }
 
+// The folder a file lives in ("statusline" from ".../src/statusline/render.ts"), used to ground
+// a caption in the area of the codebase it touches. Drops generic container folders so the area
+// names something meaningful, and returns null when there is nothing useful to say.
+const GENERIC_FOLDERS = new Set(["src", "lib", "dist", "app", "test", "tests", "__tests__", ""]);
+function folderArea(input: unknown): string | undefined {
+  const p = fullPath(input);
+  if (!p) return undefined;
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  const folder = parts[parts.length - 2] ?? "";
+  return GENERIC_FOLDERS.has(folder.toLowerCase()) ? undefined : folder;
+}
+
 function prettify(s: string): string {
   const words = s.replace(/_/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
@@ -112,7 +124,7 @@ export function actionSubtitle(tool: string | null, input: unknown): string {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd).sentence;
   }
-  return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
+  return purposeSentence(tool, classifyStage(tool, input), actionSubject(tool, input), 1, folderArea(input));
 }
 
 // The full detail behind an action, revealed on expand: the command for Bash, the path for
