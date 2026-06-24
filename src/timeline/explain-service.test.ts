@@ -24,7 +24,7 @@ function snapshot(): SessionSnapshot {
   return {
     sessionId: "s1", sessionName: "S", project: null, color: "c", live: false, startedAt: 0,
     lastActivityAt: 0, totalTokens: 0, workTotal: 0, contextTotal: 0, taskCount: 1,
-    priciestTaskName: null, groups: [group("p0", [c0])], chunks: [c0], activeWarning: null,
+    priciestTaskName: null, priciestTaskWork: 0, groups: [group("p0", [c0])], chunks: [c0], activeWarning: null,
     seedDepth: "deep", genAuto: true, budgetLeft: null,
   };
 }

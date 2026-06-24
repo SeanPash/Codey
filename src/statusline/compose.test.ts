@@ -97,7 +97,7 @@ describe("composeView done", () => {
   it("falls back to a clean generic line when there is no recap", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const view = composeView(events, snap({ doneAt: 200, why: null }), 10000);
-    expect(view.sentence).toBe("Finished this prompt. Open the timeline for the full breakdown.");
+    expect(view.sentence).toBe("Finished this prompt. Run /codey:timeline for the full breakdown.");
   });
 
   it("snaps to done even before any reveal would have caught up", () => {

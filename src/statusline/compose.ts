@@ -77,7 +77,7 @@ function pickSentence(caption: LiveCaption, mode: Mode): string {
   return caption.simple;
 }
 
-const DONE_SENTENCE = "Finished this prompt. Open the timeline for the full breakdown.";
+const DONE_SENTENCE = "Finished this prompt. Run /codey:timeline for the full breakdown.";
 const SEE_MORE = "/codey:timeline · /codey:costs";
 
 export function composeView(
