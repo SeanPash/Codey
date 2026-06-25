@@ -9,7 +9,7 @@ Codey is a plugin for Claude Code. It turns every session into a visual story in
 </div>
 
 <!-- SCREENSHOT NEEDED: hero shot of the browser timeline showing the live now-strip at the top, the per-task storyboard down the page, and the token-breakdown chart -->
-![Codey timeline](assets/timeline.png)
+<!-- ![Codey timeline](assets/timeline.png) -->
 
 ## Install
 
@@ -46,7 +46,7 @@ Codey closes that gap. It reads the tool-call stream Claude Code already produce
 Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you curious, there's an **Explain this step** button right on it, and a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
 
 <!-- SCREENSHOT NEEDED: the browser timeline with the live now-strip, Follow Live, per-task storyboard, and stats -->
-![Codey timeline](assets/timeline.png)
+<!-- ![Codey timeline](assets/timeline.png) -->
 
 ### Narration right in your terminal
 
@@ -55,7 +55,7 @@ While Codey is on, the bottom of your terminal becomes a two-line readout: the c
 At the lightest setting it costs almost nothing. You choose how much it says.
 
 <!-- SCREENSHOT NEEDED: the terminal status line, action on top, reason underneath -->
-![Codey status line](assets/status-line.png)
+<!-- ![Codey status line](assets/status-line.png) -->
 
 ### Knows when Claude is stuck
 
@@ -64,14 +64,14 @@ Some of the most useful work Codey does is free. Pure, AI-free detectors watch t
 When something fires, the stuck task gets an amber bar with three choices: nudge it to move on, push it toward a different approach, or stop and hand control back to you. One click feeds Claude a short, plain reason it reads and acts on. Codey only ever observes and suggests. It never acts without your click.
 
 <!-- SCREENSHOT NEEDED: the amber intervention bar on a stuck task with the three buttons -->
-![Stuck-task intervention](assets/intervention.png)
+<!-- ![Stuck-task intervention](assets/intervention.png) -->
 
 ### Explain any step, only when you want
 
 The timeline is readable for free. When a step makes you curious, click **Explain this step** for a deeper, on-demand explanation of what happened and why. You spend a few tokens only on the steps you choose, so you stay cheap by default and dig in exactly where it matters. The same works for a whole prompt: ask for a recap of everything Claude got done that turn.
 
 <!-- SCREENSHOT NEEDED: the token-breakdown chart with a label next to each color -->
-![Token breakdown chart](assets/token-breakdown.png)
+<!-- ![Token breakdown chart](assets/token-breakdown.png) -->
 
 ### Replay any session
 
@@ -86,7 +86,7 @@ Running Claude Code in two or three terminals at once, it's easy to lose track o
 It's the difference between juggling several silent terminals and watching all of them tell their story on one screen.
 
 <!-- SCREENSHOT NEEDED: the Active Terminals view with two or three live session timelines side by side, each following its own run -->
-![Active terminals](assets/active-terminals.png)
+<!-- ![Active terminals](assets/active-terminals.png) -->
 
 ## Without Codey vs with Codey
 
