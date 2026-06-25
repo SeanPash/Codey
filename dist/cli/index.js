@@ -3090,10 +3090,10 @@ function metaPath(sessionId, root) {
   return join2(root, sessionId, "meta.json");
 }
 function readMeta(sessionId, root = defaultRoot()) {
-  const file7 = metaPath(sessionId, root);
-  if (!existsSync2(file7)) return null;
+  const file6 = metaPath(sessionId, root);
+  if (!existsSync2(file6)) return null;
   try {
-    return JSON.parse(readFileSync2(file7, "utf8"));
+    return JSON.parse(readFileSync2(file6, "utf8"));
   } catch {
     return null;
   }
@@ -3423,10 +3423,7 @@ Do not list the tools; describe the goal. Be specific and concrete: name the act
 var PACING = {
   simple: { everyN: 1, minMs: 7e3 },
   deep: { everyN: 2, minMs: 5e3 },
-  teach: { everyN: 3, minMs: 5e3 },
-  // ask never auto-narrates: thresholds that can't be met. The user pulls a why with
-  // /codey:explain instead, so no narration tokens are spent unless asked.
-  ask: { everyN: Infinity, minMs: Infinity }
+  teach: { everyN: 3, minMs: 5e3 }
 };
 function shouldNarrate(mode, state) {
   const p = PACING[mode];
@@ -3633,29 +3630,29 @@ function describeBash(cmd) {
   }
   const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
   const name = pathArg(cmd);
-  const file7 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
+  const file6 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
   const folder = (verb, fallback) => ({ tag: verb, target: name ? `the folder ${name}` : fallback });
   switch (word) {
     case "rm":
     case "del":
     case "unlink":
-      return file7("removing", "a file");
+      return file6("removing", "a file");
     case "rmdir":
       return folder("removing", "a folder");
     case "mkdir":
       return folder("creating", "a folder");
     case "touch":
-      return file7("creating", "a file");
+      return file6("creating", "a file");
     case "cp":
-      return file7("copying", "a file");
+      return file6("copying", "a file");
     case "mv":
-      return file7("moving", "a file");
+      return file6("moving", "a file");
     case "cat":
     case "less":
     case "more":
     case "head":
     case "tail":
-      return file7("reading", "a file");
+      return file6("reading", "a file");
     case "cd":
       return folder("switching to", "a folder");
     case "ls":
@@ -3698,13 +3695,13 @@ function describeBash(cmd) {
   return word ? { tag: "running", target: `the ${word} command` } : { tag: "running", target: "a shell command" };
 }
 function rawTarget(tool, input) {
-  const file7 = str(input, "file_path") ?? str(input, "path");
+  const file6 = str(input, "file_path") ?? str(input, "path");
   switch (tool) {
     case "Read":
     case "Edit":
     case "MultiEdit":
     case "Write":
-      return file7;
+      return file6;
     case "Bash":
       return str(input, "command");
     case "Grep":
@@ -3714,8 +3711,8 @@ function rawTarget(tool, input) {
   return null;
 }
 function actionLabel(tool, input) {
-  const file7 = str(input, "file_path") ?? str(input, "path");
-  const named = (verb) => ({ tag: verb, target: file7 ? `the file ${basename(file7)}` : "a file" });
+  const file6 = str(input, "file_path") ?? str(input, "path");
+  const named = (verb) => ({ tag: verb, target: file6 ? `the file ${basename(file6)}` : "a file" });
   switch (tool) {
     case "Read":
       return named("reading");
@@ -4001,8 +3998,8 @@ function commandIntent(cmd) {
     if (/\btest\b/.test(tail)) {
       return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
     }
-    const file7 = (tail.trim().split(/\s+/).find((t) => !t.startsWith("-")) || "").split(/[\\/]/).pop();
-    if (file7) return intent(`the ${file7} script`, `Running ${file7}`, `Claude is running ${file7}.`);
+    const file6 = (tail.trim().split(/\s+/).find((t) => !t.startsWith("-")) || "").split(/[\\/]/).pop();
+    if (file6) return intent(`the ${file6} script`, `Running ${file6}`, `Claude is running ${file6}.`);
     return intent("a script", "Running a script", "Claude is running a script.");
   }
   if (word === "curl" || word === "wget") {
@@ -4437,7 +4434,6 @@ function buildCaption(chunk, mode, why) {
   const outcome = outcomeText(chunk);
   const evidence = chunk.count === 1 && chunk.raw ? chunk.raw : void 0;
   const caption = { stage: chunk.stage, title: d.title, simple: d.simple, outcome, evidence };
-  if (mode === "ask") return caption;
   if (mode === "simple") {
     if (clean) caption.simple = clean;
     return caption;
@@ -4610,10 +4606,6 @@ function readBudget(dir) {
     return null;
   }
 }
-function armBudget(dir, cap2) {
-  mkdirSync3(dir, { recursive: true });
-  writeFileSync3(file3(dir), JSON.stringify({ cap: cap2, spent: 0 }));
-}
 function clearBudget(dir) {
   rmSync(file3(dir), { force: true });
 }
@@ -4636,12 +4628,7 @@ function budgetLeftLabel(b) {
 }
 function budgetPausedMessage(b) {
   if (!b || b.spent < b.cap) return null;
-  return `Budget reached (${formatTokens(b.spent)} / ${formatTokens(b.cap)}). Auto-explaining paused - /codey:budget <n> to raise it, or /codey:explain for one on demand.`;
-}
-function budgetStatusLine(b) {
-  if (!b) return "No budget set. Codey explains as usual. Set one with /codey:budget <tokens>.";
-  const left = Math.max(0, b.cap - b.spent);
-  return `Budget: ${formatTokens(b.spent)} spent of ${formatTokens(b.cap)} (${formatTokens(left)} left).`;
+  return `Budget reached (${formatTokens(b.spent)} / ${formatTokens(b.cap)}). Auto-explaining paused.`;
 }
 
 // src/cli/narrate.ts
@@ -4813,48 +4800,6 @@ function buildRecap(events) {
 }
 
 // src/statusline/compose.ts
-var GROUP_WINDOW_MS = 2500;
-function shortName2(target) {
-  return target.replace(/^the (file|folder) /, "");
-}
-function groupNoun(tag) {
-  if (/read|edit|writ|remov|creat|mov|copy/.test(tag)) return "files";
-  if (/search|fetch/.test(tag)) return "searches";
-  return "steps";
-}
-function groupedTarget(tag, names) {
-  const head = names.slice(0, 2).join(", ");
-  const extra = names.length > 2 ? `, +${names.length - 2}` : "";
-  return `${names.length} ${groupNoun(tag)} (${head}${extra})`;
-}
-function cardsFromEvents(events) {
-  const built = [];
-  let seq = 0;
-  for (const e of events) {
-    if (e.phase !== "pre") continue;
-    seq++;
-    const action = actionLabel(e.tool, e.input);
-    const last = built[built.length - 1];
-    const close = last && e.timestamp - last.lastTs <= GROUP_WINDOW_MS;
-    if (last && close && last.action.tag === action.tag) {
-      last.names.push(shortName2(action.target));
-      last.lastTs = e.timestamp;
-      last.endSeq = seq;
-      last.ts = e.timestamp;
-      last.action = { tag: action.tag, target: groupedTarget(action.tag, last.names) };
-    } else {
-      built.push({
-        seq,
-        action,
-        raw: rawTarget(e.tool, e.input),
-        ts: e.timestamp,
-        names: [shortName2(action.target)],
-        lastTs: e.timestamp
-      });
-    }
-  }
-  return built.map(({ names, lastTs, ...card }) => card);
-}
 function pickSentence(caption, mode) {
   if (mode === "deep") return caption.deep ?? caption.simple;
   if (mode === "teach") return caption.teach ?? caption.deep ?? caption.simple;
@@ -4863,8 +4808,7 @@ function pickSentence(caption, mode) {
 var SENTENCE_BUDGET = {
   simple: { sentences: 1, chars: 120 },
   deep: { sentences: 2, chars: 200 },
-  teach: { sentences: 2, chars: 200 },
-  ask: { sentences: 1, chars: 120 }
+  teach: { sentences: 2, chars: 200 }
 };
 function splitSentences(text) {
   return text.trim().split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
@@ -4914,11 +4858,11 @@ function composeView(events, snap, now, whys = [], budget = null) {
   }
   const current = chunks[chunks.length - 1];
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
-  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
+  const ai = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
   const caption = buildCaption(current, snap.mode, ai);
   const plain = ai ? buildCaption(current, snap.mode, null) : caption;
   const sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
-  const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
+  const hint = paused;
   return {
     ...base,
     // The line-one chip leads with the purpose ("Adding math.js"), not the bare stage, so the
@@ -4942,8 +4886,7 @@ var RED = "\x1B[38;5;203m";
 var MODE_COLOR = {
   simple: "\x1B[38;5;75m",
   deep: "\x1B[38;5;141m",
-  teach: "\x1B[38;5;150m",
-  ask: "\x1B[38;5;180m"
+  teach: "\x1B[38;5;150m"
 };
 var WRAP = 120;
 function stageColor(state, mode) {
@@ -5025,8 +4968,8 @@ function eventSummary(e) {
     }
     return desc ?? "ran a command";
   }
-  const file7 = field(e.input, "file_path") ?? field(e.input, "path") ?? field(e.input, "notebook_path");
-  if (file7) return `${e.tool} ${basename3(file7)}`;
+  const file6 = field(e.input, "file_path") ?? field(e.input, "path") ?? field(e.input, "notebook_path");
+  if (file6) return `${e.tool} ${basename3(file6)}`;
   const pattern = field(e.input, "pattern");
   if (pattern) return `${e.tool} for ${pattern}`;
   return e.tool;
@@ -5081,10 +5024,10 @@ function cachePath(sessionId, root) {
   return join6(root, sessionId, "timeline.json");
 }
 function readCache(sessionId, root = defaultRoot()) {
-  const file7 = cachePath(sessionId, root);
-  if (!existsSync9(file7)) return null;
+  const file6 = cachePath(sessionId, root);
+  if (!existsSync9(file6)) return null;
   try {
-    return JSON.parse(readFileSync9(file7, "utf8"));
+    return JSON.parse(readFileSync9(file6, "utf8"));
   } catch {
     return null;
   }
@@ -5190,10 +5133,10 @@ import { writeFileSync as writeFileSync5, readFileSync as readFileSync11, mkdirS
 import { join as join8 } from "node:path";
 var NAME_FILE = "name.json";
 function readCustomName(dir) {
-  const file7 = join8(dir, NAME_FILE);
-  if (!existsSync11(file7)) return null;
+  const file6 = join8(dir, NAME_FILE);
+  if (!existsSync11(file6)) return null;
   try {
-    const parsed = JSON.parse(readFileSync11(file7, "utf8"));
+    const parsed = JSON.parse(readFileSync11(file6, "utf8"));
     const trimmed = String(parsed.name ?? "").trim();
     return trimmed.length > 0 ? trimmed : null;
   } catch {
@@ -5201,17 +5144,17 @@ function readCustomName(dir) {
   }
 }
 function writeCustomName(dir, name) {
-  const file7 = join8(dir, NAME_FILE);
+  const file6 = join8(dir, NAME_FILE);
   const trimmed = name.trim();
   if (!trimmed) {
     try {
-      rmSync2(file7, { force: true });
+      rmSync2(file6, { force: true });
     } catch {
     }
     return;
   }
   mkdirSync5(dir, { recursive: true });
-  writeFileSync5(file7, JSON.stringify({ name: trimmed }, null, 2));
+  writeFileSync5(file6, JSON.stringify({ name: trimmed }, null, 2));
 }
 
 // src/cli/sessions.ts
@@ -5303,7 +5246,7 @@ function readSessionMode(sessionDir) {
   const p = modeFile(sessionDir);
   if (!existsSync13(p)) return null;
   const raw = readFileSync12(p, "utf8").trim();
-  return raw === "simple" || raw === "deep" || raw === "teach" || raw === "ask" ? raw : null;
+  return raw === "simple" || raw === "deep" || raw === "teach" ? raw : null;
 }
 function anyActiveSession(root) {
   if (!existsSync13(root)) return false;
@@ -5639,15 +5582,15 @@ function thinkingSubtitle(text) {
 }
 function describeAction(tool, input, text) {
   if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
-  const file7 = fileFrom(input);
+  const file6 = fileFrom(input);
   switch (tool) {
     case "Write":
-      return file7 ? `Writing ${file7}` : "Writing a file";
+      return file6 ? `Writing ${file6}` : "Writing a file";
     case "Edit":
     case "MultiEdit":
-      return file7 ? `Editing ${file7}` : "Editing a file";
+      return file6 ? `Editing ${file6}` : "Editing a file";
     case "Read":
-      return file7 ? `Reading ${file7}` : "Reading a file";
+      return file6 ? `Reading ${file6}` : "Reading a file";
     case "Bash":
     case "PowerShell":
       return descFrom(input) ?? "Ran a command";
@@ -5663,8 +5606,8 @@ function describeAction(tool, input, text) {
 }
 function actionSubject(tool, input) {
   if (tool === "Grep" || tool === "Glob") return phrasePattern(patternFrom(input) ?? "");
-  const file7 = fileFrom(input);
-  if (file7) return humanFile(file7);
+  const file6 = fileFrom(input);
+  if (file6) return humanFile(file6);
   return humanFile(shortTarget(actionLabel(tool, input).target)) || "the code";
 }
 function actionTitle(tool, input, text) {
@@ -6481,9 +6424,9 @@ import { join as join16 } from "node:path";
 function interventionPath(sessionId, root = defaultRoot()) {
   return join16(root, sessionId, "intervene.json");
 }
-function writeInterventionFile(sessionId, file7, root = defaultRoot()) {
+function writeInterventionFile(sessionId, file6, root = defaultRoot()) {
   mkdirSync9(join16(root, sessionId), { recursive: true });
-  writeFileSync9(interventionPath(sessionId, root), JSON.stringify(file7));
+  writeFileSync9(interventionPath(sessionId, root), JSON.stringify(file6));
 }
 
 // src/intervene/record.ts
@@ -6814,227 +6757,12 @@ function turnOff(session) {
   if (!anyActiveSession(defaultRoot())) writeSettings(withoutStatusLine(readSettings()));
 }
 
-// src/cli/budget.ts
-import { join as join21 } from "node:path";
-function parseBudgetArg(raw) {
-  const s = (raw ?? "").trim().toLowerCase();
-  if (!s) return { kind: "report" };
-  if (s === "off" || s === "0") return { kind: "clear" };
-  const m = /^(\d{1,3}(?:,\d{3})*|\d+)(k)?$/.exec(s);
-  if (!m) return { kind: "invalid" };
-  const n = Number(m[1].replace(/,/g, "")) * (m[2] ? 1e3 : 1);
-  if (!Number.isFinite(n) || n <= 0) return { kind: "invalid" };
-  return { kind: "arm", cap: n };
-}
-function runBudget(raw) {
-  const session = latestSessionId();
-  if (!session) {
-    console.error("No Codey sessions found yet.");
-    process.exit(1);
-  }
-  const dir = join21(defaultRoot(), session);
-  const arg = parseBudgetArg(raw);
-  switch (arg.kind) {
-    case "report":
-      console.log(budgetStatusLine(readBudget(dir)));
-      return;
-    case "clear":
-      clearBudget(dir);
-      console.log("Budget cleared. Codey explains as usual.");
-      return;
-    case "arm":
-      armBudget(dir, arg.cap);
-      console.log(budgetStatusLine(readBudget(dir)));
-      return;
-    case "invalid":
-      console.log("Usage: /codey:budget <tokens>  (e.g. 5000 or 5k), or 'off' to clear.");
-      return;
-  }
-}
-
-// src/cli/explain.ts
-import { join as join23 } from "node:path";
-import { existsSync as existsSync22, readFileSync as readFileSync20 } from "node:fs";
-
-// src/narration/explain.ts
-var DEPTHS = ["simple", "deep", "teach"];
-function currentTurnStart(promptMarks) {
-  return promptMarks.length ? promptMarks[promptMarks.length - 1] : Number.NEGATIVE_INFINITY;
-}
-function eventsForCurrentTurn(events, turnStart) {
-  return events.filter((e) => e.timestamp >= turnStart);
-}
-function parseExplainArgs(tokens) {
-  let depth = "deep";
-  let task = null;
-  for (const t of tokens) {
-    const low = t.toLowerCase();
-    if (DEPTHS.includes(low)) depth = low;
-    else if (/^#?\d+$/.test(low)) {
-      const n = Number(low.replace("#", ""));
-      if (n >= 1) task = n;
-    }
-  }
-  return { depth, task };
-}
-function eventForTask(turnEvents, taskNumber) {
-  const pres = turnEvents.filter((e) => e.phase === "pre");
-  const card = cardsFromEvents(turnEvents).find((c) => {
-    const end2 = c.endSeq ?? c.seq;
-    return taskNumber >= c.seq && taskNumber <= end2;
-  });
-  if (!card) return [];
-  const end = card.endSeq ?? card.seq;
-  return pres.slice(card.seq - 1, end);
-}
-function summarizeEvent2(e) {
-  const input = JSON.stringify(e.input ?? null).slice(0, 200);
-  const status = e.phase === "post" ? e.isError ? " [ERROR]" : " [done]" : "";
-  return `- ${e.tool}${status} ${input}`;
-}
-function depthInstruction(depth) {
-  switch (depth) {
-    case "simple":
-      return "In one plain English sentence for a non-technical person, say what Claude did and why.";
-    case "teach":
-      return "In a few plain English sentences for someone learning to code, explain what Claude did and why, then briefly teach the key concept involved (define any technical term you use).";
-    default:
-      return "In a few plain English sentences for a non-technical person, explain what Claude did and why it matters.";
-  }
-}
-function buildExplainPrompt(events, priorPasses, depth = "deep") {
-  const lines = events.map(summarizeEvent2).join("\n");
-  const instruction2 = depthInstruction(depth);
-  if (priorPasses.length === 0) {
-    return `These are the actions an AI coding agent took for the current task:
-${lines}
-
-${instruction2} Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation.`;
-  }
-  const heard = priorPasses.map((p, i) => `${i + 1}. ${p}`).join("\n");
-  return `These are the actions an AI coding agent took for the current task:
-${lines}
-
-The user has already been told:
-${heard}
-
-Go one level deeper than that. Add new detail or a clearer mental model, and do not repeat what was already said. ${instruction2} Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation.`;
-}
-
-// src/narration/explain-log.ts
-import { appendFileSync as appendFileSync4, readFileSync as readFileSync19, existsSync as existsSync21 } from "node:fs";
-import { join as join22 } from "node:path";
-function file6(dir) {
-  return join22(dir, "explain.jsonl");
-}
-function appendPass(dir, scope, text) {
-  appendFileSync4(file6(dir), JSON.stringify({ scope, text }) + "\n");
-}
-function passesForScope(dir, scope) {
-  const p = file6(dir);
-  if (!existsSync21(p)) return [];
-  const out = [];
-  for (const line of readFileSync19(p, "utf8").split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      const o = JSON.parse(line);
-      if (o.scope === scope && typeof o.text === "string") out.push(o.text);
-    } catch {
-    }
-  }
-  return out;
-}
-
-// src/cli/explain.ts
-function readEvents2(dir) {
-  const p = join23(dir, "events.jsonl");
-  if (!existsSync22(p)) return [];
-  const out = [];
-  for (const line of readFileSync20(p, "utf8").split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      out.push(JSON.parse(line));
-    } catch {
-    }
-  }
-  return out;
-}
-async function runExplain2(args = []) {
-  const session = latestSessionId();
-  if (!session) {
-    console.error("No Codey sessions found yet.");
-    process.exit(1);
-  }
-  const dir = join23(defaultRoot(), session);
-  const { depth, task } = parseExplainArgs(args);
-  const start = currentTurnStart(readPrompts(dir));
-  const turnEvents = eventsForCurrentTurn(readEvents2(dir), start);
-  const turnKey = start === Number.NEGATIVE_INFINITY ? 0 : start;
-  let events = turnEvents;
-  let scope = String(turnKey);
-  if (task != null) {
-    events = eventForTask(turnEvents, task);
-    scope = `${turnKey}:t${task}`;
-    if (events.length === 0) {
-      console.log(`Task #${task} hasn't happened yet this turn.`);
-      return;
-    }
-  } else if (events.length === 0) {
-    console.log("Nothing to explain yet; Claude has not started working on this prompt.");
-    return;
-  }
-  const prior = passesForScope(dir, scope);
-  const prompt = buildExplainPrompt(events, prior, depth);
-  const result = await runClaudeMetered(prompt, 3e4);
-  if (!result) {
-    console.log("Could not reach Claude for an explanation just now. Try again in a moment.");
-    return;
-  }
-  addSpend(dir, result.tokens);
-  appendPass(dir, scope, result.text);
-  console.log(result.text);
-}
-
-// src/timeline/costs.ts
-function summarizeCosts(turns) {
-  const b = attributeChunk(turns, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
-  const lines = b.workLines.map((l) => ({ label: l.label, tokens: l.tokens, failed: l.status === "fail" }));
-  let priciest = null;
-  let max = -1;
-  for (const l of b.workLines) {
-    if (l.status === "none") continue;
-    if (l.tokens > max) {
-      max = l.tokens;
-      priciest = l.label;
-    }
-  }
-  return { lines, total: b.workTotal, priciest };
-}
-function renderCosts(s) {
-  if (s.lines.length === 0) return "No tasks recorded yet.";
-  const rows = s.lines.map((l) => `  ${String(l.tokens).padStart(6)}  ${l.label}${l.failed ? " (failed)" : ""}`);
-  const tail = [`  Total: ${s.total} tokens`];
-  if (s.priciest) tail.push(`  Priciest: ${s.priciest}`);
-  return ["Token cost by task (work output tokens):", ...rows, "", ...tail].join("\n");
-}
-
-// src/cli/costs.ts
-function runCosts() {
-  const session = latestSessionId();
-  if (!session) {
-    console.error("No Codey sessions found yet.");
-    process.exit(1);
-  }
-  const turns = readTranscriptTurns(readMeta(session)?.transcriptPath ?? null);
-  console.log(renderCosts(summarizeCosts(turns)));
-}
-
 // src/cli/timeline.ts
 import { spawn as spawn2 } from "node:child_process";
 import { connect } from "node:net";
 import { get as httpGet } from "node:http";
-import { readFileSync as readFileSync21, writeFileSync as writeFileSync11, existsSync as existsSync23 } from "node:fs";
-import { join as join24 } from "node:path";
+import { readFileSync as readFileSync19, writeFileSync as writeFileSync11, existsSync as existsSync21 } from "node:fs";
+import { join as join21 } from "node:path";
 var DEFAULT_PORT = 4317;
 function timelineDecision(lock, currentBuild, probe) {
   if (!lock) return { action: "spawn", port: DEFAULT_PORT };
@@ -7044,13 +6772,13 @@ function timelineDecision(lock, currentBuild, probe) {
   return { action: "replace", port: lock.port, pid: lock.pid };
 }
 function lockPath(root) {
-  return join24(root, "serve.lock");
+  return join21(root, "serve.lock");
 }
 function readLock(root) {
   const p = lockPath(root);
-  if (!existsSync23(p)) return null;
+  if (!existsSync21(p)) return null;
   try {
-    const o = JSON.parse(readFileSync21(p, "utf8"));
+    const o = JSON.parse(readFileSync19(p, "utf8"));
     if (typeof o.port === "number" && typeof o.pid === "number") {
       return { port: o.port, pid: o.pid, build: typeof o.build === "string" ? o.build : "" };
     }
@@ -7159,18 +6887,18 @@ async function runTimeline() {
 }
 
 // src/cli/index.ts
-import { join as join25 } from "node:path";
+import { join as join22 } from "node:path";
 function parseMode(m) {
-  return ["simple", "deep", "teach", "ask"].includes(m) ? m : "simple";
+  return ["simple", "deep", "teach"].includes(m) ? m : "simple";
 }
 function resolveWatchMode(opt, session) {
   if (opt) return parseMode(opt);
-  const snap = readStatus(join25(defaultRoot(), session));
+  const snap = readStatus(join22(defaultRoot(), session));
   return snap?.mode ?? "simple";
 }
 var program2 = new Command();
 program2.name("codey").description("Live legibility for Claude Code");
-program2.command("watch").description("Watch the current Claude Code session and narrate what it's doing").option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask (defaults to the session's mode)").option("-s, --session <id>", "session id to watch (defaults to most recent)").action((opts) => {
+program2.command("watch").description("Watch the current Claude Code session and narrate what it's doing").option("-m, --mode <mode>", "narration depth: simple | deep | teach (defaults to the session's mode)").option("-s, --session <id>", "session id to watch (defaults to most recent)").action((opts) => {
   const session = opts.session ?? latestSessionId();
   if (!session) {
     console.error("No Codey sessions found yet. Start a Claude Code session with the plugin enabled, then run `codey watch`.");
@@ -7189,7 +6917,7 @@ program2.command("feed").description("Scrollable terminal view of every task and
   }
   runFeed(session);
 });
-program2.command("narrate").description("Background narrator that feeds the status line").option("-m, --mode <mode>", "narration depth: simple | deep | teach | ask", "simple").option("-s, --session <id>", "session id (defaults to most recent)").action((opts) => {
+program2.command("narrate").description("Background narrator that feeds the status line").option("-m, --mode <mode>", "narration depth: simple | deep | teach", "simple").option("-s, --session <id>", "session id (defaults to most recent)").action((opts) => {
   const mode = parseMode(opts.mode);
   const session = opts.session ?? latestSessionId();
   if (!session) {
@@ -7199,7 +6927,7 @@ program2.command("narrate").description("Background narrator that feeds the stat
   runNarrate(session, mode);
 });
 program2.command("statusline").description("Print the Codey status line (called by Claude Code)").action(() => runStatusLine());
-program2.command("on").description("Turn narration on in the status line").option("-m, --mode <mode>", "simple | deep | teach | ask", "simple").action((opts) => {
+program2.command("on").description("Turn narration on in the status line").option("-m, --mode <mode>", "simple | deep | teach", "simple").action((opts) => {
   const mode = parseMode(opts.mode);
   const session = latestSessionId();
   if (!session) {
@@ -7211,11 +6939,6 @@ program2.command("on").description("Turn narration on in the status line").optio
   console.log("For the full scrollable task history, run this in a new terminal:");
   console.log(`  node "${process.argv[1]}" feed`);
 });
-program2.command("explain").description("Explain the most recent task in depth; run again to go deeper").argument("[args...]", "optional depth (simple | deep | teach) and/or a task number").action((args) => {
-  void runExplain2(args);
-});
-program2.command("budget").description("Set or report the token budget for automatic narration").argument("[amount]", "token allowance (e.g. 5000 or 5k), 'off' to clear, omit to report").action((amount) => runBudget(amount));
-program2.command("costs").description("Show the token cost of each task in this session").action(() => runCosts());
 program2.command("timeline").description("Open the browser timeline for this session, reusing a running one").action(() => {
   void runTimeline();
 });

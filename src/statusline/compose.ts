@@ -85,7 +85,6 @@ const SENTENCE_BUDGET: Record<Mode, { sentences: number; chars: number }> = {
   simple: { sentences: 1, chars: 120 },
   deep: { sentences: 2, chars: 200 },
   teach: { sentences: 2, chars: 200 },
-  ask: { sentences: 1, chars: 120 },
 };
 
 // Split on sentence ends, keeping the punctuation, so each piece is a whole thought.
@@ -177,18 +176,18 @@ export function composeView(
   // The current phase is simply the latest chunk: it stays put until the stage changes, so the
   // line holds a meaningful caption instead of flickering once per tool call.
   const current = chunks[chunks.length - 1];
-  // In ask mode nothing is narrated automatically; when the budget is spent we stop too. In
-  // both cases the caption falls back to its free deterministic wording. The why history is
-  // scoped to the current turn so a leftover explanation from the previous prompt never shows
-  // under this turn's stage: the explanation always matches the work on screen.
+  // When the budget is spent we stop narrating and the caption falls back to its free
+  // deterministic wording. The why history is scoped to the current turn so a leftover
+  // explanation from the previous prompt never shows under this turn's stage: the
+  // explanation always matches the work on screen.
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
-  const ai = snap.mode === "ask" || paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
+  const ai = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
   const caption = buildCaption(current, snap.mode, ai);
   // The deterministic caption is the fallback when the AI sentence is too long to show whole,
   // so the line always ends on a complete thought.
   const plain = ai ? buildCaption(current, snap.mode, null) : caption;
   const sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
-  const hint = snap.mode === "ask" ? "/codey:explain for the why" : paused;
+  const hint = paused;
 
   return {
     ...base,

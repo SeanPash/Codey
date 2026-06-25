@@ -32,9 +32,9 @@ export interface ExplainDeps {
 }
 
 // Map a session's narration mode to the timeline's opening depth and whether it should
-// auto-generate summaries. deep and teach are spend-friendly, so they open in Auto; simple,
-// ask, and off stay frugal (Token-saver: nothing generates until the user clicks).
-export function timelineDefaults(mode: "simple" | "deep" | "teach" | "ask" | null): { seedDepth: ExplainDepth; genAuto: boolean } {
+// auto-generate summaries. deep and teach are spend-friendly, so they open in Auto; simple
+// and off stay frugal (Token-saver: nothing generates until the user clicks).
+export function timelineDefaults(mode: "simple" | "deep" | "teach" | null): { seedDepth: ExplainDepth; genAuto: boolean } {
   switch (mode) {
     case "simple": return { seedDepth: "simple", genAuto: false };
     case "teach": return { seedDepth: "teach", genAuto: true };

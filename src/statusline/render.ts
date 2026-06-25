@@ -15,7 +15,6 @@ const MODE_COLOR: Record<Mode, string> = {
   simple: "\x1b[38;5;75m",
   deep: "\x1b[38;5;141m",
   teach: "\x1b[38;5;150m",
-  ask: "\x1b[38;5;180m",
 };
 
 const WRAP = 120;

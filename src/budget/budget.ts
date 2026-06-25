@@ -56,11 +56,11 @@ export function budgetLeftLabel(b: Budget | null): string | null {
 
 export function budgetPausedMessage(b: Budget | null): string | null {
   if (!b || b.spent < b.cap) return null;
-  return `Budget reached (${formatTokens(b.spent)} / ${formatTokens(b.cap)}). Auto-explaining paused - /codey:budget <n> to raise it, or /codey:explain for one on demand.`;
+  return `Budget reached (${formatTokens(b.spent)} / ${formatTokens(b.cap)}). Auto-explaining paused.`;
 }
 
 export function budgetStatusLine(b: Budget | null): string {
-  if (!b) return "No budget set. Codey explains as usual. Set one with /codey:budget <tokens>.";
+  if (!b) return "No budget set. Codey explains as usual.";
   const left = Math.max(0, b.cap - b.spent);
   return `Budget: ${formatTokens(b.spent)} spent of ${formatTokens(b.cap)} (${formatTokens(left)} left).`;
 }

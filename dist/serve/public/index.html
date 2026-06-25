@@ -828,7 +828,7 @@
       const cached = explCache.get(key);
       if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(activeDepth())}</span></div><div class="etext">${esc(cached)}</div></div>`;
       if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(activeDepth())} depth…</span></div>`;
-      if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining. Raise it with <b>/codey:budget &lt;n&gt;</b> in your terminal, then try again.</div>`;
+      if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining.</div>`;
       return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#9670;</span> Explain this task</button>`
         + `<div class="genhint">Generates a ${esc(activeDepth())} explanation. Uses your Codey tokens.</div></div>`;
     }
@@ -840,7 +840,7 @@
       if (cached) return `<div class="recap"><div class="rt"><span class="ic">&#9670;</span> What Claude got done</div><div class="rx">${esc(cached)}</div></div>`;
       if (explLoading.has(key)) return `<div class="recap"><span class="gening"><span class="spin"></span>Summarizing this prompt…</span></div>`;
       if (g.live) return `<div class="recap"><span class="pend">A recap appears here once Claude finishes this prompt.</span></div>`;
-      if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached. Raise it with /codey:budget, then summarize.</span></div>`;
+      if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached, so Codey paused explaining.</span></div>`;
       return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
         + `<div class="genhint">Generates a ${esc(activeDepth())} recap. Uses your Codey tokens.</div></div>`;
     }
@@ -1024,7 +1024,7 @@
       const cached = explCache.get(key);
       if (cached) return `<div class="expls">${explainSections(cached)}</div>`;
       if (explLoading.has(key)) return `<div class="expls"><span class="gening"><span class="spin"></span>Explaining at ${esc(activeDepth())} depth…</span></div>`;
-      if (budgetPaused) return `<div class="expls paused">Budget reached, so Codey paused explaining. Raise it with <b>/codey:budget</b>, then try again.</div>`;
+      if (budgetPaused) return `<div class="expls paused">Budget reached, so Codey paused explaining.</div>`;
       return "";
     }
 

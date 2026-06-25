@@ -30,9 +30,3 @@ describe("teach pacing", () => {
     expect(shouldNarrate("teach", { newEvents: 1, msSinceLast: 1000 })).toBe(false);
   });
 });
-
-describe("ask suppresses auto narration", () => {
-  it("never narrates in ask mode, however many events", () => {
-    expect(shouldNarrate("ask", { newEvents: 1000, msSinceLast: 1_000_000 })).toBe(false);
-  });
-});
