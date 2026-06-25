@@ -25,7 +25,7 @@ Then install the plugin:
 /plugin install codey@codey
 ```
 
-Restart your session so the hooks load, then run `/codey:deep` to turn narration on. Codey ships prebuilt, so there is no build step.
+Restart your session so the hooks load, then run `/codey:timeline` to open the browser story, or `/codey:deep` (or any mode) to turn on terminal narration. Codey ships prebuilt, so there is no build step.
 
 That's it. It uses the Claude Code login you already have. No API keys. No accounts. No setup.
 
