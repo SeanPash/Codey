@@ -49,15 +49,25 @@ export function runNarrate(sessionId: string, mode: Mode): void {
   const state = createWatchState(mode, narrate);
   patchStatus(store.dir, { mode });
 
+  // A narration pass can take seconds (it shells out to claude). Without this guard a burst of
+  // file changes would fire overlapping ticks that each spawn their own claude before the
+  // throttle state is updated, multiplying processes and overshooting the budget.
+  let inFlight = false;
   const tick = async () => {
+    if (inFlight) return;
     if (!existsSync(store.path)) return;
-    const events: ToolEvent[] = [];
-    for (const line of readFileSync(store.path, "utf8").split("\n")) {
-      if (!line.trim()) continue;
-      try { events.push(JSON.parse(line) as ToolEvent); } catch { /* partial line */ }
+    inFlight = true;
+    try {
+      const events: ToolEvent[] = [];
+      for (const line of readFileSync(store.path, "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        try { events.push(JSON.parse(line) as ToolEvent); } catch { /* partial line */ }
+      }
+      const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
+      await narrateTick(store.dir, reconcileErrors(events, turns), state, Date.now());
+    } finally {
+      inFlight = false;
     }
-    const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
-    await narrateTick(store.dir, reconcileErrors(events, turns), state, Date.now());
   };
 
   watchFile(store.path, { interval: 1000 }, () => { void tick(); });

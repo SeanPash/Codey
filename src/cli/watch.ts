@@ -82,21 +82,30 @@ export function runWatch(sessionId: string, mode: Mode): void {
   console.log(renderHeader(mode));
   console.log(`(session: ${sessionId})`);
 
+  // Skip a tick while the previous one is still narrating, so a burst of file changes cannot
+  // start overlapping claude passes before the throttle state has caught up.
+  let inFlight = false;
   const tick = async () => {
+    if (inFlight) return;
     if (!existsSync(store.path)) return;
-    const events: ToolEvent[] = [];
-    for (const line of readFileSync(store.path, "utf8").split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        events.push(JSON.parse(line) as ToolEvent);
-      } catch {
-        // Skip a partial or malformed line (e.g. read while the hook is mid-write).
+    inFlight = true;
+    try {
+      const events: ToolEvent[] = [];
+      for (const line of readFileSync(store.path, "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          events.push(JSON.parse(line) as ToolEvent);
+        } catch {
+          // Skip a partial or malformed line (e.g. read while the hook is mid-write).
+        }
       }
+      // Errored tools never produce a PostToolUse, so fold their outcome in from the transcript.
+      const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
+      const result = await processTick(reconcileErrors(events, turns), state, Date.now());
+      for (const line of result.lines) console.log(line);
+    } finally {
+      inFlight = false;
     }
-    // Errored tools never produce a PostToolUse, so fold their outcome in from the transcript.
-    const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
-    const result = await processTick(reconcileErrors(events, turns), state, Date.now());
-    for (const line of result.lines) console.log(line);
   };
 
   watchFile(store.path, { interval: 1000 }, () => { void tick(); });
