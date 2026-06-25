@@ -4,7 +4,7 @@
 
 ### See what Claude is doing, and why.
 
-Codey is a plugin for Claude Code. It turns every session into a visual story in your browser, a timeline where you can scroll through every task Claude did and follow along live as it happens. And while you work, a quiet line at the bottom of your terminal narrates each step in plain English, so you always know what Claude is doing and why.
+Codey is a plugin for Claude Code. It turns every session into a visual story in your browser, a timeline where you can scroll through every task Claude did and follow along live as it happens. And while you work, a quiet line at the bottom of your terminal narrates each step in plain English, so you always know what Claude is doing and why. Want the exact reasoning behind a single step? Click it for a full explanation, or ask for a recap of a whole task.
 
 </div>
 
@@ -44,8 +44,6 @@ Codey closes that gap. It reads the tool-call stream Claude Code already produce
 `/codey:timeline` opens a local browser page that lays out the whole session as a visual storyboard. The run unfolds as a sequence of readable steps grouped by the prompt that started them, with failures and warnings flagged right where they happened. A live strip at the top shows what Claude is doing this very moment, and Follow Live keeps the page pinned to the latest step, so the browser stays in sync with your terminal in real time.
 
 Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you curious, there's an **Explain this step** button right on it, and a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
-
-> **The timeline is free.** It reads a local log of what already happened, so scrolling the full story of any session, including past ones, costs zero tokens. You only spend when you click to explain a step.
 
 <!-- SCREENSHOT NEEDED: the browser timeline with the live now-strip, Follow Live, per-task storyboard, and stats -->
 ![Codey timeline](assets/timeline.png)
@@ -109,6 +107,16 @@ It's the difference between juggling several silent terminals and watching all o
 - Understanding token usage
 - Following autonomous coding sessions
 
+## Token costs
+
+Codey is built to stay cheap, and most of it costs nothing at all.
+
+- **The timeline is free.** It reads a local log of what already happened, so scrolling the full story of any session, including past ones, costs zero tokens. The stuck detectors are free too, since they are plain checks with no model behind them.
+- **Narration runs on the cheapest model**, in short bursts throttled by mode. `simple` is near-zero, while `deep` and `teach` spend a little more to explain the why.
+- **Explanations are on demand.** Clicking to explain a step, or recapping a whole task, is the only time the timeline spends anything, and only on the step you picked.
+
+It all runs on the Claude plan you already have, so there is no separate bill to worry about.
+
 ## Your machine, and only your machine
 
 Codey runs entirely on your computer. There are no API keys to paste, no account to create, and nothing it phones home to.
@@ -131,7 +139,7 @@ The three narration modes are really one knob: how many tokens you spend to unde
 
 ## Found a bug?
 
-Open an issue on the [GitHub issue tracker](https://github.com/SeanPash/Codey/issues). A quick note on what you were doing, what you expected, and what actually happened goes a long way. Codey is young, so reports genuinely help.
+Open an issue on the [GitHub issue tracker](https://github.com/SeanPash/Codey/issues). A quick note on what you were doing, what you expected, and what actually happened goes a long way. Codey is new, so reports genuinely help.
 
 ## Working on Codey
 
