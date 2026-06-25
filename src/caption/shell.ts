@@ -1,3 +1,5 @@
+import { clampWords, tidySubject } from "./sanitize.js";
+
 // Shell intent: turn a raw command into a human purpose, not a tool category. Codey should
 // say what Claude is trying to accomplish ("checking the installed plugin config"), never
 // what program it happened to invoke ("running a few shell commands"). This stays strictly
@@ -174,7 +176,9 @@ function commandIntent(cmd: string): ShellIntent | null {
   return null;
 }
 
-// Words at the start of Claude's description that read better as a gerund in our sentence.
+// Words at the start of Claude's description that read better as a specific gerund than the plain
+// "-ing" form would ("show" -> "checking", not "showing"). Anything not listed is turned into a
+// gerund by the regular English rules in gerundize().
 const GERUND: Record<string, string> = {
   show: "checking", display: "checking", find: "checking", check: "checking", verify: "verifying",
   list: "listing", run: "running", build: "building", rebuild: "rebuilding", create: "creating",
@@ -183,29 +187,55 @@ const GERUND: Record<string, string> = {
   start: "starting", stop: "stopping", open: "opening", count: "counting", print: "printing",
 };
 
+// Turn an imperative verb into its gerund by the regular rules, so an unrecognised description
+// verb ("locate", "ensure") still reads as a purpose ("locating", "ensuring") instead of staying a
+// capitalised verb stranded in the middle of a sentence.
+function gerundize(word: string): string {
+  const w = word.toLowerCase();
+  if (/[^aeiou]e$/.test(w)) return w.slice(0, -1) + "ing"; // locate -> locating, make -> making
+  if (/^[a-z]*[aeiou][^aeiouwxy]$/.test(w) && w.length <= 4) return w + w.slice(-1) + "ing"; // set -> setting
+  return w + "ing"; // check -> checking, build -> building
+}
+
 // A description Claude rarely means literally; too vague to prefer over the command itself.
 function descriptionIsVague(desc: string): boolean {
   const d = desc.trim().toLowerCase();
   return d.length < 6 || /^(run|running)\s+(a\s+)?(command|script)\b/.test(d) || d === "command";
 }
 
+// Drop a leading article or question word so a clamped subject reads as a plain noun
+// ("which Codey plugin copy" -> "Codey plugin copy").
+function nounStart(phrase: string): string {
+  return phrase.replace(/^(which|the|a|an|that|this|some|whether)\s+/i, "");
+}
+
 // Build an intent from Claude's own one-line description, which is already plain active voice.
+// The sentence keeps the full description (it is Claude's own words), but the title and subject are
+// clamped to short purpose phrases so a parent caption that folds them in never sprawls into a
+// debug dump.
 function descriptionIntent(desc: string): ShellIntent {
   const clean = desc.trim().replace(/[.]+$/, "");
-  const title = clean.charAt(0).toUpperCase() + clean.slice(1);
+  // Claude's command descriptions are imperative ("Locate the cache copy", "Run the tests"), so the
+  // first word is the action verb. Stripping it for the subject and turning it into a gerund keeps
+  // the verb out of the noun phrase, which is what stops "Locate cache copy" reading as a subject.
   const m = /^([A-Za-z]+)\b\s*(.*)$/.exec(clean);
-  if (m && GERUND[m[1].toLowerCase()]) {
-    const verb = GERUND[m[1].toLowerCase()];
+  if (m) {
+    const verb = GERUND[m[1].toLowerCase()] ?? gerundize(m[1]);
+    const Verb = verb.charAt(0).toUpperCase() + verb.slice(1);
     const tail = m[2].trim();
     const sentence = tail ? `Claude is ${verb} ${tail}.` : `Claude is ${verb} something.`;
+    // A tidy purpose label, not the whole description echoed back as a heading.
+    const title = tail ? `${Verb} ${clampWords(nounStart(tail), 4)}` : `${Verb} this step`;
+    const subject = tidySubject(nounStart(tail), 4) || "the result";
     // The deep line keeps the description's own subject but reframes the verb as a purpose, so it
     // never reads as the title repeated back. The teach line adds the shell concept on top.
     const deep = `${stem(sentence)} to confirm the result before moving on.`;
-    return intent(tail || clean, title, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
+    return intent(subject, title, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
   }
-  // Unknown leading verb: keep the description as a faithful sentence rather than guessing.
+  // No leading word to read as a verb: keep the description as a faithful sentence rather than guessing.
   const fallback = `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
-  return intent(clean, title, fallback);
+  const title = clampWords(clean.charAt(0).toUpperCase() + clean.slice(1), 5);
+  return intent(tidySubject(nounStart(clean)) || clean, title, fallback);
 }
 
 // The one entry point. Description first (it is Claude's own intent), then the command's obvious

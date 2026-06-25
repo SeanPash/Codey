@@ -4,6 +4,7 @@ import type { WorkChunk } from "./chunks.js";
 import type { Stage } from "./stage.js";
 import { humanFile, phrasePattern, phraseSearch, purposeTitle, joinNames } from "./subject.js";
 import { describeShellIntent } from "./shell.js";
+import { stripEllipsis, looksLikeEvidenceDump, tidySubject } from "./sanitize.js";
 
 // The one caption shape every surface renders from. `simple` is always a complete sentence;
 // `deep` and `teach` layer on more only when the mode asks for them. The optional fields are
@@ -26,16 +27,18 @@ interface Described {
 }
 
 // The best short subject for this chunk: a search pattern phrased plainly, otherwise the
-// humanized name of the first thing touched.
+// humanized name of the first thing touched. A shell-derived subject is tidied so a long
+// description never leaks into the sentence as a raw phrase.
 function subjectOf(chunk: WorkChunk): string {
   if (chunk.tool === "Grep" || chunk.tool === "Glob") return phrasePattern(chunk.raw ?? "");
-  return humanFile(chunk.targets[0] ?? "") || "the code";
+  return tidySubject(humanFile(chunk.targets[0] ?? "")) || "the code";
 }
 
-// The files this chunk touched, named the way a person would say them. Falls back to a plain
-// phrase only when there is genuinely nothing to name.
+// The files this chunk touched, named the way a person would say them. Each name is tidied so a
+// shell description folded into a target stays a short noun, never a sprawling list item. Falls
+// back to a plain phrase only when there is genuinely nothing to name.
 function namedTargets(chunk: WorkChunk): string {
-  return joinNames(chunk.targets.map(humanFile)) || "the code";
+  return joinNames(chunk.targets.map((t) => tidySubject(humanFile(t)))) || "the code";
 }
 
 // What the chunk searched for, phrased plainly: "token breakdown, active terminal, and saver".
@@ -238,11 +241,21 @@ function outcomeText(chunk: WorkChunk): string | undefined {
 // to free deterministic labels until the user pulls an explanation on demand.
 export function buildCaption(chunk: WorkChunk, mode: Mode, why?: string | null): LiveCaption {
   const d = describe(chunk);
-  const clean = why ? stripDashes(why) : null;
+  // A generated why is only used when it reads as a phrased thought. One that comes back as a raw
+  // command or a long comma list of internals is rejected here, so deep and teach fall back to the
+  // clean deterministic line instead of printing a debug dump on the status line.
+  const cleaned = why ? stripEllipsis(stripDashes(why)) : null;
+  const clean = cleaned && !looksLikeEvidenceDump(cleaned) ? cleaned : null;
   const outcome = outcomeText(chunk);
   const evidence = chunk.count === 1 && chunk.raw ? chunk.raw : undefined;
 
-  const caption: LiveCaption = { stage: chunk.stage, title: d.title, simple: d.simple, outcome, evidence };
+  const caption: LiveCaption = {
+    stage: chunk.stage,
+    title: d.title,
+    simple: stripEllipsis(d.simple),
+    outcome,
+    evidence,
+  };
 
   if (mode === "simple") {
     if (clean) caption.simple = clean;
@@ -250,12 +263,12 @@ export function buildCaption(chunk: WorkChunk, mode: Mode, why?: string | null):
   }
 
   if (mode === "deep") {
-    caption.deep = clean ?? d.deep;
+    caption.deep = clean ?? stripEllipsis(d.deep);
     return caption;
   }
 
   // teach
-  caption.deep = d.deep;
-  caption.teach = clean ?? d.teach;
+  caption.deep = stripEllipsis(d.deep);
+  caption.teach = clean ?? stripEllipsis(d.teach);
   return caption;
 }

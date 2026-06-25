@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildCaption } from "./caption.js";
 import { hasBannedPhrase } from "./banned.js";
+import { looksLikeEvidenceDump } from "./sanitize.js";
 import type { WorkChunk } from "./chunks.js";
 
 const chunk = (over: Partial<WorkChunk> = {}): WorkChunk => ({
@@ -213,5 +214,79 @@ describe("buildCaption", () => {
         if (v) expect(v).not.toMatch(NO_DASH);
       }
     }
+  });
+
+  // The statusline rules: deep is richer than simple but never a debug dump, teach adds a concept,
+  // no sentence trails off with an ellipsis, and titles are purpose labels not bare filenames.
+  describe("statusline reads as clean English, never a debug dump", () => {
+    // A messy mixed run: several shell steps whose long descriptions became targets, plus searches.
+    // This is the shape that used to concatenate into one sprawling "searching X, Y, Z, and ..." line.
+    const messy = chunk({
+      stage: "inspecting",
+      tool: "Grep",
+      count: 5,
+      searches: ["token breakdown", "tokenBreakdown"],
+      targets: [
+        "cache copy index.html and serve static dir",
+        "breakdown row markup in the running cache copy",
+        "codey runtime state and serve sources",
+      ],
+    });
+
+    it("deep does not dump a raw evidence list", () => {
+      const deep = buildCaption(messy, "deep").deep!;
+      expect(looksLikeEvidenceDump(deep)).toBe(false);
+      expect(deep).not.toMatch(/\$\(|\| head|~\//);
+    });
+
+    it("deep is richer than simple but still concise", () => {
+      const simple = buildCaption(messy, "simple").simple;
+      const deep = buildCaption(messy, "deep").deep!;
+      expect(deep).not.toBe(simple);
+      expect(deep.length).toBeGreaterThan(simple.length);
+      expect(deep.length).toBeLessThan(240);
+    });
+
+    it("teach adds a concept sentence on top of deep, not a paragraph", () => {
+      const deep = buildCaption(messy, "deep").deep!;
+      const teach = buildCaption(messy, "teach").teach!;
+      expect(teach.length).toBeGreaterThan(deep.length);
+      // One extra sentence (the concept), not three.
+      const sentences = teach.split(/(?<=[.!?])\s+/).filter(Boolean);
+      expect(sentences.length).toBeGreaterThanOrEqual(2);
+      expect(sentences.length).toBeLessThanOrEqual(3);
+    });
+
+    it("rejects a generated why that comes back as a raw command and falls back to deterministic", () => {
+      const dumpWhy = "Claude is running d=$(ls -td ~/.codey/sessions/* | head -1) to find the active session.";
+      const c = buildCaption(chunk({ stage: "inspecting" }), "deep", dumpWhy);
+      expect(c.deep).not.toBe(dumpWhy);
+      expect(looksLikeEvidenceDump(c.deep!)).toBe(false);
+    });
+
+    it("never ends a sentence with an ellipsis, even when the why trails off", () => {
+      const trailing = "Claude is comparing the served page with the source to find the bug…";
+      for (const mode of ["simple", "deep", "teach"] as const) {
+        const c = buildCaption(chunk(), mode, trailing);
+        for (const v of [c.simple, c.deep, c.teach]) {
+          if (v) expect(v).not.toMatch(/(\.{3,}|…)$/);
+        }
+      }
+    });
+
+    it("titles are purpose labels with a verb, not a bare filename", () => {
+      const shapes: Partial<WorkChunk>[] = [
+        { stage: "inspecting", count: 1, targets: ["index.html"] },
+        { stage: "editing", tool: "Edit", targets: ["render.ts"] },
+        { stage: "inspecting", tool: "Grep", searches: ["token breakdown"], targets: ["index.html"] },
+      ];
+      for (const s of shapes) {
+        const title = buildCaption(chunk(s), "deep").title;
+        // Starts with a capitalized verb word, and is not just the filename echoed back.
+        expect(title).toMatch(/^[A-Z][a-z]+ing\b/);
+        expect(title).not.toBe("index.html");
+        expect(title).not.toBe("render.ts");
+      }
+    });
   });
 });
