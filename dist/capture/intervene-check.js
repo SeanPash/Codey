@@ -34,12 +34,16 @@ function deleteInterventionFile(sessionId, root = defaultRoot()) {
 }
 
 // src/intervene/messages.ts
-function blockReason(action, tool, count) {
+function stuckPhrase(kind, tool, count) {
+  return kind === "hang" ? `have been stuck on the same ${tool} step for about ${count}s` : `have repeated the same ${tool} step ${count} times without making progress`;
+}
+function blockReason(action, kind, tool, count) {
+  const stuck = stuckPhrase(kind, tool, count);
   switch (action) {
     case "nudge":
-      return `You've repeated this same step ${count} times without making progress. Stop retrying it and move on to the next part of the task. If this step genuinely can't be completed, say so plainly and continue with what you can.`;
+      return `You ${stuck}. Stop retrying it and move on to the next part of the task. If this step genuinely can't be completed, say so plainly and continue with what you can.`;
     case "different":
-      return `This approach has failed ${count} times. The current method isn't working, so stop and switch to a clearly different strategy instead of repeating variations of the same one.`;
+      return `The current method isn't working: you ${stuck}. Stop and switch to a clearly different strategy instead of repeating variations of the same one.`;
     case "stop":
       return `The user wants to step in. Stop here, briefly summarize what you were trying to do and where you got stuck, then ask the user how they'd like to proceed before taking any more actions.`;
   }
@@ -51,7 +55,7 @@ function decideIntervention(file, toolName, now) {
   if (!file) return null;
   if (now - file.createdAt > TTL_MS) return { block: false, consume: true };
   if (file.tool !== toolName) return null;
-  return { block: true, reason: blockReason(file.action, file.tool, file.count), consume: true };
+  return { block: true, reason: blockReason(file.action, file.kind, file.tool, file.count), consume: true };
 }
 
 // src/capture/intervene-check.ts

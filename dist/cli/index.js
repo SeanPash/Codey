@@ -4536,19 +4536,26 @@ function runWatch(sessionId, mode) {
   const state = createWatchState(mode, (p) => runClaude(p));
   console.log(renderHeader(mode));
   console.log(`(session: ${sessionId})`);
+  let inFlight = false;
   const tick = async () => {
+    if (inFlight) return;
     if (!existsSync4(store.path)) return;
-    const events = [];
-    for (const line of readFileSync4(store.path, "utf8").split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        events.push(JSON.parse(line));
-      } catch {
+    inFlight = true;
+    try {
+      const events = [];
+      for (const line of readFileSync4(store.path, "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          events.push(JSON.parse(line));
+        } catch {
+        }
       }
+      const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
+      const result = await processTick(reconcileErrors(events, turns), state, Date.now());
+      for (const line of result.lines) console.log(line);
+    } finally {
+      inFlight = false;
     }
-    const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
-    const result = await processTick(reconcileErrors(events, turns), state, Date.now());
-    for (const line of result.lines) console.log(line);
   };
   watchFile(store.path, { interval: 1e3 }, () => {
     void tick();
@@ -4589,7 +4596,10 @@ function file2(dir) {
   return join4(dir, "narration.jsonl");
 }
 function appendWhy(dir, entry) {
-  appendFileSync2(file2(dir), JSON.stringify(entry) + "\n");
+  try {
+    appendFileSync2(file2(dir), JSON.stringify(entry) + "\n");
+  } catch {
+  }
 }
 function readWhys(dir) {
   const p = file2(dir);
@@ -4707,18 +4717,25 @@ function runNarrate(sessionId, mode) {
   );
   const state = createWatchState(mode, narrate);
   patchStatus(store.dir, { mode });
+  let inFlight = false;
   const tick = async () => {
+    if (inFlight) return;
     if (!existsSync8(store.path)) return;
-    const events = [];
-    for (const line of readFileSync8(store.path, "utf8").split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        events.push(JSON.parse(line));
-      } catch {
+    inFlight = true;
+    try {
+      const events = [];
+      for (const line of readFileSync8(store.path, "utf8").split("\n")) {
+        if (!line.trim()) continue;
+        try {
+          events.push(JSON.parse(line));
+        } catch {
+        }
       }
+      const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
+      await narrateTick(store.dir, reconcileErrors(events, turns), state, Date.now());
+    } finally {
+      inFlight = false;
     }
-    const turns = readTranscriptTurns(readMeta(sessionId)?.transcriptPath ?? null);
-    await narrateTick(store.dir, reconcileErrors(events, turns), state, Date.now());
   };
   watchFile2(store.path, { interval: 1e3 }, () => {
     void tick();
@@ -5367,6 +5384,13 @@ import { rmSync as rmSync6 } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { readFileSync as readFileSync14 } from "node:fs";
 import { join as join12 } from "node:path";
+function decodeId(raw) {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
 function resolveRoute(method, url) {
   if (!url) return { type: "notfound" };
   const path = url.split("?")[0];
@@ -5378,25 +5402,49 @@ function resolveRoute(method, url) {
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
     const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
-    if (mnow) return { type: "now", id: decodeURIComponent(mnow[1]) };
+    if (mnow) {
+      const id = decodeId(mnow[1]);
+      return id == null ? { type: "notfound" } : { type: "now", id };
+    }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
-    if (m) return { type: "session", id: decodeURIComponent(m[1]) };
+    if (m) {
+      const id = decodeId(m[1]);
+      return id == null ? { type: "notfound" } : { type: "session", id };
+    }
   }
   if (method === "POST") {
     const mi = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
-    if (mi) return { type: "intervene", id: decodeURIComponent(mi[1]) };
+    if (mi) {
+      const id = decodeId(mi[1]);
+      return id == null ? { type: "notfound" } : { type: "intervene", id };
+    }
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
-    if (mn) return { type: "rename", id: decodeURIComponent(mn[1]) };
+    if (mn) {
+      const id = decodeId(mn[1]);
+      return id == null ? { type: "notfound" } : { type: "rename", id };
+    }
     const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
-    if (me) return { type: "explain", id: decodeURIComponent(me[1]) };
+    if (me) {
+      const id = decodeId(me[1]);
+      return id == null ? { type: "notfound" } : { type: "explain", id };
+    }
     const md = /^\/api\/session\/([^/]+)\/dismiss$/.exec(path);
-    if (md) return { type: "dismiss", id: decodeURIComponent(md[1]) };
+    if (md) {
+      const id = decodeId(md[1]);
+      return id == null ? { type: "notfound" } : { type: "dismiss", id };
+    }
     const mr = /^\/api\/session\/([^/]+)\/restore$/.exec(path);
-    if (mr) return { type: "restore", id: decodeURIComponent(mr[1]) };
+    if (mr) {
+      const id = decodeId(mr[1]);
+      return id == null ? { type: "notfound" } : { type: "restore", id };
+    }
   }
   if (method === "DELETE") {
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
-    if (m) return { type: "delete", id: decodeURIComponent(m[1]) };
+    if (m) {
+      const id = decodeId(m[1]);
+      return id == null ? { type: "notfound" } : { type: "delete", id };
+    }
   }
   return { type: "notfound" };
 }
@@ -6484,11 +6532,12 @@ function isAction(a) {
 function recordIntervention(sessionId, action, root = defaultRoot()) {
   if (!isAction(action)) return false;
   const events = new SessionStore(sessionId, root).readAll();
-  const warning = resolveActiveWarning(events, Date.now());
+  const turns = readTranscriptTurns(readMeta(sessionId, root)?.transcriptPath ?? null);
+  const warning = resolveActiveWarning(reconcileErrors(events, turns), Date.now());
   if (!warning) return false;
   writeInterventionFile(
     sessionId,
-    { action, tool: warning.tool, count: warning.count, createdAt: Date.now() },
+    { action, kind: warning.kind, tool: warning.tool, count: warning.count, createdAt: Date.now() },
     root
   );
   return true;
@@ -6543,6 +6592,9 @@ var here = dirname2(fileURLToPath(import.meta.url));
 function publicDir() {
   return join18(here, "..", "serve", "public");
 }
+function safeId2(id) {
+  return !!id && !id.includes("/") && !id.includes("\\") && !id.includes("..");
+}
 function runServe(opts) {
   try {
     pruneEventless(defaultRoot(), Date.now(), 30 * 6e4);
@@ -6553,12 +6605,18 @@ function runServe(opts) {
     fontsDir: join18(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
-    getSnapshot: (id) => loadSnapshot(id),
-    getNow: (id) => loadNow(id),
+    getSnapshot: (id) => {
+      if (!safeId2(id)) throw new Error("invalid session id");
+      return loadSnapshot(id);
+    },
+    getNow: (id) => {
+      if (!safeId2(id)) throw new Error("invalid session id");
+      return loadNow(id);
+    },
     getLive: () => loadLive(),
-    intervene: (id, action) => recordIntervention(id, action),
+    intervene: (id, action) => safeId2(id) && recordIntervention(id, action),
     rename: (id, name) => {
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId2(id)) return false;
       try {
         writeCustomName(join18(defaultRoot(), id), name);
         return true;
@@ -6567,7 +6625,7 @@ function runServe(opts) {
       }
     },
     remove: (id) => {
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId2(id)) return false;
       try {
         rmSync6(join18(defaultRoot(), id), { recursive: true, force: true });
         return true;
@@ -6576,7 +6634,7 @@ function runServe(opts) {
       }
     },
     dismiss: (id) => {
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId2(id)) return false;
       try {
         dismiss(defaultRoot(), id);
         return true;
@@ -6585,7 +6643,7 @@ function runServe(opts) {
       }
     },
     restore: (id) => {
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId2(id)) return false;
       try {
         restore(defaultRoot(), id);
         return true;
@@ -6603,7 +6661,7 @@ function runServe(opts) {
     }
     process.exit(1);
   });
-  server.listen(opts.port, () => {
+  server.listen(opts.port, "127.0.0.1", () => {
     console.log(`Codey timeline at http://localhost:${opts.port}`);
     if (opts.session) console.log(`(session: ${opts.session})`);
   });
