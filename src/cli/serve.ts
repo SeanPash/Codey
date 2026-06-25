@@ -17,6 +17,12 @@ function publicDir(): string {
   return join(here, "..", "serve", "public");
 }
 
+// A session id maps straight onto a folder under the sessions root, so reject anything that
+// could climb out of it. Applied to every handler that joins the id onto a path.
+function safeId(id: string): boolean {
+  return !!id && !id.includes("/") && !id.includes("\\") && !id.includes("..");
+}
+
 export function runServe(opts: { session?: string; port: number }): void {
   // Remove stale event-less session folders left by phantom headless invocations.
   try {
@@ -30,13 +36,18 @@ export function runServe(opts: { session?: string; port: number }): void {
     fontsDir: join(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
-    getSnapshot: (id) => loadSnapshot(id),
-    getNow: (id) => loadNow(id),
+    getSnapshot: (id) => {
+      if (!safeId(id)) throw new Error("invalid session id");
+      return loadSnapshot(id);
+    },
+    getNow: (id) => {
+      if (!safeId(id)) throw new Error("invalid session id");
+      return loadNow(id);
+    },
     getLive: () => loadLive(),
-    intervene: (id, action) => recordIntervention(id, action),
+    intervene: (id, action) => safeId(id) && recordIntervention(id, action),
     rename: (id, name) => {
-      // Reject ids that could escape the sessions root via path traversal.
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId(id)) return false;
       try {
         writeCustomName(join(defaultRoot(), id), name);
         return true;
@@ -45,7 +56,7 @@ export function runServe(opts: { session?: string; port: number }): void {
       }
     },
     remove: (id) => {
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId(id)) return false;
       try {
         rmSync(join(defaultRoot(), id), { recursive: true, force: true });
         return true;
@@ -54,11 +65,11 @@ export function runServe(opts: { session?: string; port: number }): void {
       }
     },
     dismiss: (id) => {
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId(id)) return false;
       try { dismiss(defaultRoot(), id); return true; } catch { return false; }
     },
     restore: (id) => {
-      if (!id || id.includes("/") || id.includes("\\") || id.includes("..")) return false;
+      if (!safeId(id)) return false;
       try { restore(defaultRoot(), id); return true; } catch { return false; }
     },
     explain: (id, body) => runExplain(id, body),
@@ -73,7 +84,9 @@ export function runServe(opts: { session?: string; port: number }): void {
     }
     process.exit(1);
   });
-  server.listen(opts.port, () => {
+  // Bind to loopback only. The timeline shows a session's full activity, so it must never be
+  // reachable from other machines on the network; it is meant for the local user alone.
+  server.listen(opts.port, "127.0.0.1", () => {
     console.log(`Codey timeline at http://localhost:${opts.port}`);
     if (opts.session) console.log(`(session: ${opts.session})`);
   });

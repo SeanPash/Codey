@@ -20,6 +20,16 @@ export type RouteResult =
   | { type: "font"; file: string }
   | { type: "notfound" };
 
+// decodeURIComponent throws on a malformed escape (e.g. "%E0%A4%A"), so wrap it: a bad id
+// becomes null and routes to notfound instead of crashing the request handler.
+function decodeId(raw: string): string | null {
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+}
+
 // Pure: map a request to an intent. Tested in isolation.
 export function resolveRoute(method: string | undefined, url: string | undefined): RouteResult {
   if (!url) return { type: "notfound" };
@@ -32,25 +42,25 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
     const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
-    if (mnow) return { type: "now", id: decodeURIComponent(mnow[1]) };
+    if (mnow) { const id = decodeId(mnow[1]); return id == null ? { type: "notfound" } : { type: "now", id }; }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
-    if (m) return { type: "session", id: decodeURIComponent(m[1]) };
+    if (m) { const id = decodeId(m[1]); return id == null ? { type: "notfound" } : { type: "session", id }; }
   }
   if (method === "POST") {
     const mi = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
-    if (mi) return { type: "intervene", id: decodeURIComponent(mi[1]) };
+    if (mi) { const id = decodeId(mi[1]); return id == null ? { type: "notfound" } : { type: "intervene", id }; }
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
-    if (mn) return { type: "rename", id: decodeURIComponent(mn[1]) };
+    if (mn) { const id = decodeId(mn[1]); return id == null ? { type: "notfound" } : { type: "rename", id }; }
     const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
-    if (me) return { type: "explain", id: decodeURIComponent(me[1]) };
+    if (me) { const id = decodeId(me[1]); return id == null ? { type: "notfound" } : { type: "explain", id }; }
     const md = /^\/api\/session\/([^/]+)\/dismiss$/.exec(path);
-    if (md) return { type: "dismiss", id: decodeURIComponent(md[1]) };
+    if (md) { const id = decodeId(md[1]); return id == null ? { type: "notfound" } : { type: "dismiss", id }; }
     const mr = /^\/api\/session\/([^/]+)\/restore$/.exec(path);
-    if (mr) return { type: "restore", id: decodeURIComponent(mr[1]) };
+    if (mr) { const id = decodeId(mr[1]); return id == null ? { type: "notfound" } : { type: "restore", id }; }
   }
   if (method === "DELETE") {
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
-    if (m) return { type: "delete", id: decodeURIComponent(m[1]) };
+    if (m) { const id = decodeId(m[1]); return id == null ? { type: "notfound" } : { type: "delete", id }; }
   }
   return { type: "notfound" };
 }

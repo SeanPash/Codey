@@ -83,4 +83,10 @@ describe("resolveRoute", () => {
     expect(resolveRoute("POST", "/api/session/my%20session/name")).toEqual({ type: "rename", id: "my session" });
     expect(resolveRoute("DELETE", "/api/session/my%20session")).toEqual({ type: "delete", id: "my session" });
   });
+
+  it("routes a malformed percent-encoded id to notfound instead of throwing", () => {
+    expect(resolveRoute("GET", "/api/session/%E0%A4%A")).toEqual({ type: "notfound" });
+    expect(resolveRoute("GET", "/api/session/%E0%A4%A/now")).toEqual({ type: "notfound" });
+    expect(resolveRoute("DELETE", "/api/session/%E0%A4%A")).toEqual({ type: "notfound" });
+  });
 });
