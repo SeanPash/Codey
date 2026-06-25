@@ -14,3 +14,7 @@ spike/
 
 # Brainstorming companion scratch (local only)
 .superpowers/
+
+# Screenshot capture working notes (local only)
+SHOOTING-GUIDE.md
+screenshots/
