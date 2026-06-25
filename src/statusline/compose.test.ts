@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { composeView, cardsFromEvents } from "./compose.js";
+import { composeView } from "./compose.js";
 import { hasBannedPhrase } from "../caption/banned.js";
 import type { ToolEvent } from "../types.js";
 import type { StatusSnapshot } from "./state.js";
@@ -24,49 +24,6 @@ const snap = (over: Partial<StatusSnapshot> = {}): StatusSnapshot => ({
   warning: null,
   updatedAt: 0,
   ...over,
-});
-
-describe("cardsFromEvents", () => {
-  it("numbers pre events and skips post events", () => {
-    const events: ToolEvent[] = [
-      pre("a", "Read", { file_path: "a.ts" }, 0),
-      { ...pre("a2", "Read", {}, 1), phase: "post" },
-      pre("b", "Write", { file_path: "b.ts" }, 2),
-    ];
-    const cards = cardsFromEvents(events);
-    expect(cards.map((c) => c.seq)).toEqual([1, 2]);
-    expect(cards[1].raw).toBe("b.ts");
-  });
-
-  it("folds a rapid run of the same action into one counted card", () => {
-    const events = [
-      pre("a", "Read", { file_path: "a.ts" }, 0),
-      pre("b", "Read", { file_path: "b.ts" }, 200),
-      pre("c", "Read", { file_path: "c.ts" }, 400),
-    ];
-    const cards = cardsFromEvents(events);
-    expect(cards).toHaveLength(1);
-    expect(cards[0].seq).toBe(1);
-    expect(cards[0].endSeq).toBe(3);
-    expect(cards[0].action.target).toBe("3 files (a.ts, b.ts, +1)");
-  });
-
-  it("keeps spaced-out steps as separate cards", () => {
-    const events = [
-      pre("a", "Read", { file_path: "a.ts" }, 0),
-      pre("b", "Read", { file_path: "b.ts" }, 9000), // well past the burst window
-    ];
-    const cards = cardsFromEvents(events);
-    expect(cards.map((c) => c.seq)).toEqual([1, 2]);
-  });
-
-  it("does not group across different actions", () => {
-    const events = [
-      pre("a", "Read", { file_path: "a.ts" }, 0),
-      pre("b", "Write", { file_path: "b.ts" }, 100),
-    ];
-    expect(cardsFromEvents(events)).toHaveLength(2);
-  });
 });
 
 describe("composeView thinking", () => {

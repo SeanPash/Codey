@@ -1,6 +1,4 @@
 import type { ToolEvent, Mode } from "../types.js";
-import { actionLabel, rawTarget } from "./labels.js";
-import { type Card } from "./schedule.js";
 import { scheduleWhy } from "./read-time.js";
 import { formatDuration } from "../timeline/duration.js";
 import type { StatusSnapshot } from "./state.js";
@@ -10,64 +8,6 @@ import { budgetLeftLabel, budgetPausedMessage, type Budget } from "../budget/bud
 import { chunkEvents } from "../caption/chunks.js";
 import { buildCaption, type LiveCaption } from "../caption/caption.js";
 import { buildRecap } from "../caption/recap.js";
-
-// A run of the same kind of action that lands faster than this is treated as one
-// burst. It keeps the /explain card numbering from fragmenting when Claude reads ten
-// files in a second, while still giving deliberate, spaced-out steps their own card.
-const GROUP_WINDOW_MS = 2500;
-
-// Strip the friendly prefix so a group can list bare names: "the file a.ts" -> "a.ts".
-function shortName(target: string): string {
-  return target.replace(/^the (file|folder) /, "");
-}
-
-// The plural noun a group is counted in, chosen from the verb.
-function groupNoun(tag: string): string {
-  if (/read|edit|writ|remov|creat|mov|copy/.test(tag)) return "files";
-  if (/search|fetch/.test(tag)) return "searches";
-  return "steps";
-}
-
-function groupedTarget(tag: string, names: string[]): string {
-  const head = names.slice(0, 2).join(", ");
-  const extra = names.length > 2 ? `, +${names.length - 2}` : "";
-  return `${names.length} ${groupNoun(tag)} (${head}${extra})`;
-}
-
-interface Building extends Card {
-  names: string[];
-  lastTs: number;
-}
-
-export function cardsFromEvents(events: ToolEvent[]): Card[] {
-  const built: Building[] = [];
-  let seq = 0;
-  for (const e of events) {
-    if (e.phase !== "pre") continue;
-    seq++;
-    const action = actionLabel(e.tool, e.input);
-    const last = built[built.length - 1];
-    const close = last && e.timestamp - last.lastTs <= GROUP_WINDOW_MS;
-    if (last && close && last.action.tag === action.tag) {
-      // Fold this event into the running burst and re-phrase the target as a count.
-      last.names.push(shortName(action.target));
-      last.lastTs = e.timestamp;
-      last.endSeq = seq;
-      last.ts = e.timestamp;
-      last.action = { tag: action.tag, target: groupedTarget(action.tag, last.names) };
-    } else {
-      built.push({
-        seq,
-        action,
-        raw: rawTarget(e.tool, e.input),
-        ts: e.timestamp,
-        names: [shortName(action.target)],
-        lastTs: e.timestamp,
-      });
-    }
-  }
-  return built.map(({ names, lastTs, ...card }) => card);
-}
 
 // Pick the sentence for the current mode: simple is one line, deep and teach reach for the
 // richer fields when they exist and fall back gracefully when they do not.
