@@ -338,18 +338,21 @@
        right-aligned in fixed columns so every number lines up. The stacked bar above already shows
        the shares visually, so rows carry no mini bars. The labelled rows are the legend. */
     .brk { margin-top:14px; }
-    .brkrow { display:flex; align-items:baseline; gap:9px; padding:7px 0;
-      border-top:1px solid var(--hair); font-variant-numeric:tabular-nums; }
+    /* Two lines per category so the label always has room: the name sits on top next to its
+       swatch and is never squeezed out by the numbers, with the count and share lined up
+       underneath. The sidebar column is too narrow to fit name, count and percent on one row. */
+    .brkrow { display:grid; grid-template-columns:auto 1fr auto; column-gap:9px; row-gap:3px;
+      padding:8px 0; border-top:1px solid var(--hair); font-variant-numeric:tabular-nums; }
     .brkrow:first-child { border-top:none; }
-    .brkrow .sw { width:9px; height:9px; border-radius:3px; flex:none; align-self:center; }
-    .brkrow .bn { flex:1; min-width:0; font-size:12px; color:var(--ink); font-weight:600;
+    .brkrow .sw { grid-column:1; grid-row:1; width:9px; height:9px; border-radius:3px; align-self:center; }
+    .brkrow .bn { grid-column:2 / 4; grid-row:1; min-width:0; font-size:12px; color:var(--ink); font-weight:600;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     /* the token count is the answer to "how much went here", so it is the bold, legible number;
-       the percent trails it as a quiet secondary. Both stay on the one line, never wrapping. */
-    .brkrow .bc { flex:none; font-size:12.5px; color:var(--ink); font-weight:700; text-align:right;
-      letter-spacing:-0.01em; white-space:nowrap; }
+       the percent sits to its right as a quiet secondary. */
+    .brkrow .bc { grid-column:2; grid-row:2; justify-self:start; font-size:12.5px; color:var(--ink);
+      font-weight:700; letter-spacing:-0.01em; white-space:nowrap; }
     .brkrow .bc small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:3px; }
-    .brkrow .pct { flex:none; min-width:34px; text-align:right; color:var(--muted); font-weight:500; font-size:11px; }
+    .brkrow .pct { grid-column:3; grid-row:2; justify-self:end; color:var(--muted); font-weight:500; font-size:11px; }
     .tokempty { font-size:11px; color:var(--muted); margin-top:12px; }
     /* priciest-task footer: its own labelled row below the breakdown, name on the left (truncated),
        spend on the right, so it reads as a separate receipt line and not part of the chart. */
