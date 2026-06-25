@@ -84,7 +84,18 @@ Codey needs no API keys and no external services. The only brain it uses is your
 
 ## Install
 
-Codey is a Claude Code plugin. Clone it, build it, then point Claude Code's plugin config at the folder:
+Codey is a Claude Code plugin. From any Claude Code session, add the marketplace and install it:
+
+```
+/plugin marketplace add SeanPash/Codey
+/plugin install codey@codey
+```
+
+Then restart your session so the hooks load. Codey ships prebuilt, so there is no build step for this path.
+
+### Local development
+
+To hack on Codey, clone and build it yourself, then add the folder as a local plugin:
 
 ```bash
 git clone https://github.com/SeanPash/Codey.git
@@ -93,7 +104,7 @@ npm install
 npm run build
 ```
 
-Add the cloned folder as a local plugin and restart your session so the hooks load. The hooks run the compiled output in `dist/`, so the build needs to succeed before your first session.
+The hooks run the compiled output in `dist/`, so the build needs to succeed before your first session.
 
 ## Requirements
 

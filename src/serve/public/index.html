@@ -1294,7 +1294,7 @@
         nowCardInner =
           `<div class="stat"><span class="d"></span>Working</div>`
           + `<div class="doing">${esc(liveChunk.name)}</div>`
-          + `<div class="el">on this task ${liveTimer(liveChunk.startTs)} &bull; session ${snap.startedAt ? liveTimer(snap.startedAt) : "running"}</div>`
+          + `<div class="el">current task ${liveTimer(liveChunk.startTs)}</div>`
           + `<div class="prog"><div class="pl">Session progress <b class="num">${done} / ${total} tasks</b></div>`
           + `<div class="bar"><i style="width:${pct}%"></i></div></div>`;
       } else {
@@ -1968,6 +1968,20 @@
     // quick steps in its trail feel live, without fetching the full snapshot that often.
     tickNow();
     setInterval(tickNow, 600);
+
+    // Reload the page when the server reports a new build. Without this an open tab keeps running
+    // whatever JS it loaded at open time, so a reinstall silently shows stale UI ("I keep fixing it
+    // but the page never changes"). We learn our own build on first poll, then reload once it moves.
+    let knownBuild = null;
+    async function checkBuild() {
+      try {
+        const { build } = await (await fetch("/health")).json();
+        if (knownBuild === null) knownBuild = build;
+        else if (build && build !== knownBuild) location.reload();
+      } catch { /* server bouncing during reinstall, try again next tick */ }
+    }
+    checkBuild();
+    setInterval(checkBuild, 3000);
   </script>
 </body>
 </html>
