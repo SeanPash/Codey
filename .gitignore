@@ -9,5 +9,8 @@ docs/
 # Personal learning notes (local only)
 teaching/
 
+# Early de-risking probes and findings (local only)
+spike/
+
 # Brainstorming companion scratch (local only)
 .superpowers/
