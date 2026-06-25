@@ -1111,22 +1111,49 @@
       return out;
     }
 
-    // A purpose summary for a folded run of same-tool steps, framed by intent rather than tool:
-    // "Creating 4 files", "Checking 3 files", "Running 3 commands".
-    function burstSummary(tool, n) {
-      const m = { Read: "Checking " + n + " files", Edit: "Updating " + n + " files", Write: "Creating " + n + " files",
-        NotebookEdit: "Updating " + n + " files",
-        Bash: "Running " + n + " commands", Grep: "Searching " + n + " times", Glob: "Searching " + n + " times" };
-      return m[tool] || ("Working through " + n + " " + tool + " steps");
+    // The distinct purpose titles in a folded run, first-seen order, compared case-insensitively.
+    // The child rows already carry tidy purpose titles, so the parent reads off those. Mirrors
+    // src/timeline/burst.ts, which is unit-tested; keep the two in sync.
+    function burstDistinctTitles(items) {
+      const seen = new Set();
+      const out = [];
+      for (const it of items) {
+        const t = (it.l.title || "").trim();
+        if (!t) continue;
+        const key = t.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(t);
+      }
+      return out;
+    }
+    function burstCountPhrase(tool, n) {
+      const noun = ["Read", "Edit", "MultiEdit", "Write", "NotebookEdit"].includes(tool) ? "files"
+        : ["Grep", "Glob"].includes(tool) ? "searches"
+        : ["Bash", "PowerShell"].includes(tool) ? "commands" : "steps";
+      const verb = { Read: "Checking", Edit: "Updating", MultiEdit: "Updating", Write: "Creating",
+        NotebookEdit: "Updating", Grep: "Searching", Glob: "Searching", Bash: "Running", PowerShell: "Running" };
+      return verb[tool] ? `${verb[tool]} ${n} ${noun}` : `Working through ${n} ${tool} steps`;
     }
 
-    // The list of names a burst touched, for its subtitle ("math.js, string.js, and 2 more").
+    // A purpose summary for a folded run of same-tool steps. When every step shares one purpose,
+    // that purpose names the whole run ("Inspecting session storage"); a genuinely mixed run falls
+    // back to an honest count instead of dumping the raw commands.
+    function burstSummary(items) {
+      const titles = burstDistinctTitles(items);
+      if (titles.length === 1) return titles[0];
+      return burstCountPhrase(items[0].l.tool, items.length);
+    }
+
+    // The subtitle for a burst: the purposes it covered in plain English, never the raw commands
+    // and never just the summary repeated back.
     function burstSubtitle(items) {
-      const names = items.map((it) => metaSubject(it.l)).filter(Boolean);
-      if (!names.length) return "A run of related steps, folded together.";
-      const head = names.slice(0, 3).join(", ");
-      const extra = names.length > 3 ? `, and ${names.length - 3} more` : "";
-      return `Worked on ${head}${extra}.`;
+      const titles = burstDistinctTitles(items);
+      if (titles.length <= 1) return `Claude did this across ${items.length} steps.`;
+      const lower = titles.map((t) => t.charAt(0).toLowerCase() + t.slice(1));
+      const named = lower.length === 2 ? `${lower[0]} and ${lower[1]}`
+        : `${lower.slice(0, 2).join(", ")}, and ${lower.length - 2} more`;
+      return `Claude worked through ${named}.`;
     }
 
     // One collapsed burst: a parent row that summarizes the run, expanding to the real child rows.
@@ -1144,7 +1171,7 @@
       const st = anyFail ? '<span class="st fail">fail</span>' : '<span class="st ok">&#10003;</span>';
       const children = isOpen
         ? `<div class="bchildren">${g.items.map((it) => workLineHtml(c, it.l, it.idx, it.idx === curIdx)).join("")}</div>` : "";
-      const main = `<div class="lmain"><span class="lbl">${esc(burstSummary(head.tool, g.items.length))}</span>`
+      const main = `<div class="lmain"><span class="lbl">${esc(burstSummary(g.items))}</span>`
         + `<span class="lsub">${esc(burstSubtitle(g.items))}</span>`
         + `<span class="lmeta">${g.items.length} ${head.tool === "thinking" ? "steps" : "items"} · ${esc(head.tool)}</span></div>`;
       return `<div class="rline brow${isOpen ? " lo" : ""}" data-burst="${esc(key)}">`

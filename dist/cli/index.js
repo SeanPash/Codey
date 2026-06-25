@@ -3844,6 +3844,34 @@ function classifyStage(tool, input, isError = false) {
   return "inspecting";
 }
 
+// src/caption/sanitize.ts
+var SHELL_NOISE = /[|`]|\$\(|&&|\|\||~\/|=\$|\$\{|\d?\s*[<>]\s*&?/;
+function stripEllipsis(text) {
+  if (!/(\.{3,}|…)\s*$/.test(text)) return text;
+  const t = text.replace(/\s*(\.{3,}|…)\s*$/, "").trimEnd();
+  return t ? t + "." : t;
+}
+function looksLikeEvidenceDump(text) {
+  if (SHELL_NOISE.test(text)) return true;
+  const commas = (text.match(/,/g) || []).length;
+  return commas >= 3;
+}
+function clampWords(text, max) {
+  const words = (text ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length <= max) return words.join(" ");
+  const kept = words.slice(0, max);
+  while (kept.length > 1 && /^(and|or|the|a|an|of|to|for|in|on|with|that|which)$/i.test(kept[kept.length - 1])) {
+    kept.pop();
+  }
+  return kept.join(" ");
+}
+function tidySubject(name, maxWords = 5) {
+  const n = (name ?? "").trim();
+  if (!n) return n;
+  if (SHELL_NOISE.test(n)) return "the command";
+  return clampWords(n, maxWords);
+}
+
 // src/caption/shell.ts
 function stem(sentence) {
   return sentence.replace(/\.\s*$/, "");
@@ -4033,23 +4061,35 @@ var GERUND = {
   count: "counting",
   print: "printing"
 };
+function gerundize(word) {
+  const w = word.toLowerCase();
+  if (/[^aeiou]e$/.test(w)) return w.slice(0, -1) + "ing";
+  if (/^[a-z]*[aeiou][^aeiouwxy]$/.test(w) && w.length <= 4) return w + w.slice(-1) + "ing";
+  return w + "ing";
+}
 function descriptionIsVague(desc) {
   const d = desc.trim().toLowerCase();
   return d.length < 6 || /^(run|running)\s+(a\s+)?(command|script)\b/.test(d) || d === "command";
 }
+function nounStart(phrase) {
+  return phrase.replace(/^(which|the|a|an|that|this|some|whether)\s+/i, "");
+}
 function descriptionIntent(desc) {
   const clean = desc.trim().replace(/[.]+$/, "");
-  const title = clean.charAt(0).toUpperCase() + clean.slice(1);
   const m = /^([A-Za-z]+)\b\s*(.*)$/.exec(clean);
-  if (m && GERUND[m[1].toLowerCase()]) {
-    const verb = GERUND[m[1].toLowerCase()];
+  if (m) {
+    const verb = GERUND[m[1].toLowerCase()] ?? gerundize(m[1]);
+    const Verb = verb.charAt(0).toUpperCase() + verb.slice(1);
     const tail = m[2].trim();
     const sentence = tail ? `Claude is ${verb} ${tail}.` : `Claude is ${verb} something.`;
+    const title2 = tail ? `${Verb} ${clampWords(nounStart(tail), 4)}` : `${Verb} this step`;
+    const subject = tidySubject(nounStart(tail), 4) || "the result";
     const deep = `${stem(sentence)} to confirm the result before moving on.`;
-    return intent(tail || clean, title, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
+    return intent(subject, title2, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
   }
   const fallback = `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
-  return intent(clean, title, fallback);
+  const title = clampWords(clean.charAt(0).toUpperCase() + clean.slice(1), 5);
+  return intent(tidySubject(nounStart(clean)) || clean, title, fallback);
 }
 function describeShellIntent(command2, description) {
   const cmd = (command2 ?? "").trim();
@@ -4256,10 +4296,10 @@ function mutating(stage) {
 // src/caption/caption.ts
 function subjectOf(chunk) {
   if (chunk.tool === "Grep" || chunk.tool === "Glob") return phrasePattern(chunk.raw ?? "");
-  return humanFile(chunk.targets[0] ?? "") || "the code";
+  return tidySubject(humanFile(chunk.targets[0] ?? "")) || "the code";
 }
 function namedTargets(chunk) {
-  return joinNames(chunk.targets.map(humanFile)) || "the code";
+  return joinNames(chunk.targets.map((t) => tidySubject(humanFile(t)))) || "the code";
 }
 function namedSearches(chunk) {
   const phrases = chunk.searches.map(phraseSearch).filter((p) => !!p);
@@ -4430,20 +4470,27 @@ function outcomeText(chunk) {
 }
 function buildCaption(chunk, mode, why) {
   const d = describe(chunk);
-  const clean = why ? stripDashes(why) : null;
+  const cleaned = why ? stripEllipsis(stripDashes(why)) : null;
+  const clean = cleaned && !looksLikeEvidenceDump(cleaned) ? cleaned : null;
   const outcome = outcomeText(chunk);
   const evidence = chunk.count === 1 && chunk.raw ? chunk.raw : void 0;
-  const caption = { stage: chunk.stage, title: d.title, simple: d.simple, outcome, evidence };
+  const caption = {
+    stage: chunk.stage,
+    title: d.title,
+    simple: stripEllipsis(d.simple),
+    outcome,
+    evidence
+  };
   if (mode === "simple") {
     if (clean) caption.simple = clean;
     return caption;
   }
   if (mode === "deep") {
-    caption.deep = clean ?? d.deep;
+    caption.deep = clean ?? stripEllipsis(d.deep);
     return caption;
   }
-  caption.deep = d.deep;
-  caption.teach = clean ?? d.teach;
+  caption.deep = stripEllipsis(d.deep);
+  caption.teach = clean ?? stripEllipsis(d.teach);
   return caption;
 }
 

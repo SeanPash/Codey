@@ -43,6 +43,19 @@ describe("timeline caption quality over a realistic session", () => {
     }
   });
 
+  it("keeps every title a tidy purpose label, never the whole description echoed back", () => {
+    for (const l of lines) {
+      const words = l.title.trim().split(/\s+/).length;
+      expect(words, `title "${l.title}"`).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it("keeps the raw command out of the subtitle, leaving it for the expandable raw row", () => {
+    for (const l of lines) {
+      expect(l.subtitle, `row "${l.title}"`).not.toMatch(/\bnode dist|index\.js|~\/|\| head|git status/);
+    }
+  });
+
   it("describes the feed command as verifying live narration, not 'running index.js'", () => {
     const feed = lines.find((l) => l.title.toLowerCase().includes("live") || /now endpoint/i.test(l.subtitle));
     expect(feed).toBeTruthy();
