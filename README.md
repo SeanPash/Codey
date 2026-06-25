@@ -4,7 +4,7 @@
 
 ### See what Claude is doing, and why.
 
-Codey is a plugin for Claude Code. Turn it on with `/codey:deep` and it narrates every step Claude takes in plain English, explaining the reasoning behind each one. Open `/codey:timeline` and the whole session becomes a visual story you can scroll through from start to finish, and follow live as it happens.
+Codey is a plugin for Claude Code. It turns every session into a visual story in your browser, a timeline where you can scroll through every task Claude did and follow along live as it happens. And while you work, a quiet line at the bottom of your terminal narrates each step in plain English, so you always know what Claude is doing and why.
 
 </div>
 
