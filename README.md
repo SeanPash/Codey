@@ -2,11 +2,9 @@
 
 # Codey
 
-### See what Claude Code is actually doing.
+### See what Claude is doing, and why.
 
-Codey is a plugin for Claude Code that narrates every move it makes, live, in plain English. No more staring at silent tool calls wondering if it's working or stuck.
-
-**Live narration** · **Interactive timeline** · **Session replay** · **Stuck detection** · **Private by default**
+Codey is a plugin for Claude Code. Turn it on with `/codey:deep` and it narrates every step Claude takes in plain English, explaining the reasoning behind each one. Open `/codey:timeline` and the whole session becomes a visual story you can scroll through from start to finish, and follow live as it happens.
 
 </div>
 
@@ -15,14 +13,19 @@ Codey is a plugin for Claude Code that narrates every move it makes, live, in pl
 
 ## Install
 
-Codey is a Claude Code plugin. From any Claude Code session:
+Codey is a Claude Code plugin. From any Claude Code session, register the marketplace:
 
 ```
 /plugin marketplace add SeanPash/Codey
+```
+
+Then install the plugin:
+
+```
 /plugin install codey@codey
 ```
 
-Restart your session so the hooks load, then run `/codey:simple` to turn narration on. Codey ships prebuilt, so there is no build step.
+Restart your session so the hooks load, then run `/codey:deep` to turn narration on. Codey ships prebuilt, so there is no build step.
 
 That's it. It uses the Claude Code login you already have. No API keys. No accounts. No setup.
 
@@ -38,11 +41,13 @@ Codey closes that gap. It reads the tool-call stream Claude Code already produce
 
 ### A timeline that tells the story
 
-`/codey:timeline` opens a local browser page that lays out the whole session as a visual storyboard. A live strip at the top shows what Claude is doing this very moment and follows along as it moves. Below it, the run unfolds as a sequence of readable steps grouped by the prompt that started them, with failures and warnings flagged right where they happened.
+`/codey:timeline` opens a local browser page that lays out the whole session as a visual storyboard. The run unfolds as a sequence of readable steps grouped by the prompt that started them, with failures and warnings flagged right where they happened. A live strip at the top shows what Claude is doing this very moment, and Follow Live keeps the page pinned to the latest step, so the browser stays in sync with your terminal in real time.
 
-Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out.
+Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you curious, there's an **Explain this step** button right on it, and a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
 
-<!-- SCREENSHOT NEEDED: the browser timeline with the live now-strip, per-task storyboard, and stats -->
+> **The timeline is free.** It reads a local log of what already happened, so scrolling the full story of any session, including past ones, costs zero tokens. You only spend when you click to explain a step.
+
+<!-- SCREENSHOT NEEDED: the browser timeline with the live now-strip, Follow Live, per-task storyboard, and stats -->
 ![Codey timeline](assets/timeline.png)
 
 ### Narration right in your terminal
@@ -65,16 +70,25 @@ When something fires, the stuck task gets an amber bar with three choices: nudge
 
 ### Explain any step, only when you want
 
-The timeline is readable for free. When a step makes you curious, click it for a deeper, on-demand explanation of what happened and why. You spend a few tokens only on the steps you choose, so you stay cheap by default and dig in exactly where it matters. The same works for a whole prompt: ask for a recap of everything Claude got done that turn.
+The timeline is readable for free. When a step makes you curious, click **Explain this step** for a deeper, on-demand explanation of what happened and why. You spend a few tokens only on the steps you choose, so you stay cheap by default and dig in exactly where it matters. The same works for a whole prompt: ask for a recap of everything Claude got done that turn.
 
 <!-- SCREENSHOT NEEDED: the token-breakdown chart with a label next to each color -->
 ![Token breakdown chart](assets/token-breakdown.png)
 
 ### Replay any session
 
-The timeline isn't just for the run happening right now. A sessions sidebar lets you flip between every recent session and replay any of them step by step, so you can go back and understand a run after it finished.
+The timeline isn't just for the run happening right now. A sessions sidebar lets you flip between every recent session and replay any of them step by step, so you can go back and understand a run long after it finished.
 
 <!-- SCREENSHOT NEEDED: the sessions sidebar with multiple recent sessions, one selected for replay -->
+
+### Every terminal in one place
+
+Running Claude Code in two or three terminals at once, it's easy to lose track of which window is doing what. The Active Terminals view puts them side by side. Each open session gets its own live timeline, following along in real time, so you can see the exact position of every run at the same moment without tabbing between windows and rebuilding the picture in your head.
+
+It's the difference between juggling several silent terminals and watching all of them tell their story on one screen.
+
+<!-- SCREENSHOT NEEDED: the Active Terminals view with two or three live session timelines side by side, each following its own run -->
+![Active terminals](assets/active-terminals.png)
 
 ## Without Codey vs with Codey
 
@@ -95,11 +109,11 @@ The timeline isn't just for the run happening right now. A sessions sidebar lets
 - Understanding token usage
 - Following autonomous coding sessions
 
-## Private by default
+## Your machine, and only your machine
 
-Codey needs no API keys and no external services. The only brain it uses is your own Claude Code, run headless on the login you already have. Everything flows one direction through local files on your machine.
+Codey runs entirely on your computer. There are no API keys to paste, no account to create, and nothing it phones home to.
 
-Your code, your prompts, and your project never leave it.
+The narration is powered by your own Claude Code, running quietly in the background on the login you already have. Events are written to local files and go nowhere else. Your code, your prompts, and your projects stay with you.
 
 ## Commands
 
@@ -113,11 +127,15 @@ Type `/codey` in Claude Code and the picker lists everything.
 | `/codey:timeline` | Opens the browser storyboard for the session. |
 | `/codey:off` | Stops narrating and restores your plain status line. |
 
-The three narration modes are really one knob: how many tokens you spend to understand more. `simple` is brief and nearly free, `deep` explains why each step matters, and `teach` explains the work and the ideas behind it. Narration draws on the same Claude plan as your normal work, so the deeper modes cost more of your quota. The timeline stays cheap either way and only spends when you click for an explanation.
+The three narration modes are really one knob: how many tokens you spend to understand more. `simple` is brief and nearly free, `deep` explains why each step matters, and `teach` explains the work and the ideas behind it. Narration runs on the cheapest model and draws on the same Claude plan as your normal work, so the deeper modes cost a little more of your quota. The timeline stays free either way, and only spends when you click for an explanation.
 
-## Local development
+## Found a bug?
 
-To hack on Codey, clone and build it yourself, then add the folder as a local plugin:
+Open an issue on the [GitHub issue tracker](https://github.com/SeanPash/Codey/issues). A quick note on what you were doing, what you expected, and what actually happened goes a long way. Codey is young, so reports genuinely help.
+
+## Working on Codey
+
+Want to change how Codey works or send a fix? Clone the repo, install the dependencies, and build it, then add your local copy as a plugin:
 
 ```bash
 git clone https://github.com/SeanPash/Codey.git
