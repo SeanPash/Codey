@@ -11,7 +11,11 @@ function file(dir: string): string {
 }
 
 export function appendWhy(dir: string, entry: WhyEntry): void {
-  appendFileSync(file(dir), JSON.stringify(entry) + "\n");
+  try {
+    appendFileSync(file(dir), JSON.stringify(entry) + "\n");
+  } catch {
+    // Best-effort log: a failed why write (missing dir, full disk) must never break a tick.
+  }
 }
 
 export function readWhys(dir: string): WhyEntry[] {

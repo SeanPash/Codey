@@ -237,8 +237,8 @@ function outcomeText(chunk: WorkChunk): string | undefined {
 
 // Build the caption for a chunk at the given mode. A real AI `why`, when present, is the
 // better sentence (it carries the actual reason), so it takes the slot the mode narrates at:
-// the headline in simple, the deeper line in deep and teach. Ask mode never uses it, keeping
-// to free deterministic labels until the user pulls an explanation on demand.
+// the headline in simple, the deeper line in deep and teach. With no `why` it stays on the
+// free deterministic labels.
 export function buildCaption(chunk: WorkChunk, mode: Mode, why?: string | null): LiveCaption {
   const d = describe(chunk);
   // A generated why is only used when it reads as a phrased thought. One that comes back as a raw

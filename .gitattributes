@@ -1,0 +1,8 @@
+# Normalize line endings so the committed build never shows as modified just because a
+# contributor checked it out with CRLF. esbuild emits LF, so keep these LF on disk too.
+* text=auto eol=lf
+
+# Fonts and other binaries must never be touched by line-ending normalization.
+*.woff binary
+*.woff2 binary
+*.png binary
