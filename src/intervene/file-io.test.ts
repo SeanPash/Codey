@@ -9,7 +9,7 @@ let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
 afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 
-const f: InterventionFile = { action: "nudge", tool: "Bash", count: 6, createdAt: 123 };
+const f: InterventionFile = { action: "nudge", kind: "loop", tool: "Bash", count: 6, createdAt: 123 };
 
 describe("intervention file io", () => {
   it("writes and reads back the file", () => {

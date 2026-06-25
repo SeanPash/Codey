@@ -15,7 +15,7 @@ function payload(over: Record<string, unknown> = {}): string {
 
 describe("handleIntervenePayload", () => {
   it("returns a block output and consumes the file when the tool matches", () => {
-    writeInterventionFile("s1", { action: "nudge", tool: "Bash", count: 6, createdAt: 1000 }, dir);
+    writeInterventionFile("s1", { action: "nudge", kind: "loop", tool: "Bash", count: 6, createdAt: 1000 }, dir);
     const out = handleIntervenePayload(payload(), dir, 2000);
     expect(out).toContain("permissionDecision");
     expect(out).toContain("6 times");
@@ -23,14 +23,14 @@ describe("handleIntervenePayload", () => {
   });
 
   it("returns null and leaves the file when a different tool fires", () => {
-    writeInterventionFile("s1", { action: "nudge", tool: "Bash", count: 6, createdAt: 1000 }, dir);
+    writeInterventionFile("s1", { action: "nudge", kind: "loop", tool: "Bash", count: 6, createdAt: 1000 }, dir);
     const out = handleIntervenePayload(payload({ tool_name: "Read" }), dir, 2000);
     expect(out).toBeNull();
     expect(readInterventionFile("s1", dir)).not.toBeNull();
   });
 
   it("returns null and clears an expired file without blocking", () => {
-    writeInterventionFile("s1", { action: "nudge", tool: "Bash", count: 6, createdAt: 1000 }, dir);
+    writeInterventionFile("s1", { action: "nudge", kind: "loop", tool: "Bash", count: 6, createdAt: 1000 }, dir);
     const out = handleIntervenePayload(payload(), dir, 1000 + 90_001);
     expect(out).toBeNull();
     expect(readInterventionFile("s1", dir)).toBeNull();

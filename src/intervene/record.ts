@@ -1,4 +1,7 @@
 import { SessionStore, defaultRoot } from "../store/session-store.js";
+import { readMeta } from "../store/session-meta.js";
+import { readTranscriptTurns } from "../timeline/transcript.js";
+import { reconcileErrors } from "../warnings/reconcile.js";
 import { resolveActiveWarning } from "./active-warning.js";
 import { writeInterventionFile } from "./file-io.js";
 import type { InterventionAction } from "../types.js";
@@ -14,9 +17,13 @@ function isAction(a: string): a is InterventionAction {
 export function recordIntervention(sessionId: string, action: string, root: string = defaultRoot()): boolean {
   if (!isAction(action)) return false;
   const events = new SessionStore(sessionId, root).readAll();
-  const warning = resolveActiveWarning(events, Date.now());
+  // Reconcile errors from the transcript first, exactly like the snapshot the user clicked on:
+  // an errored tool fires no PostToolUse, so a repeat_error warning only exists after this step.
+  // Without it, clicking on a repeat_error warning would resolve to nothing and silently no-op.
+  const turns = readTranscriptTurns(readMeta(sessionId, root)?.transcriptPath ?? null);
+  const warning = resolveActiveWarning(reconcileErrors(events, turns), Date.now());
   if (!warning) return false;
   writeInterventionFile(sessionId,
-    { action, tool: warning.tool, count: warning.count, createdAt: Date.now() }, root);
+    { action, kind: warning.kind, tool: warning.tool, count: warning.count, createdAt: Date.now() }, root);
   return true;
 }

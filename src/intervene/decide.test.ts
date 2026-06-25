@@ -3,7 +3,7 @@ import { decideIntervention, TTL_MS } from "./decide.js";
 import type { InterventionFile } from "../types.js";
 
 function file(over: Partial<InterventionFile>): InterventionFile {
-  return { action: "nudge", tool: "Bash", count: 6, createdAt: 1_000_000, ...over };
+  return { action: "nudge", kind: "loop", tool: "Bash", count: 6, createdAt: 1_000_000, ...over };
 }
 
 describe("decideIntervention", () => {

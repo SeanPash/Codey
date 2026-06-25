@@ -20,5 +20,5 @@ export function decideIntervention(
   if (!file) return null;
   if (now - file.createdAt > TTL_MS) return { block: false, consume: true };
   if (file.tool !== toolName) return null;
-  return { block: true, reason: blockReason(file.action, file.tool, file.count), consume: true };
+  return { block: true, reason: blockReason(file.action, file.kind, file.tool, file.count), consume: true };
 }
