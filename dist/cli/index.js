@@ -4668,8 +4668,22 @@ function readWhys(dir) {
 
 // src/narration/claude-metered.ts
 import { execFile as execFile2 } from "node:child_process";
+import { tmpdir } from "node:os";
 function buildMeteredArgs(prompt) {
-  return ["-p", prompt, "--model", "haiku", "--output-format", "json"];
+  return [
+    "-p",
+    prompt,
+    "--model",
+    "haiku",
+    "--output-format",
+    "json",
+    "--setting-sources",
+    "",
+    "--exclude-dynamic-system-prompt-sections"
+  ];
+}
+function meteredExecOptions(timeoutMs) {
+  return { timeout: timeoutMs, shell: false, windowsHide: true, cwd: tmpdir(), env: headlessEnv(), encoding: "utf8" };
 }
 function estimateTokens(s) {
   return Math.ceil(s.length / 4);
@@ -4690,7 +4704,7 @@ function parseMetered(stdout, prompt) {
 }
 function runClaudeMetered(prompt, timeoutMs = 35e3) {
   return new Promise((resolve) => {
-    execFile2("claude", buildMeteredArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env: headlessEnv() }, (err, stdout) => {
+    execFile2("claude", buildMeteredArgs(prompt), meteredExecOptions(timeoutMs), (err, stdout) => {
       if (err) return resolve(null);
       resolve(parseMetered(stdout, prompt));
     });
