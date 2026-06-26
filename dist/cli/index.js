@@ -3530,10 +3530,8 @@ var DISALLOWED_TOOLS = [
   "Task",
   "NotebookEdit",
   "TodoWrite",
-  "MultiEdit",
   "BashOutput",
-  "KillShell",
-  "SlashCommand"
+  "KillShell"
 ];
 var NARRATOR_SYSTEM_PROMPT = "You narrate what an AI coding agent is doing for someone watching it work. Reply with only the narration in plain English: no preamble, no markdown, no tool names as nouns.";
 var SEGMENTER_SYSTEM_PROMPT = "You are a precise assistant. Follow the user's instructions and output format exactly, with no extra text.";
@@ -3554,6 +3552,19 @@ function headlessExecOptions(timeoutMs) {
 
 // src/narration/claude-metered.ts
 import { execFile } from "node:child_process";
+
+// src/cost/pricing.ts
+var HAIKU_RATES = {
+  input: 1,
+  output: 5,
+  cacheRead: 0.1,
+  cacheWrite: 1.25
+};
+function costUsd(u) {
+  return (u.input * HAIKU_RATES.input + u.output * HAIKU_RATES.output + u.cacheRead * HAIKU_RATES.cacheRead + u.cacheWrite * HAIKU_RATES.cacheWrite) / 1e6;
+}
+
+// src/narration/claude-metered.ts
 var NO_USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 function buildMeteredArgs(prompt) {
   return [
@@ -3584,9 +3595,10 @@ function parseMetered(stdout, prompt) {
       cacheWrite: u.cache_creation_input_tokens ?? 0
     };
     const tokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
-    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text), usage };
+    const costUsd2 = typeof o.total_cost_usd === "number" ? o.total_cost_usd : costUsd(usage);
+    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text), usage, costUsd: costUsd2 };
   } catch {
-    return { text: out, tokens: estimateTokens(prompt + out), usage: { ...NO_USAGE } };
+    return { text: out, tokens: estimateTokens(prompt + out), usage: { ...NO_USAGE }, costUsd: 0 };
   }
 }
 function runClaudeMetered(prompt, timeoutMs = 35e3) {
@@ -4823,17 +4835,6 @@ function readSpend(dir) {
   return out;
 }
 
-// src/cost/pricing.ts
-var HAIKU_RATES = {
-  input: 1,
-  output: 5,
-  cacheRead: 0.1,
-  cacheWrite: 1.25
-};
-function costUsd(u) {
-  return (u.input * HAIKU_RATES.input + u.output * HAIKU_RATES.output + u.cacheRead * HAIKU_RATES.cacheRead + u.cacheWrite * HAIKU_RATES.cacheWrite) / 1e6;
-}
-
 // src/cli/narrate.ts
 async function narrateTick(dir, events, state, now) {
   const w = activeWarning(events, now);
@@ -4858,7 +4859,7 @@ function runNarrate(sessionId, mode) {
   const store = new SessionStore(sessionId);
   const meteredAndLogged = async (p) => {
     const r = await runClaudeMetered(p);
-    if (r) appendSpend(store.dir, { ts: Date.now(), kind: "narration", mode, usage: r.usage, costUsd: costUsd(r.usage) });
+    if (r) appendSpend(store.dir, { ts: Date.now(), kind: "narration", mode, usage: r.usage, costUsd: r.costUsd });
     return r;
   };
   const narrate = makeBudgetedNarrate(
@@ -5343,7 +5344,7 @@ function refresh(sessionId, events, lockBefore, prev, root) {
         kind: "timeline",
         mode: null,
         usage: res.usage,
-        costUsd: costUsd(res.usage)
+        costUsd: res.costUsd
       });
     }
     const tail = res?.text ? parseSegmentation(res.text, slice.length) : [];

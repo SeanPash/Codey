@@ -11,7 +11,6 @@ import { appendWhy } from "../narration/history.js";
 import { runClaudeMetered, type MeteredResult } from "../narration/claude-metered.js";
 import { readBudget, addSpend, budgetAllows, type Budget } from "../budget/budget.js";
 import { appendSpend } from "../cost/spend-log.js";
-import { costUsd } from "../cost/pricing.js";
 import type { NarrateFn } from "../narration/engine.js";
 
 export async function narrateTick(dir: string, events: ToolEvent[], state: WatchState, now: number): Promise<void> {
@@ -48,7 +47,7 @@ export function runNarrate(sessionId: string, mode: Mode): void {
   // makeBudgetedNarrate decides to spend, so a skipped (budget-paused) call records nothing.
   const meteredAndLogged = async (p: string) => {
     const r = await runClaudeMetered(p);
-    if (r) appendSpend(store.dir, { ts: Date.now(), kind: "narration", mode, usage: r.usage, costUsd: costUsd(r.usage) });
+    if (r) appendSpend(store.dir, { ts: Date.now(), kind: "narration", mode, usage: r.usage, costUsd: r.costUsd });
     return r;
   };
   const narrate = makeBudgetedNarrate(

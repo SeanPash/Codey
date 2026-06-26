@@ -5,7 +5,6 @@ import type { ToolEvent } from "../types.js";
 import { naiveSegment, buildSegmentationPrompt, parseSegmentation, type RawChunk } from "./segment.js";
 import { runSegmentationMetered } from "../narration/claude-headless.js";
 import { appendSpend } from "../cost/spend-log.js";
-import { costUsd } from "../cost/pricing.js";
 
 export interface TimelineCache {
   eventCount: number;
@@ -84,7 +83,7 @@ function refresh(sessionId: string, events: ToolEvent[], lockBefore: number, pre
     .then((res) => {
       if (res) {
         appendSpend(join(root, sessionId), {
-          ts: Date.now(), kind: "timeline", mode: null, usage: res.usage, costUsd: costUsd(res.usage),
+          ts: Date.now(), kind: "timeline", mode: null, usage: res.usage, costUsd: res.costUsd,
         });
       }
       const tail = res?.text ? parseSegmentation(res.text, slice.length) : [];

@@ -6,7 +6,7 @@ import { headlessEnv } from "./claude-spawn.js";
 // tokens, the single biggest chunk of the per-call context) out of every narration call.
 export const DISALLOWED_TOOLS = [
   "Bash", "Edit", "Read", "Write", "Glob", "Grep", "WebFetch", "WebSearch", "Task",
-  "NotebookEdit", "TodoWrite", "MultiEdit", "BashOutput", "KillShell", "SlashCommand",
+  "NotebookEdit", "TodoWrite", "BashOutput", "KillShell",
 ];
 
 // Live narration writes a single plain sentence. Replacing the default system prompt with this drops

@@ -1,11 +1,13 @@
 import { execFile } from "node:child_process";
 import { trimArgs, headlessExecOptions, NARRATOR_SYSTEM_PROMPT } from "./headless-flags.js";
+import { costUsd as estimateCostUsd } from "../cost/pricing.js";
 import type { Usage } from "../types.js";
 
 export interface MeteredResult {
   text: string;
   tokens: number;
-  usage: Usage; // the breakdown, so cost can weight cache reads correctly
+  usage: Usage;   // the breakdown, kept for the token display
+  costUsd: number; // the CLI's own total_cost_usd, or a rate estimate when it is absent
 }
 
 const NO_USAGE: Usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
@@ -31,7 +33,7 @@ export function parseMetered(stdout: string, prompt: string): MeteredResult | nu
   const out = stdout.trim();
   if (!out) return null;
   try {
-    const o = JSON.parse(out) as { result?: unknown; usage?: Record<string, number> };
+    const o = JSON.parse(out) as { result?: unknown; usage?: Record<string, number>; total_cost_usd?: number };
     const text = typeof o.result === "string" ? o.result.trim() : "";
     if (!text) return null;
     const u = o.usage ?? {};
@@ -42,11 +44,14 @@ export function parseMetered(stdout: string, prompt: string): MeteredResult | nu
       cacheWrite: u.cache_creation_input_tokens ?? 0,
     };
     const tokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
-    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text), usage };
+    // Prefer the CLI's own reported cost: it reflects the real cache tiers and any pricing the rate
+    // table can't see. Fall back to the rate estimate only when the field is missing.
+    const costUsd = typeof o.total_cost_usd === "number" ? o.total_cost_usd : estimateCostUsd(usage);
+    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text), usage, costUsd };
   } catch {
     // Older CLI or plain output: take stdout as the reply and estimate the cost. No real usage to
     // report, so the breakdown is empty and this call contributes nothing to the cost estimate.
-    return { text: out, tokens: estimateTokens(prompt + out), usage: { ...NO_USAGE } };
+    return { text: out, tokens: estimateTokens(prompt + out), usage: { ...NO_USAGE }, costUsd: 0 };
   }
 }
 
