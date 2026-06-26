@@ -166,7 +166,8 @@ describe("composeView live phase", () => {
     const first = "Claude is editing helper.ts so the loss function removes one point of defense from the opponent.";
     const why =
       first +
-      " It then recalculates the round score and writes the corrected totals back so the next turn never starts from a stale value left over from before the change.";
+      " It then recalculates the round score and writes the corrected totals back to the shared match state so the very next turn never starts from a stale value left over from before this particular change was applied.";
+    expect(why.length).toBeGreaterThan(260);
     const view = composeView(events, snap({ mode: "deep", why }), 1000, []);
     // The specific first sentence survives rather than the line dropping to a generic template.
     expect(view.sentence).toBe(first);

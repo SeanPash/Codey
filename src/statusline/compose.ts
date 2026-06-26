@@ -26,7 +26,7 @@ function pickSentence(caption: LiveCaption, mode: Mode): string {
 // overflows that do we fall back to the shorter deterministic caption (never a mid-thought cut).
 const SENTENCE_BUDGET: Record<Mode, { sentences: number; chars: number }> = {
   simple: { sentences: 1, chars: 140 },
-  deep: { sentences: 2, chars: 240 },
+  deep: { sentences: 2, chars: 260 },
   teach: { sentences: 2, chars: 320 },
 };
 

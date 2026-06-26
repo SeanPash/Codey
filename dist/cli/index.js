@@ -4922,7 +4922,7 @@ function pickSentence(caption, mode) {
 }
 var SENTENCE_BUDGET = {
   simple: { sentences: 1, chars: 140 },
-  deep: { sentences: 2, chars: 240 },
+  deep: { sentences: 2, chars: 260 },
   teach: { sentences: 2, chars: 320 }
 };
 function splitSentences(text) {
