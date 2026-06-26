@@ -39,7 +39,7 @@ describe("makeBudgetedNarrate", () => {
     const meter = vi.fn();
     const fn = makeBudgetedNarrate(
       () => ({ cap: 100, spent: 100 }),
-      async () => ({ text: "why", tokens: 10 }),
+      async () => ({ text: "why", tokens: 10, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }),
       meter,
     );
     expect(await fn("prompt")).toBeNull();
@@ -50,7 +50,7 @@ describe("makeBudgetedNarrate", () => {
     const meter = vi.fn();
     const fn = makeBudgetedNarrate(
       () => ({ cap: 100, spent: 0 }),
-      async () => ({ text: "why", tokens: 10 }),
+      async () => ({ text: "why", tokens: 10, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }),
       meter,
     );
     expect(await fn("prompt")).toBe("why");
@@ -61,7 +61,7 @@ describe("makeBudgetedNarrate", () => {
     const meter = vi.fn();
     const fn = makeBudgetedNarrate(
       () => null,
-      async () => ({ text: "why", tokens: 7 }),
+      async () => ({ text: "why", tokens: 7, usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }),
       meter,
     );
     expect(await fn("prompt")).toBe("why");

@@ -8,6 +8,8 @@ import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/sessi
 import { readCustomName } from "../store/session-name-store.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
+import { readSpend } from "../cost/spend-log.js";
+import { summarizeSpend } from "../cost/spend-summary.js";
 import { resolveActiveWarning } from "../intervene/active-warning.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
 import { listSessions, RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
@@ -97,6 +99,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     seedDepth,
     genAuto,
     cancelledAt,
+    overhead: summarizeSpend(readSpend(store.dir)),
   });
   const reconciled = reconcileErrors(events, turns);
   const withMeta = {

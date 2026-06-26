@@ -111,6 +111,39 @@ export interface SessionSnapshot {
   seedDepth: "simple" | "deep" | "teach"; // depth to open the timeline at (from the session mode)
   genAuto: boolean;                // true when the session mode wants summaries to auto-generate
   budgetLeft: string | null;       // a "12k left" / "budget reached" cue, or null when uncapped
+  codeyOverhead: CodeyOverhead;    // what Codey's own narration + timeline calls cost this session
+}
+
+// --- Codey overhead: what Codey's own headless calls cost, kept separate from Claude's work ---
+
+// One headless call's token usage, split so cost can weight cache reads correctly.
+export interface Usage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+// One logged headless call. kind separates live narration from the timeline segmenter.
+export interface SpendEntry {
+  ts: number;
+  kind: "narration" | "timeline";
+  mode: Mode | null; // the narration mode, or null for the segmenter
+  usage: Usage;
+  costUsd: number;
+}
+
+export interface SpendTotals {
+  calls: number;
+  tokens: number;  // input + output + cache, the context that moved
+  costUsd: number; // cache-aware estimate
+}
+
+// The whole-session rollup Codey shows so users see exactly what Codey itself cost.
+export interface CodeyOverhead {
+  total: SpendTotals;
+  byKind: { narration: SpendTotals; timeline: SpendTotals };
+  byMode: Partial<Record<Mode, SpendTotals>>;
 }
 
 // --- Live Split: compact multi-session view ---

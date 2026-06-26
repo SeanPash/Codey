@@ -14,12 +14,16 @@ describe("buildMeteredArgs", () => {
 });
 
 describe("parseMetered", () => {
-  it("pulls text and summed usage tokens from a json result", () => {
+  it("pulls text, summed tokens, and the usage breakdown from a json result", () => {
     const stdout = JSON.stringify({
       result: "  Claude is reading a file.  ",
       usage: { input_tokens: 100, output_tokens: 20, cache_read_input_tokens: 5, cache_creation_input_tokens: 0 },
     });
-    expect(parseMetered(stdout, "prompt")).toEqual({ text: "Claude is reading a file.", tokens: 125 });
+    expect(parseMetered(stdout, "prompt")).toEqual({
+      text: "Claude is reading a file.",
+      tokens: 125,
+      usage: { input: 100, output: 20, cacheRead: 5, cacheWrite: 0 },
+    });
   });
 
   it("estimates tokens from length when usage is absent", () => {

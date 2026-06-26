@@ -1,4 +1,5 @@
-import type { ToolEvent, Warning, TimelineChunk, SessionSnapshot } from "../types.js";
+import type { ToolEvent, Warning, TimelineChunk, SessionSnapshot, CodeyOverhead } from "../types.js";
+import { summarizeSpend } from "../cost/spend-summary.js";
 import type { AssistantTurn, UserPrompt } from "../timeline/transcript.js";
 import type { RawChunk } from "../timeline/segment.js";
 import { attributeChunk } from "../timeline/attribution.js";
@@ -37,6 +38,7 @@ export interface SnapshotInput {
   seedDepth?: "simple" | "deep" | "teach"; // depth the timeline opens at; defaults to deep
   genAuto?: boolean;                        // whether the session wants auto summaries
   cancelledAt?: number;                     // when the user last interrupted, 0 if never
+  overhead?: CodeyOverhead;                 // Codey's own narration + timeline cost, or empty
 }
 
 interface Boundary { startIndex: number; name: string; narration: string; }
@@ -131,5 +133,6 @@ export function buildSnapshot(input: SnapshotInput): SessionSnapshot {
     seedDepth: input.seedDepth ?? "deep",
     genAuto: input.genAuto ?? false,
     budgetLeft: null,
+    codeyOverhead: input.overhead ?? summarizeSpend([]),
   };
 }

@@ -8,6 +8,8 @@ import { latestSessionId } from "./sessions.js";
 import { readSessionMode } from "../statusline/active-mode.js";
 import { readWhys } from "../narration/history.js";
 import { readBudget } from "../budget/budget.js";
+import { readSpend } from "../cost/spend-log.js";
+import { summarizeSpend } from "../cost/spend-summary.js";
 import type { ToolEvent, Mode } from "../types.js";
 
 function readEvents(dir: string): ToolEvent[] {
@@ -24,7 +26,11 @@ function readEvents(dir: string): ToolEvent[] {
 export function statusLineFor(dir: string, now = Date.now(), mode?: Mode): string {
   if (!existsSync(dir)) return "";
   const snap: StatusSnapshot = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
-  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir), readBudget(dir)));
+  // Scope Codey's overhead to the current turn so the done footer reads "...this turn", matching the
+  // recap above it. Before any prompt is stamped, the whole session counts as the turn.
+  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+  const overhead = summarizeSpend(readSpend(dir).filter((e) => e.ts >= turnStart));
+  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir), readBudget(dir), overhead));
 }
 
 // Pull the session id out of the JSON payload Claude Code pipes to the status line.

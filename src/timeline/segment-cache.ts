@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { defaultRoot } from "../store/session-store.js";
 import type { ToolEvent } from "../types.js";
 import { naiveSegment, buildSegmentationPrompt, parseSegmentation, type RawChunk } from "./segment.js";
-import { runSegmentation } from "../narration/claude-headless.js";
+import { runSegmentationMetered } from "../narration/claude-headless.js";
+import { appendSpend } from "../cost/spend-log.js";
+import { costUsd } from "../cost/pricing.js";
 
 export interface TimelineCache {
   eventCount: number;
@@ -78,9 +80,14 @@ function refresh(sessionId: string, events: ToolEvent[], lockBefore: number, pre
   if (refreshing.has(sessionId)) return;
   refreshing.add(sessionId);
   const slice = events.slice(lockBefore);
-  runSegmentation(buildSegmentationPrompt(slice))
-    .then((text) => {
-      const tail = text ? parseSegmentation(text, slice.length) : [];
+  runSegmentationMetered(buildSegmentationPrompt(slice))
+    .then((res) => {
+      if (res) {
+        appendSpend(join(root, sessionId), {
+          ts: Date.now(), kind: "timeline", mode: null, usage: res.usage, costUsd: costUsd(res.usage),
+        });
+      }
+      const tail = res?.text ? parseSegmentation(res.text, slice.length) : [];
       if (tail.length === 0) return;
       const chunks = mergeSegmentation(prev, tail, lockBefore);
       if (chunks.length > 0) writeCache(sessionId, { eventCount: events.length, chunks }, root);

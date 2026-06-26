@@ -26,6 +26,7 @@ function snapshot(): SessionSnapshot {
     lastActivityAt: 0, totalTokens: 0, workTotal: 0, contextTotal: 0, taskCount: 1,
     priciestTaskName: null, priciestTaskWork: 0, groups: [group("p0", [c0])], chunks: [c0], activeWarning: null,
     seedDepth: "deep", genAuto: true, budgetLeft: null,
+    codeyOverhead: { total: { calls: 0, tokens: 0, costUsd: 0 }, byKind: { narration: { calls: 0, tokens: 0, costUsd: 0 }, timeline: { calls: 0, tokens: 0, costUsd: 0 } }, byMode: {} },
   };
 }
 
