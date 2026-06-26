@@ -24,8 +24,8 @@ describe("segment cache", () => {
   it("is stale when there is no cache or the event count grew enough", () => {
     expect(isStale(null, 10)).toBe(true);
     expect(isStale({ eventCount: 10, chunks }, 10)).toBe(false);
-    expect(isStale({ eventCount: 10, chunks }, 11)).toBe(false); // within slack
-    expect(isStale({ eventCount: 10, chunks }, 16)).toBe(true);  // grew past slack
+    expect(isStale({ eventCount: 10, chunks }, 18)).toBe(false); // within slack
+    expect(isStale({ eventCount: 10, chunks }, 21)).toBe(true);  // grew past slack
   });
 });
 
@@ -50,7 +50,24 @@ describe("segmentPlan (freeze completed prompts)", () => {
   });
 
   it("does not re-segment a live session that is not yet stale", () => {
-    expect(segmentPlan(cache, 12, true, 11).refresh).toBe(false); // only 2 new events
+    expect(segmentPlan(cache, 18, true, 11, 1_000_000).refresh).toBe(false); // only 8 new, within slack
+  });
+
+  it("holds off a live re-segment while inside the time floor", () => {
+    const now = 1_000_000;
+    const fresh: TimelineCache = { eventCount: 10, chunks, segmentedAt: now - 5_000 };
+    // Stale by event count and live, but the last pass was only 5s ago: wait.
+    expect(segmentPlan(fresh, 40, true, 12, now).refresh).toBe(false);
+  });
+
+  it("allows a live re-segment once the time floor has passed", () => {
+    const now = 1_000_000;
+    const old: TimelineCache = { eventCount: 10, chunks, segmentedAt: now - 20_000 };
+    expect(segmentPlan(old, 40, true, 12, now)).toEqual({ refresh: true, lockBefore: 12 });
+  });
+
+  it("treats a cache with no segmentedAt as past the floor (back-compat)", () => {
+    expect(segmentPlan(cache, 40, true, 12, 1_000_000).refresh).toBe(true);
   });
 });
 

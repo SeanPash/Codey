@@ -9,10 +9,18 @@ import { appendSpend } from "../cost/spend-log.js";
 export interface TimelineCache {
   eventCount: number;
   chunks: RawChunk[];
+  // When the last AI segmentation finished. Drives the time floor so a busy live turn cannot
+  // fire a fresh headless pass every couple of seconds. Optional so older caches still load.
+  segmentedAt?: number;
 }
 
 // Re-segment only after enough new events to be worth a headless pass.
-const STALE_SLACK = 5;
+const STALE_SLACK = 10;
+
+// The shortest gap between two AI segmentations of the same live turn. The free NOW strip and the
+// deterministic per-event actions keep the page feeling live between passes, so the costly
+// re-grouping can run far less often without the timeline looking frozen.
+const MIN_LIVE_SEGMENT_MS = 15_000;
 
 function cachePath(sessionId: string, root: string): string {
   return join(root, sessionId, "timeline.json");
@@ -48,11 +56,15 @@ export function isStale(cache: TimelineCache | null, eventCount: number): boolea
 export interface SegmentPlan { refresh: boolean; lockBefore: number; }
 export function segmentPlan(
   cache: TimelineCache | null, eventCount: number, live: boolean, turnStartIndex: number,
+  nowMs: number = Date.now(),
 ): SegmentPlan {
   if (eventCount === 0) return { refresh: false, lockBefore: 0 };
   if (!cache) return { refresh: true, lockBefore: 0 };
   const lockBefore = Math.max(0, Math.min(turnStartIndex, eventCount));
-  const refresh = live && isStale(cache, eventCount) && lockBefore < eventCount;
+  // A cache with no segmentedAt predates the floor; treat it as long past so it can refresh.
+  const sinceLast = nowMs - (cache.segmentedAt ?? 0);
+  const pastFloor = sinceLast >= MIN_LIVE_SEGMENT_MS;
+  const refresh = live && isStale(cache, eventCount) && lockBefore < eventCount && pastFloor;
   return { refresh, lockBefore };
 }
 
@@ -89,7 +101,9 @@ function refresh(sessionId: string, events: ToolEvent[], lockBefore: number, pre
       const tail = res?.text ? parseSegmentation(res.text, slice.length) : [];
       if (tail.length === 0) return;
       const chunks = mergeSegmentation(prev, tail, lockBefore);
-      if (chunks.length > 0) writeCache(sessionId, { eventCount: events.length, chunks }, root);
+      if (chunks.length > 0) {
+        writeCache(sessionId, { eventCount: events.length, chunks, segmentedAt: Date.now() }, root);
+      }
     })
     .catch(() => { /* leave the existing cache in place */ })
     .finally(() => { refreshing.delete(sessionId); });

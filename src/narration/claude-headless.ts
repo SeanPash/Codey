@@ -25,11 +25,13 @@ export function runSegmentationMetered(prompt: string, timeoutMs = 30_000): Prom
 // narration pass would record itself as a phantom session.
 export function runClaude(prompt: string, timeoutMs = 15000): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
+    const child = execFile("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
       if (err) return resolve(null);
       const out = stdout.trim();
       resolve(out.length > 0 ? out : null);
     });
+    // Close stdin so headless claude does not sit ~3s waiting for input it will never get.
+    child.stdin?.end();
   });
 }
 
