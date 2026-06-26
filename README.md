@@ -142,6 +142,17 @@ Type `/codey` in Claude Code and the picker lists everything.
 
 The three narration modes are really one knob: how many tokens you spend to understand more. `simple` is brief and nearly free, `deep` explains why each step matters, and `teach` explains the work and the ideas behind it. Narration runs on the cheapest model and draws on the same Claude plan as your normal work, so the deeper modes cost a little more of your quota. The timeline stays free either way, and only spends when you click for an explanation.
 
+## What's next
+
+Codey is young and moving fast. A few things on the roadmap:
+
+- **Codex support.** Right now Codey reads the tool-call stream from Claude Code. The plan is to follow OpenAI's Codex CLI the same way, so the live timeline and narration work no matter which agent you run.
+- **Better budget controls.** A tighter, clearer handle on what narration and explanations cost, with per-session caps you set up front, so the deeper modes stay predictable.
+- **A sharper timeline.** More work on the browser UI: faster, cleaner, and easier to scan, with more of the run readable at a glance.
+- **Smarter narration.** Tighter explanations that say more in fewer tokens, so `deep` and `teach` get richer without getting pricier.
+
+Have something you want to see? Open an issue.
+
 ## Found a bug?
 
 Open an issue on the [GitHub issue tracker](https://github.com/SeanPash/Codey/issues). A quick note on what you were doing, what you expected, and what actually happened goes a long way. Codey is new, so reports genuinely help.
