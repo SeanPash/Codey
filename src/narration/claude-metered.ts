@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { trimArgs, headlessExecOptions, NARRATOR_SYSTEM_PROMPT } from "./headless-flags.js";
 import { costUsd as estimateCostUsd } from "../cost/pricing.js";
+import { describeExecError } from "./narrator-log.js";
 import type { Usage } from "../types.js";
 
 export interface MeteredResult {
@@ -56,22 +57,37 @@ export function parseMetered(stdout: string, prompt: string): MeteredResult | nu
 }
 
 // Runs the user's own Claude Code headless and reports both the text and the token spend.
-// The timeout has to clear a real haiku round trip. A two-sentence deep why regularly takes
-// 25 to 35 seconds end to end (the model reasons before answering), so a tighter budget would
-// drop those narrations and leave the status line stuck on the free deterministic caption. 35s
-// catches the slow calls; the in-flight guard in the narrator keeps one slow call from stacking
-// up more, and a real explanation a little late beats a generic line on time.
-export function runClaudeMetered(prompt: string, timeoutMs = 35000): Promise<MeteredResult | null> {
-  return runMetered(buildMeteredArgs(prompt), prompt, timeoutMs);
+// The timeout has to clear a real haiku round trip. Each call is cold (no cache reuse across
+// separate processes), and a deep why reasons before answering, so calls land in the 25 to 40
+// second band. 45s catches the slow tail instead of dropping it to a timeout (the old 35s budget,
+// plus a ~3s stdin wait since removed, was tipping deep calls over and leaving 0 narrations). The
+// in-flight guard keeps one slow call from stacking up more, and a late explanation beats none.
+export function runClaudeMetered(
+  prompt: string, timeoutMs = 45000, onError?: (info: string) => void,
+): Promise<MeteredResult | null> {
+  return runMetered(buildMeteredArgs(prompt), prompt, timeoutMs, onError);
 }
 
 // The shared headless runner: spawn claude with the given args and parse text plus usage. Both live
 // narration and the timeline segmenter go through here so every call's cost is captured the same way.
-export function runMetered(args: string[], prompt: string, timeoutMs: number): Promise<MeteredResult | null> {
+// onError reports why a call produced nothing (a missing binary, a timeout, an empty reply) so the
+// otherwise-silent background narrator can leave a breadcrumb instead of just returning null.
+export function runMetered(
+  args: string[], prompt: string, timeoutMs: number, onError?: (info: string) => void,
+): Promise<MeteredResult | null> {
   return new Promise((resolve) => {
-    execFile("claude", args, headlessExecOptions(timeoutMs), (err, stdout) => {
-      if (err) return resolve(null);
-      resolve(parseMetered(stdout, prompt));
+    const child = execFile("claude", args, headlessExecOptions(timeoutMs), (err, stdout, stderr) => {
+      if (err) {
+        onError?.(describeExecError(err, stderr));
+        return resolve(null);
+      }
+      const r = parseMetered(stdout, prompt);
+      if (!r) onError?.(describeExecError(null));
+      resolve(r);
     });
+    // The prompt rides in as an argument, so we send no stdin. execFile leaves the stdin pipe open,
+    // and headless claude then waits ~3s for input that never comes before proceeding. Close it now
+    // so claude sees EOF immediately: that wait is dead latency on every narration and segmentation.
+    child.stdin?.end();
   });
 }

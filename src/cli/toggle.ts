@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, rmSync, openSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
@@ -76,11 +76,13 @@ export function turnOn(mode: Mode, session: string): void {
   patchStatus(dir, { mode, why: null, action: null, warning: null, doneAt: null });
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
   // detached lets the narrator outlive the slash command's process tree (Claude Code kills
-  // that tree when the command returns). stdio "ignore" means no console handles, and
-  // windowsHide suppresses any console window; the claude calls it makes are hidden too.
+  // that tree when the command returns). windowsHide suppresses any console window. stdout and
+  // stderr go to narrator.log (not /dev/null) so a crash or an uncaught error in the detached
+  // process is captured instead of vanishing; stdin stays closed.
+  const logFd = openSync(join(dir, "narrator.log"), "a");
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
     detached: true,
-    stdio: "ignore",
+    stdio: ["ignore", logFd, logFd],
     windowsHide: true,
   });
   child.unref();
