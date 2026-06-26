@@ -3456,7 +3456,7 @@ function summarizeEvent(e) {
 }
 function buildNarrationPrompt(events, mode) {
   const lines = events.map(summarizeEvent).join("\n");
-  const instruction2 = mode === "teach" ? "Write exactly two sentences for someone learning to code, about 40 words total. Sentence one: the specific change, naming the real file and the function, value, or rule it changes and what that makes the code do differently. Sentence two: teach the one concept behind it and define any term you use. Lead with the change itself, not a throat-clearing intro, and never write a third sentence." : mode === "deep" ? `Write at most two sentences, no more than about 35 words total. Lead immediately with the specific change: name the real file and the actual function, value, or behavior being changed, say what the change makes the code do differently, and why that matters here. State the mechanism itself, not a filler intro like "implements new logic" or "updates the system". For example: "Claude is editing helper.ts so the loss function drops the opponent's defense by one and raises the player's advantage by one, the rule that lets a winner press their edge."` : "Write one sentence, no more than about 20 words, saying what Claude is doing right now, naming the real file and the specific function or command involved. Be concrete, not generic.";
+  const instruction2 = mode === "teach" ? "Write exactly two sentences for someone learning to code, about 40 words total. Sentence one: the specific change, naming the real file and the function, value, or rule it changes and what that makes the code do differently. Sentence two: teach the one concept behind it and define any term you use. Lead with the change itself, not a throat-clearing intro, and never write a third sentence." : mode === "deep" ? `Write exactly two sentences, each ending in a period and each about 18 words or fewer. First sentence: what Claude is doing and why, naming the real file and the actual function, value, or behavior being changed and what it now does differently. Second sentence: how that works or what it connects to. Do not merge them into one long sentence with "while" or "and". State the mechanism itself, not filler like "implements new logic" or "updates the system". For example: "Claude is editing helper.ts so the loss function drops the opponent's defense by one. That is the rule that lets a winner press their edge after an exchange."` : "Write one sentence, no more than about 20 words, saying what Claude is doing right now, naming the real file and the specific function or command involved. Be concrete, not generic.";
   return `These are the most recent actions an AI coding agent took, newest last:
 ${lines}
 
@@ -3903,6 +3903,9 @@ function looksLikeEvidenceDump(text) {
   if (SHELL_NOISE.test(text)) return true;
   const commas = (text.match(/,/g) || []).length;
   return commas >= 3;
+}
+function hasShellNoise(text) {
+  return SHELL_NOISE.test(text);
 }
 function clampWords(text, max) {
   const words = (text ?? "").trim().split(/\s+/).filter(Boolean);
@@ -4685,7 +4688,7 @@ function parseMetered(stdout, prompt) {
     return { text: out, tokens: estimateTokens(prompt + out) };
   }
 }
-function runClaudeMetered(prompt, timeoutMs = 25e3) {
+function runClaudeMetered(prompt, timeoutMs = 35e3) {
   return new Promise((resolve) => {
     execFile2("claude", buildMeteredArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env: headlessEnv() }, (err, stdout) => {
       if (err) return resolve(null);
@@ -4935,6 +4938,17 @@ function fitWithin(text, sentences, chars) {
   }
   return kept.join(" ");
 }
+function clampToChars(text, chars) {
+  const t = text.trim();
+  if (t.length <= chars) return t;
+  const cut = t.slice(0, chars);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > chars * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
+}
+function fitWhy(text, mode) {
+  const { sentences, chars } = SENTENCE_BUDGET[mode];
+  return fitWithin(text, sentences, chars) || clampToChars(text, chars);
+}
 function fitSentence(primary, fallback, mode) {
   const { sentences, chars } = SENTENCE_BUDGET[mode];
   const fit = fitWithin(primary, sentences, chars);
@@ -4970,17 +4984,26 @@ function composeView(events, snap, now, whys = [], budget = null) {
   }
   const current = chunks[chunks.length - 1];
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
-  const ai = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
-  const caption = buildCaption(current, snap.mode, ai);
-  const plain = ai ? buildCaption(current, snap.mode, null) : caption;
-  const sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
+  const rawWhy = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
+  const cleanWhy = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
+  const richMode = snap.mode === "deep" || snap.mode === "teach";
+  const whyForDisplay = cleanWhy && !hasShellNoise(cleanWhy) ? cleanWhy : null;
+  const title = buildCaption(current, snap.mode, null).title;
+  let sentence;
+  if (richMode && whyForDisplay) {
+    sentence = fitWhy(whyForDisplay, snap.mode);
+  } else {
+    const caption = buildCaption(current, snap.mode, cleanWhy);
+    const plain = cleanWhy ? buildCaption(current, snap.mode, null) : caption;
+    sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
+  }
   const hint = paused;
   return {
     ...base,
     // The line-one chip leads with the purpose ("Adding math.js"), not the bare stage, so the
     // HUD says what Claude is working on at a glance.
     state: "live",
-    stage: caption.title,
+    stage: title,
     sentence,
     warning: snap.warning,
     hint

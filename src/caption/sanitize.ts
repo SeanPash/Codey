@@ -25,6 +25,13 @@ export function looksLikeEvidenceDump(text: string): boolean {
   return commas >= 3;
 }
 
+// A lighter gate than looksLikeEvidenceDump: true only when the text carries raw shell syntax.
+// The paid deep and teach modes show their generated why even when it has several commas (rich
+// prose naturally does), so they reject only a literal command pasted into prose, nothing else.
+export function hasShellNoise(text: string): boolean {
+  return SHELL_NOISE.test(text);
+}
+
 // Keep the first few words of a phrase, dropping a trailing connective so a clamp never ends on
 // "and" or "the". This is how a long shell description becomes a short subject or title fragment
 // without turning into a sprawling run-on.

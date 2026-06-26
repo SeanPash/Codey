@@ -185,6 +185,31 @@ describe("composeView live phase", () => {
     expect(view.sentence).toBe(why);
   });
 
+  it("shows the deep AI why even as one over-long sentence, clamped, never the generic caption", () => {
+    const events = [pre("a", "Bash", { command: "git status" }, 0)];
+    // One run-on sentence longer than the whole deep budget. It must still show (clamped), not be
+    // dropped for the deterministic git caption.
+    const why =
+      "Claude is editing src/statusline/compose.ts so the deep status line always shows the generated explanation grounded in the real files instead of throwing it away for the free deterministic caption whenever the sentence runs a little longer than one terminal line of text.";
+    const view = composeView(events, snap({ mode: "deep", why }), 1000, []);
+    expect(view.sentence).toContain("compose.ts");
+    expect(view.sentence).not.toMatch(/git status|checking|reading/i);
+  });
+
+  it("does not reject a specific deep why just because it has several commas", () => {
+    const events = [pre("a", "Bash", { command: "git status" }, 0)];
+    const why =
+      "Claude is editing helper.ts so the loss function, which targets the opponent, lowers their defense by one, and raises the player's advantage.";
+    const view = composeView(events, snap({ mode: "deep", why }), 1000, []);
+    expect(view.sentence).toBe(why);
+  });
+
+  it("still rejects a why that is literally raw shell text, even in deep mode", () => {
+    const events = [pre("a", "Bash", { command: "git status" }, 0)];
+    const view = composeView(events, snap({ mode: "deep", why: "Running cat events.jsonl | tail -5 to inspect." }), 1000, []);
+    expect(view.sentence).not.toContain("| tail");
+  });
+
   it("makes deep mode meaningfully richer than simple for the same step, with no AI why", () => {
     const events = [pre("a", "Bash", { command: "git status" }, 0)];
     const simple = composeView(events, snap({ mode: "simple", why: null }), 1000, []);

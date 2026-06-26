@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripEllipsis, looksLikeEvidenceDump, clampWords, tidySubject } from "./sanitize.js";
+import { stripEllipsis, looksLikeEvidenceDump, hasShellNoise, clampWords, tidySubject } from "./sanitize.js";
 
 describe("stripEllipsis", () => {
   it("turns a trailing ellipsis into a closed sentence", () => {
@@ -33,6 +33,20 @@ describe("looksLikeEvidenceDump", () => {
   it("passes a clean one or two clause sentence", () => {
     expect(looksLikeEvidenceDump("Claude is comparing the live page with the source file to find the bug.")).toBe(false);
     expect(looksLikeEvidenceDump("Claude is reading a.ts and b.ts.")).toBe(false);
+  });
+});
+
+describe("hasShellNoise", () => {
+  it("flags raw shell syntax", () => {
+    expect(hasShellNoise("Running cat events.jsonl | tail -5.")).toBe(true);
+    expect(hasShellNoise("d=$(ls -td ~/.codey/*)")).toBe(true);
+  });
+
+  it("passes rich prose with several commas, unlike the stricter dump check", () => {
+    const why = "Claude is editing helper.ts so the loss function, which targets the opponent, lowers defense, and raises advantage.";
+    expect(hasShellNoise(why)).toBe(false);
+    // The stricter gate would reject this for its commas; the shell-only gate keeps it.
+    expect(looksLikeEvidenceDump(why)).toBe(true);
   });
 });
 

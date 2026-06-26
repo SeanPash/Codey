@@ -8,6 +8,8 @@ import { budgetLeftLabel, budgetPausedMessage, type Budget } from "../budget/bud
 import { chunkEvents } from "../caption/chunks.js";
 import { buildCaption, type LiveCaption } from "../caption/caption.js";
 import { buildRecap } from "../caption/recap.js";
+import { stripEllipsis, hasShellNoise } from "../caption/sanitize.js";
+import { stripDashes, stripMarkdown } from "../util/text.js";
 
 // Pick the sentence for the current mode: simple is one line, deep and teach reach for the
 // richer fields when they exist and fall back gracefully when they do not.
@@ -48,6 +50,25 @@ function fitWithin(text: string, sentences: number, chars: number): string {
     kept.push(s);
   }
   return kept.join(" ");
+}
+
+// Clamp at a word boundary so a runaway single sentence still shows instead of being dropped.
+// The trailing ellipsis is honest: it signals the thought was cut, which only happens when the
+// model returns one sentence longer than the whole budget.
+function clampToChars(text: string, chars: number): string {
+  const t = text.trim();
+  if (t.length <= chars) return t;
+  const cut = t.slice(0, chars);
+  const sp = cut.lastIndexOf(" ");
+  return (sp > chars * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "…";
+}
+
+// The body for a paid mode (deep/teach): show the real AI why, keeping whole sentences within
+// the mode's budget, and clamping only when a single sentence runs past the whole budget. The
+// generated why is the point of these modes, so it is never swapped out for the free caption.
+function fitWhy(text: string, mode: Mode): string {
+  const { sentences, chars } = SENTENCE_BUDGET[mode];
+  return fitWithin(text, sentences, chars) || clampToChars(text, chars);
 }
 
 // The HUD's second line: prefer the AI-grounded sentence, but only as whole sentences within
@@ -122,12 +143,25 @@ export function composeView(
   // explanation from the previous prompt never shows under this turn's stage: the
   // explanation always matches the work on screen.
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
-  const ai = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
-  const caption = buildCaption(current, snap.mode, ai);
-  // The deterministic caption is the fallback when the AI sentence is too long to show whole,
-  // so the line always ends on a complete thought.
-  const plain = ai ? buildCaption(current, snap.mode, null) : caption;
-  const sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
+  const rawWhy = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
+  const cleanWhy = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
+  // Deep and teach are the paid modes: the generated why is the whole point, so show it (clamped
+  // to fit) and never swap it for the free deterministic caption. We only reject a why that is
+  // literally raw shell text. The deterministic line shows for these modes only before the first
+  // why has been generated. Simple keeps its tighter one-line fit-or-fallback behavior.
+  const richMode = snap.mode === "deep" || snap.mode === "teach";
+  const whyForDisplay = cleanWhy && !hasShellNoise(cleanWhy) ? cleanWhy : null;
+  // The line-one chip title is the deterministic purpose label and never depends on the why.
+  const title = buildCaption(current, snap.mode, null).title;
+
+  let sentence: string;
+  if (richMode && whyForDisplay) {
+    sentence = fitWhy(whyForDisplay, snap.mode);
+  } else {
+    const caption = buildCaption(current, snap.mode, cleanWhy);
+    const plain = cleanWhy ? buildCaption(current, snap.mode, null) : caption;
+    sentence = fitSentence(pickSentence(caption, snap.mode), pickSentence(plain, snap.mode), snap.mode);
+  }
   const hint = paused;
 
   return {
@@ -135,7 +169,7 @@ export function composeView(
     // The line-one chip leads with the purpose ("Adding math.js"), not the bare stage, so the
     // HUD says what Claude is working on at a glance.
     state: "live",
-    stage: caption.title,
+    stage: title,
     sentence,
     warning: snap.warning,
     hint,
