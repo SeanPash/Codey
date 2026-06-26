@@ -1,10 +1,23 @@
 import { execFile } from "node:child_process";
 import { trimArgs, headlessExecOptions, SEGMENTER_SYSTEM_PROMPT } from "./headless-flags.js";
+import { runMetered, type MeteredResult } from "./claude-metered.js";
 
 // Timeline segmentation gets the same context trim as live narration, but keeps a neutral system
 // prompt because it must return strict JSON (see headless-flags.ts).
 export function buildClaudeArgs(prompt: string): string[] {
   return ["-p", prompt, "--model", "haiku", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
+}
+
+// Same call as buildClaudeArgs but asks for json output, so the segmenter's token usage comes back
+// and can be logged to the Codey-overhead account alongside live narration.
+export function buildSegmenterMeteredArgs(prompt: string): string[] {
+  return ["-p", prompt, "--model", "haiku", "--output-format", "json", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
+}
+
+// Segmentation is a one-shot pass; allow a longer budget than live narration. Returns the JSON text
+// (in result) plus usage, or null on failure.
+export function runSegmentationMetered(prompt: string, timeoutMs = 30_000): Promise<MeteredResult | null> {
+  return runMetered(buildSegmenterMeteredArgs(prompt), prompt, timeoutMs);
 }
 
 // Runs the user's own Claude Code headless. Resolves to trimmed stdout, or null on failure.

@@ -3090,10 +3090,10 @@ function metaPath(sessionId, root) {
   return join2(root, sessionId, "meta.json");
 }
 function readMeta(sessionId, root = defaultRoot()) {
-  const file6 = metaPath(sessionId, root);
-  if (!existsSync2(file6)) return null;
+  const file7 = metaPath(sessionId, root);
+  if (!existsSync2(file7)) return null;
   try {
-    return JSON.parse(readFileSync2(file6, "utf8"));
+    return JSON.parse(readFileSync2(file7, "utf8"));
   } catch {
     return null;
   }
@@ -3413,23 +3413,23 @@ function summarizeEvent(e) {
   const err = e.phase === "post" && e.isError && e.errorText ? ` error: ${clip(e.errorText, 140)}` : "";
   const input = e.input ?? {};
   const str2 = (k) => typeof input[k] === "string" ? input[k] : null;
-  const file6 = str2("file_path") ?? str2("path") ?? str2("notebook_path");
+  const file7 = str2("file_path") ?? str2("path") ?? str2("notebook_path");
   let line;
   switch (e.tool) {
     case "Edit":
     case "MultiEdit": {
       const newS = str2("new_string");
       const oldS = str2("old_string");
-      if (file6 && newS != null) {
+      if (file7 && newS != null) {
         const from = oldS ? `, replacing "${clip(oldS, 80)}"` : "";
-        line = `- Edit ${file6}${status}: new code "${clip(newS, 220)}"${from}`;
-      } else line = `- ${e.tool} ${file6 ?? ""}${status}`;
+        line = `- Edit ${file7}${status}: new code "${clip(newS, 220)}"${from}`;
+      } else line = `- ${e.tool} ${file7 ?? ""}${status}`;
       break;
     }
     case "Write":
     case "NotebookEdit": {
       const content = str2("new_source") ?? str2("content");
-      line = `- Write ${file6 ?? "a file"}${status}: ${content ? `"${clip(content, 220)}"` : "new file"}`;
+      line = `- Write ${file7 ?? "a file"}${status}: ${content ? `"${clip(content, 220)}"` : "new file"}`;
       break;
     }
     case "Bash":
@@ -3441,12 +3441,12 @@ function summarizeEvent(e) {
     case "Grep":
     case "Glob": {
       const pat = str2("pattern");
-      const where = file6 ?? str2("glob");
+      const where = file7 ?? str2("glob");
       line = pat ? `- Search${status} for "${clip(pat, 80)}"${where ? ` in ${where}` : ""}` : `- ${e.tool}${status}`;
       break;
     }
     case "Read": {
-      line = `- Read ${file6 ?? "a file"}${status}`;
+      line = `- Read ${file7 ?? "a file"}${status}`;
       break;
     }
     default:
@@ -3507,7 +3507,7 @@ var NarrationEngine = class {
 };
 
 // src/narration/claude-headless.ts
-import { execFile } from "node:child_process";
+import { execFile as execFile2 } from "node:child_process";
 
 // src/narration/headless-flags.ts
 import { tmpdir } from "node:os";
@@ -3530,10 +3530,8 @@ var DISALLOWED_TOOLS = [
   "Task",
   "NotebookEdit",
   "TodoWrite",
-  "MultiEdit",
   "BashOutput",
-  "KillShell",
-  "SlashCommand"
+  "KillShell"
 ];
 var NARRATOR_SYSTEM_PROMPT = "You narrate what an AI coding agent is doing for someone watching it work. Reply with only the narration in plain English: no preamble, no markdown, no tool names as nouns.";
 var SEGMENTER_SYSTEM_PROMPT = "You are a precise assistant. Follow the user's instructions and output format exactly, with no extra text.";
@@ -3552,21 +3550,87 @@ function headlessExecOptions(timeoutMs) {
   return { timeout: timeoutMs, shell: false, windowsHide: true, cwd: tmpdir(), env: headlessEnv(), encoding: "utf8" };
 }
 
+// src/narration/claude-metered.ts
+import { execFile } from "node:child_process";
+
+// src/cost/pricing.ts
+var HAIKU_RATES = {
+  input: 1,
+  output: 5,
+  cacheRead: 0.1,
+  cacheWrite: 1.25
+};
+function costUsd(u) {
+  return (u.input * HAIKU_RATES.input + u.output * HAIKU_RATES.output + u.cacheRead * HAIKU_RATES.cacheRead + u.cacheWrite * HAIKU_RATES.cacheWrite) / 1e6;
+}
+
+// src/narration/claude-metered.ts
+var NO_USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+function buildMeteredArgs(prompt) {
+  return [
+    "-p",
+    prompt,
+    "--model",
+    "haiku",
+    "--output-format",
+    "json",
+    ...trimArgs(NARRATOR_SYSTEM_PROMPT)
+  ];
+}
+function estimateTokens(s) {
+  return Math.ceil(s.length / 4);
+}
+function parseMetered(stdout, prompt) {
+  const out = stdout.trim();
+  if (!out) return null;
+  try {
+    const o = JSON.parse(out);
+    const text = typeof o.result === "string" ? o.result.trim() : "";
+    if (!text) return null;
+    const u = o.usage ?? {};
+    const usage = {
+      input: u.input_tokens ?? 0,
+      output: u.output_tokens ?? 0,
+      cacheRead: u.cache_read_input_tokens ?? 0,
+      cacheWrite: u.cache_creation_input_tokens ?? 0
+    };
+    const tokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
+    const costUsd2 = typeof o.total_cost_usd === "number" ? o.total_cost_usd : costUsd(usage);
+    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text), usage, costUsd: costUsd2 };
+  } catch {
+    return { text: out, tokens: estimateTokens(prompt + out), usage: { ...NO_USAGE }, costUsd: 0 };
+  }
+}
+function runClaudeMetered(prompt, timeoutMs = 35e3) {
+  return runMetered(buildMeteredArgs(prompt), prompt, timeoutMs);
+}
+function runMetered(args, prompt, timeoutMs) {
+  return new Promise((resolve) => {
+    execFile("claude", args, headlessExecOptions(timeoutMs), (err, stdout) => {
+      if (err) return resolve(null);
+      resolve(parseMetered(stdout, prompt));
+    });
+  });
+}
+
 // src/narration/claude-headless.ts
 function buildClaudeArgs(prompt) {
   return ["-p", prompt, "--model", "haiku", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
 }
+function buildSegmenterMeteredArgs(prompt) {
+  return ["-p", prompt, "--model", "haiku", "--output-format", "json", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
+}
+function runSegmentationMetered(prompt, timeoutMs = 3e4) {
+  return runMetered(buildSegmenterMeteredArgs(prompt), prompt, timeoutMs);
+}
 function runClaude(prompt, timeoutMs = 15e3) {
   return new Promise((resolve) => {
-    execFile("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
+    execFile2("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
       if (err) return resolve(null);
       const out = stdout.trim();
       resolve(out.length > 0 ? out : null);
     });
   });
-}
-function runSegmentation(prompt) {
-  return runClaude(prompt, 3e4);
 }
 
 // src/terminal/render.ts
@@ -3715,29 +3779,29 @@ function describeBash(cmd) {
   }
   const word = (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
   const name = pathArg(cmd);
-  const file6 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
+  const file7 = (verb, fallback) => ({ tag: verb, target: name ? `the file ${name}` : fallback });
   const folder = (verb, fallback) => ({ tag: verb, target: name ? `the folder ${name}` : fallback });
   switch (word) {
     case "rm":
     case "del":
     case "unlink":
-      return file6("removing", "a file");
+      return file7("removing", "a file");
     case "rmdir":
       return folder("removing", "a folder");
     case "mkdir":
       return folder("creating", "a folder");
     case "touch":
-      return file6("creating", "a file");
+      return file7("creating", "a file");
     case "cp":
-      return file6("copying", "a file");
+      return file7("copying", "a file");
     case "mv":
-      return file6("moving", "a file");
+      return file7("moving", "a file");
     case "cat":
     case "less":
     case "more":
     case "head":
     case "tail":
-      return file6("reading", "a file");
+      return file7("reading", "a file");
     case "cd":
       return folder("switching to", "a folder");
     case "ls":
@@ -3780,13 +3844,13 @@ function describeBash(cmd) {
   return word ? { tag: "running", target: `the ${word} command` } : { tag: "running", target: "a shell command" };
 }
 function rawTarget(tool, input) {
-  const file6 = str(input, "file_path") ?? str(input, "path");
+  const file7 = str(input, "file_path") ?? str(input, "path");
   switch (tool) {
     case "Read":
     case "Edit":
     case "MultiEdit":
     case "Write":
-      return file6;
+      return file7;
     case "Bash":
       return str(input, "command");
     case "Grep":
@@ -3796,8 +3860,8 @@ function rawTarget(tool, input) {
   return null;
 }
 function actionLabel(tool, input) {
-  const file6 = str(input, "file_path") ?? str(input, "path");
-  const named = (verb) => ({ tag: verb, target: file6 ? `the file ${basename(file6)}` : "a file" });
+  const file7 = str(input, "file_path") ?? str(input, "path");
+  const named = (verb) => ({ tag: verb, target: file7 ? `the file ${basename(file7)}` : "a file" });
   switch (tool) {
     case "Read":
       return named("reading");
@@ -4114,8 +4178,8 @@ function commandIntent(cmd) {
     if (/\btest\b/.test(tail)) {
       return intent("the tests", "Running the tests", "Claude is running the tests to check the work.");
     }
-    const file6 = (tail.trim().split(/\s+/).find((t) => !t.startsWith("-")) || "").split(/[\\/]/).pop();
-    if (file6) return intent(`the ${file6} script`, `Running ${file6}`, `Claude is running ${file6}.`);
+    const file7 = (tail.trim().split(/\s+/).find((t) => !t.startsWith("-")) || "").split(/[\\/]/).pop();
+    if (file7) return intent(`the ${file7} script`, `Running ${file7}`, `Claude is running ${file7}.`);
     return intent("a script", "Running a script", "Claude is running a script.");
   }
   if (word === "curl" || word === "wget") {
@@ -4652,7 +4716,7 @@ function runWatch(sessionId, mode) {
 }
 
 // src/cli/narrate.ts
-import { existsSync as existsSync8, readFileSync as readFileSync8, watchFile as watchFile2 } from "node:fs";
+import { existsSync as existsSync9, readFileSync as readFileSync9, watchFile as watchFile2 } from "node:fs";
 
 // src/statusline/state.ts
 import { readFileSync as readFileSync5, writeFileSync as writeFileSync2, existsSync as existsSync5 } from "node:fs";
@@ -4703,45 +4767,6 @@ function readWhys(dir) {
   return out;
 }
 
-// src/narration/claude-metered.ts
-import { execFile as execFile2 } from "node:child_process";
-function buildMeteredArgs(prompt) {
-  return [
-    "-p",
-    prompt,
-    "--model",
-    "haiku",
-    "--output-format",
-    "json",
-    ...trimArgs(NARRATOR_SYSTEM_PROMPT)
-  ];
-}
-function estimateTokens(s) {
-  return Math.ceil(s.length / 4);
-}
-function parseMetered(stdout, prompt) {
-  const out = stdout.trim();
-  if (!out) return null;
-  try {
-    const o = JSON.parse(out);
-    const text = typeof o.result === "string" ? o.result.trim() : "";
-    if (!text) return null;
-    const u = o.usage ?? {};
-    const tokens = (u.input_tokens ?? 0) + (u.output_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
-    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text) };
-  } catch {
-    return { text: out, tokens: estimateTokens(prompt + out) };
-  }
-}
-function runClaudeMetered(prompt, timeoutMs = 35e3) {
-  return new Promise((resolve) => {
-    execFile2("claude", buildMeteredArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
-      if (err) return resolve(null);
-      resolve(parseMetered(stdout, prompt));
-    });
-  });
-}
-
 // src/budget/budget.ts
 import { readFileSync as readFileSync7, writeFileSync as writeFileSync3, existsSync as existsSync7, rmSync, mkdirSync as mkdirSync3 } from "node:fs";
 import { join as join5 } from "node:path";
@@ -4784,6 +4809,32 @@ function budgetPausedMessage(b) {
   return `Budget reached (${formatTokens(b.spent)} / ${formatTokens(b.cap)}). Auto-explaining paused.`;
 }
 
+// src/cost/spend-log.ts
+import { appendFileSync as appendFileSync3, readFileSync as readFileSync8, existsSync as existsSync8 } from "node:fs";
+import { join as join6 } from "node:path";
+function file4(dir) {
+  return join6(dir, "codey-spend.jsonl");
+}
+function appendSpend(dir, entry) {
+  try {
+    appendFileSync3(file4(dir), JSON.stringify(entry) + "\n");
+  } catch {
+  }
+}
+function readSpend(dir) {
+  const p = file4(dir);
+  if (!existsSync8(p)) return [];
+  const out = [];
+  for (const line of readFileSync8(p, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+    }
+  }
+  return out;
+}
+
 // src/cli/narrate.ts
 async function narrateTick(dir, events, state, now) {
   const w = activeWarning(events, now);
@@ -4806,9 +4857,14 @@ function makeBudgetedNarrate(getBudget, metered, meter) {
 }
 function runNarrate(sessionId, mode) {
   const store = new SessionStore(sessionId);
+  const meteredAndLogged = async (p) => {
+    const r = await runClaudeMetered(p);
+    if (r) appendSpend(store.dir, { ts: Date.now(), kind: "narration", mode, usage: r.usage, costUsd: r.costUsd });
+    return r;
+  };
   const narrate = makeBudgetedNarrate(
     () => readBudget(store.dir),
-    (p) => runClaudeMetered(p),
+    meteredAndLogged,
     (tokens) => addSpend(store.dir, tokens)
   );
   const state = createWatchState(mode, narrate);
@@ -4816,11 +4872,11 @@ function runNarrate(sessionId, mode) {
   let inFlight = false;
   const tick = async () => {
     if (inFlight) return;
-    if (!existsSync8(store.path)) return;
+    if (!existsSync9(store.path)) return;
     inFlight = true;
     try {
       const events = [];
-      for (const line of readFileSync8(store.path, "utf8").split("\n")) {
+      for (const line of readFileSync9(store.path, "utf8").split("\n")) {
         if (!line.trim()) continue;
         try {
           events.push(JSON.parse(line));
@@ -4840,8 +4896,8 @@ function runNarrate(sessionId, mode) {
 }
 
 // src/cli/statusline.ts
-import { join as join11 } from "node:path";
-import { existsSync as existsSync14, readFileSync as readFileSync13 } from "node:fs";
+import { join as join12 } from "node:path";
+import { existsSync as existsSync15, readFileSync as readFileSync14 } from "node:fs";
 
 // src/statusline/read-time.ts
 var PER_WORD_MS = 350;
@@ -4874,6 +4930,44 @@ function formatDuration(ms) {
   const h = Math.floor(m / 60);
   const rm = m % 60;
   return `${h}h ${String(rm).padStart(2, "0")}m`;
+}
+
+// src/cost/format.ts
+function formatUsd(n) {
+  if (n === 0) return "$0.00";
+  if (n < 0.01) return "<$0.01";
+  return `$${n.toFixed(2)}`;
+}
+function overheadFooter(o) {
+  if (o.total.tokens === 0) return null;
+  return `Codey used ${formatTokens(o.total.tokens)} tok (~${formatUsd(o.total.costUsd)}) this turn.`;
+}
+
+// src/cost/spend-summary.ts
+function tokensOf(u) {
+  return u.input + u.output + u.cacheRead + u.cacheWrite;
+}
+function add(t, e) {
+  return { calls: t.calls + 1, tokens: t.tokens + tokensOf(e.usage), costUsd: t.costUsd + e.costUsd };
+}
+function zero() {
+  return { calls: 0, tokens: 0, costUsd: 0 };
+}
+function summarizeSpend(entries) {
+  const out = {
+    total: zero(),
+    byKind: { narration: zero(), timeline: zero() },
+    byMode: {}
+  };
+  for (const e of entries) {
+    out.total = add(out.total, e);
+    out.byKind[e.kind] = add(out.byKind[e.kind], e);
+    if (e.kind === "narration" && e.mode) {
+      const m = e.mode;
+      out.byMode[m] = add(out.byMode[m] ?? zero(), e);
+    }
+  }
+  return out;
 }
 
 // src/caption/recap.ts
@@ -5002,7 +5096,7 @@ function fitSentence(primary, fallback, mode) {
   return fb || fallback;
 }
 var DONE_FOOTER = "Run /codey:timeline for the full breakdown.";
-function composeView(events, snap, now, whys = [], budget = null) {
+function composeView(events, snap, now, whys = [], budget = null, overhead = summarizeSpend([])) {
   const budgetLeft = budgetLeftLabel(budget);
   const paused = budgetPausedMessage(budget);
   const newestTs = events.reduce((m, e) => Math.max(m, e.timestamp), Number.NEGATIVE_INFINITY);
@@ -5020,7 +5114,9 @@ function composeView(events, snap, now, whys = [], budget = null) {
   if (done) {
     const turnStart2 = snap.promptAt ?? Number.NEGATIVE_INFINITY;
     const recap = buildRecap(events.filter((e) => e.timestamp >= turnStart2));
-    return { ...base, state: "done", stage: "Done", sentence: recap.sentence, warning: null, hint: DONE_FOOTER };
+    const overheadLine = overheadFooter(overhead);
+    const hint2 = overheadLine ? `${overheadLine} ${DONE_FOOTER}` : DONE_FOOTER;
+    return { ...base, state: "done", stage: "Done", sentence: recap.sentence, warning: null, hint: hint2 };
   }
   const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
   const chunks = chunkEvents(events.filter((e) => e.timestamp >= turnStart));
@@ -5109,12 +5205,12 @@ function renderStatus(view, _width = WRAP) {
 }
 
 // src/cli/sessions.ts
-import { readdirSync, statSync, existsSync as existsSync12 } from "node:fs";
-import { join as join9 } from "node:path";
+import { readdirSync, statSync, existsSync as existsSync13 } from "node:fs";
+import { join as join10 } from "node:path";
 
 // src/timeline/segment-cache.ts
-import { writeFileSync as writeFileSync4, readFileSync as readFileSync9, existsSync as existsSync9, mkdirSync as mkdirSync4 } from "node:fs";
-import { join as join6 } from "node:path";
+import { writeFileSync as writeFileSync4, readFileSync as readFileSync10, existsSync as existsSync10, mkdirSync as mkdirSync4 } from "node:fs";
+import { join as join7 } from "node:path";
 
 // src/timeline/segment.ts
 function naiveSegment(events) {
@@ -5148,8 +5244,8 @@ function eventSummary(e) {
     }
     return desc ?? "ran a command";
   }
-  const file6 = field(e.input, "file_path") ?? field(e.input, "path") ?? field(e.input, "notebook_path");
-  if (file6) return `${e.tool} ${basename3(file6)}`;
+  const file7 = field(e.input, "file_path") ?? field(e.input, "path") ?? field(e.input, "notebook_path");
+  if (file7) return `${e.tool} ${basename3(file7)}`;
   const pattern = field(e.input, "pattern");
   if (pattern) return `${e.tool} for ${pattern}`;
   return e.tool;
@@ -5201,19 +5297,19 @@ function parseSegmentation(text, eventCount) {
 // src/timeline/segment-cache.ts
 var STALE_SLACK = 5;
 function cachePath(sessionId, root) {
-  return join6(root, sessionId, "timeline.json");
+  return join7(root, sessionId, "timeline.json");
 }
 function readCache(sessionId, root = defaultRoot()) {
-  const file6 = cachePath(sessionId, root);
-  if (!existsSync9(file6)) return null;
+  const file7 = cachePath(sessionId, root);
+  if (!existsSync10(file7)) return null;
   try {
-    return JSON.parse(readFileSync9(file6, "utf8"));
+    return JSON.parse(readFileSync10(file7, "utf8"));
   } catch {
     return null;
   }
 }
 function writeCache(sessionId, cache, root = defaultRoot()) {
-  mkdirSync4(join6(root, sessionId), { recursive: true });
+  mkdirSync4(join7(root, sessionId), { recursive: true });
   writeFileSync4(cachePath(sessionId, root), JSON.stringify(cache));
 }
 function isStale(cache, eventCount) {
@@ -5241,8 +5337,17 @@ function refresh(sessionId, events, lockBefore, prev, root) {
   if (refreshing.has(sessionId)) return;
   refreshing.add(sessionId);
   const slice = events.slice(lockBefore);
-  runSegmentation(buildSegmentationPrompt(slice)).then((text) => {
-    const tail = text ? parseSegmentation(text, slice.length) : [];
+  runSegmentationMetered(buildSegmentationPrompt(slice)).then((res) => {
+    if (res) {
+      appendSpend(join7(root, sessionId), {
+        ts: Date.now(),
+        kind: "timeline",
+        mode: null,
+        usage: res.usage,
+        costUsd: res.costUsd
+      });
+    }
+    const tail = res?.text ? parseSegmentation(res.text, slice.length) : [];
     if (tail.length === 0) return;
     const chunks = mergeSegmentation(prev, tail, lockBefore);
     if (chunks.length > 0) writeCache(sessionId, { eventCount: events.length, chunks }, root);
@@ -5259,16 +5364,16 @@ function chunksFor(sessionId, events, root = defaultRoot(), opts = { live: true,
 }
 
 // src/capture/prompts.ts
-import { appendFileSync as appendFileSync3, readFileSync as readFileSync10, existsSync as existsSync10 } from "node:fs";
-import { join as join7 } from "node:path";
-function file4(dir) {
-  return join7(dir, "prompts.jsonl");
+import { appendFileSync as appendFileSync4, readFileSync as readFileSync11, existsSync as existsSync11 } from "node:fs";
+import { join as join8 } from "node:path";
+function file5(dir) {
+  return join8(dir, "prompts.jsonl");
 }
 function readPrompts(dir) {
-  const p = file4(dir);
-  if (!existsSync10(p)) return [];
+  const p = file5(dir);
+  if (!existsSync11(p)) return [];
   const out = [];
-  for (const line of readFileSync10(p, "utf8").split("\n")) {
+  for (const line of readFileSync11(p, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
       const o = JSON.parse(line);
@@ -5309,14 +5414,14 @@ function sessionColor(sessionId) {
 }
 
 // src/store/session-name-store.ts
-import { writeFileSync as writeFileSync5, readFileSync as readFileSync11, mkdirSync as mkdirSync5, existsSync as existsSync11, rmSync as rmSync2 } from "node:fs";
-import { join as join8 } from "node:path";
+import { writeFileSync as writeFileSync5, readFileSync as readFileSync12, mkdirSync as mkdirSync5, existsSync as existsSync12, rmSync as rmSync2 } from "node:fs";
+import { join as join9 } from "node:path";
 var NAME_FILE = "name.json";
 function readCustomName(dir) {
-  const file6 = join8(dir, NAME_FILE);
-  if (!existsSync11(file6)) return null;
+  const file7 = join9(dir, NAME_FILE);
+  if (!existsSync12(file7)) return null;
   try {
-    const parsed = JSON.parse(readFileSync11(file6, "utf8"));
+    const parsed = JSON.parse(readFileSync12(file7, "utf8"));
     const trimmed = String(parsed.name ?? "").trim();
     return trimmed.length > 0 ? trimmed : null;
   } catch {
@@ -5324,31 +5429,31 @@ function readCustomName(dir) {
   }
 }
 function writeCustomName(dir, name) {
-  const file6 = join8(dir, NAME_FILE);
+  const file7 = join9(dir, NAME_FILE);
   const trimmed = name.trim();
   if (!trimmed) {
     try {
-      rmSync2(file6, { force: true });
+      rmSync2(file7, { force: true });
     } catch {
     }
     return;
   }
   mkdirSync5(dir, { recursive: true });
-  writeFileSync5(file6, JSON.stringify({ name: trimmed }, null, 2));
+  writeFileSync5(file7, JSON.stringify({ name: trimmed }, null, 2));
 }
 
 // src/cli/sessions.ts
 function eventsMtime(sessionDir) {
-  const p = join9(sessionDir, "events.jsonl");
-  return existsSync12(p) ? statSync(p).mtimeMs : null;
+  const p = join10(sessionDir, "events.jsonl");
+  return existsSync13(p) ? statSync(p).mtimeMs : null;
 }
 function latestSessionId(root = defaultRoot()) {
-  if (!existsSync12(root)) return null;
+  if (!existsSync13(root)) return null;
   const names = readdirSync(root);
   if (names.length === 0) return null;
-  const active = names.map((name) => ({ name, mtime: eventsMtime(join9(root, name)) })).filter((s) => s.mtime !== null).sort((a, b) => b.mtime - a.mtime);
+  const active = names.map((name) => ({ name, mtime: eventsMtime(join10(root, name)) })).filter((s) => s.mtime !== null).sort((a, b) => b.mtime - a.mtime);
   if (active.length > 0) return active[0].name;
-  return names.map((name) => ({ name, mtime: statSync(join9(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
+  return names.map((name) => ({ name, mtime: statSync(join10(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
 }
 var RUNNING_WINDOW_MS = 15e3;
 var OPEN_WINDOW_MS = 10 * 6e4;
@@ -5365,9 +5470,9 @@ function dayBucket(mtime, now) {
   return d.toLocaleDateString();
 }
 function listSessions(root = defaultRoot(), now = Date.now()) {
-  if (!existsSync12(root)) return [];
-  return readdirSync(root).filter((name) => statSync(join9(root, name)).isDirectory()).map((id) => {
-    const dir = join9(root, id);
+  if (!existsSync13(root)) return [];
+  return readdirSync(root).filter((name) => statSync(join10(root, name)).isDirectory()).map((id) => {
+    const dir = join10(root, id);
     const evMtime = eventsMtime(dir);
     const cache = readCache(id, root);
     const prompts = readPrompts(dir);
@@ -5410,10 +5515,10 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
 }
 
 // src/statusline/active-mode.ts
-import { readFileSync as readFileSync12, writeFileSync as writeFileSync6, existsSync as existsSync13, rmSync as rmSync3, mkdirSync as mkdirSync6, readdirSync as readdirSync2 } from "node:fs";
-import { join as join10 } from "node:path";
+import { readFileSync as readFileSync13, writeFileSync as writeFileSync6, existsSync as existsSync14, rmSync as rmSync3, mkdirSync as mkdirSync6, readdirSync as readdirSync2 } from "node:fs";
+import { join as join11 } from "node:path";
 function modeFile(sessionDir) {
-  return join10(sessionDir, "mode");
+  return join11(sessionDir, "mode");
 }
 function writeSessionMode(mode, sessionDir) {
   mkdirSync6(sessionDir, { recursive: true });
@@ -5424,24 +5529,24 @@ function clearSessionMode(sessionDir) {
 }
 function readSessionMode(sessionDir) {
   const p = modeFile(sessionDir);
-  if (!existsSync13(p)) return null;
-  const raw = readFileSync12(p, "utf8").trim();
+  if (!existsSync14(p)) return null;
+  const raw = readFileSync13(p, "utf8").trim();
   return raw === "simple" || raw === "deep" || raw === "teach" ? raw : null;
 }
 function anyActiveSession(root) {
-  if (!existsSync13(root)) return false;
+  if (!existsSync14(root)) return false;
   for (const name of readdirSync2(root)) {
-    if (existsSync13(modeFile(join10(root, name)))) return true;
+    if (existsSync14(modeFile(join11(root, name)))) return true;
   }
   return false;
 }
 
 // src/cli/statusline.ts
 function readEvents(dir) {
-  const p = join11(dir, "events.jsonl");
-  if (!existsSync14(p)) return [];
+  const p = join12(dir, "events.jsonl");
+  if (!existsSync15(p)) return [];
   const out = [];
-  for (const line of readFileSync13(p, "utf8").split("\n")) {
+  for (const line of readFileSync14(p, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
       out.push(JSON.parse(line));
@@ -5451,9 +5556,11 @@ function readEvents(dir) {
   return out;
 }
 function statusLineFor(dir, now = Date.now(), mode) {
-  if (!existsSync14(dir)) return "";
+  if (!existsSync15(dir)) return "";
   const snap = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
-  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir), readBudget(dir)));
+  const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
+  const overhead = summarizeSpend(readSpend(dir).filter((e) => e.ts >= turnStart));
+  return renderStatus(composeView(readEvents(dir), { ...snap, mode: mode ?? snap.mode }, now, readWhys(dir), readBudget(dir), overhead));
 }
 function sessionFromPayload(payload) {
   try {
@@ -5472,7 +5579,7 @@ function offHint() {
 }
 function lineForSession(session, root, now) {
   if (!session) return "";
-  const dir = join11(root, session);
+  const dir = join12(root, session);
   const mode = readSessionMode(dir);
   if (!mode) return offHint();
   return statusLineFor(dir, now, mode);
@@ -5493,13 +5600,13 @@ function runStatusLine() {
 
 // src/cli/serve.ts
 import { fileURLToPath } from "node:url";
-import { dirname as dirname2, join as join18 } from "node:path";
+import { dirname as dirname2, join as join19 } from "node:path";
 import { rmSync as rmSync6 } from "node:fs";
 
 // src/serve/server.ts
 import { createServer as createHttpServer } from "node:http";
-import { readFileSync as readFileSync14 } from "node:fs";
-import { join as join12 } from "node:path";
+import { readFileSync as readFileSync15 } from "node:fs";
+import { join as join13 } from "node:path";
 function decodeId(raw) {
   try {
     return decodeURIComponent(raw);
@@ -5582,7 +5689,7 @@ function createServer(deps) {
     try {
       if (route.type === "page") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-        res.end(readFileSync14(deps.pagePath, "utf8"));
+        res.end(readFileSync15(deps.pagePath, "utf8"));
       } else if (route.type === "health") {
         sendJson(res, 200, { build: deps.buildId });
       } else if (route.type === "sessions") {
@@ -5596,7 +5703,7 @@ function createServer(deps) {
       } else if (route.type === "font") {
         const ct = route.file.endsWith(".woff2") ? "font/woff2" : "font/woff";
         res.writeHead(200, { "content-type": ct, "cache-control": "max-age=86400" });
-        res.end(readFileSync14(join12(deps.fontsDir, route.file)));
+        res.end(readFileSync15(join13(deps.fontsDir, route.file)));
       } else if (route.type === "intervene") {
         void readBody(req).then((body) => {
           let action = "";
@@ -5664,7 +5771,7 @@ function buildIdFrom(entryPath) {
 
 // src/serve/load-snapshot.ts
 import { statSync as statSync2 } from "node:fs";
-import { join as join15 } from "node:path";
+import { join as join16 } from "node:path";
 
 // src/caption/banned.ts
 var BANNED_PHRASES = [
@@ -5793,15 +5900,15 @@ function thinkingSubtitle(text) {
 }
 function describeAction(tool, input, text) {
   if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
-  const file6 = fileFrom(input);
+  const file7 = fileFrom(input);
   switch (tool) {
     case "Write":
-      return file6 ? `Writing ${file6}` : "Writing a file";
+      return file7 ? `Writing ${file7}` : "Writing a file";
     case "Edit":
     case "MultiEdit":
-      return file6 ? `Editing ${file6}` : "Editing a file";
+      return file7 ? `Editing ${file7}` : "Editing a file";
     case "Read":
-      return file6 ? `Reading ${file6}` : "Reading a file";
+      return file7 ? `Reading ${file7}` : "Reading a file";
     case "Bash":
     case "PowerShell":
       return descFrom(input) ?? "Ran a command";
@@ -5817,8 +5924,8 @@ function describeAction(tool, input, text) {
 }
 function actionSubject(tool, input) {
   if (tool === "Grep" || tool === "Glob") return phrasePattern(patternFrom(input) ?? "");
-  const file6 = fileFrom(input);
-  if (file6) return humanFile(file6);
+  const file7 = fileFrom(input);
+  if (file7) return humanFile(file7);
   return humanFile(shortTarget(actionLabel(tool, input).target)) || "the code";
 }
 function actionTitle(tool, input, text) {
@@ -6103,7 +6210,8 @@ function buildSnapshot(input) {
     activeWarning: null,
     seedDepth: input.seedDepth ?? "deep",
     genAuto: input.genAuto ?? false,
-    budgetLeft: null
+    budgetLeft: null,
+    codeyOverhead: input.overhead ?? summarizeSpend([])
   };
 }
 
@@ -6254,10 +6362,10 @@ function buildSummaryPrompt(promptText, tasks, depth) {
 }
 
 // src/timeline/explain-cache.ts
-import { readFileSync as readFileSync15, writeFileSync as writeFileSync7, existsSync as existsSync15, mkdirSync as mkdirSync7 } from "node:fs";
-import { join as join13 } from "node:path";
+import { readFileSync as readFileSync16, writeFileSync as writeFileSync7, existsSync as existsSync16, mkdirSync as mkdirSync7 } from "node:fs";
+import { join as join14 } from "node:path";
 function cachePath2(sessionId, root) {
-  return join13(root, sessionId, "explanations.json");
+  return join14(root, sessionId, "explanations.json");
 }
 function idPrefix(scope, id) {
   return `${scope}:${id}:`;
@@ -6267,9 +6375,9 @@ function key(scope, id, contentHash, depth) {
 }
 function read(sessionId, root) {
   const p = cachePath2(sessionId, root);
-  if (!existsSync15(p)) return {};
+  if (!existsSync16(p)) return {};
   try {
-    const o = JSON.parse(readFileSync15(p, "utf8"));
+    const o = JSON.parse(readFileSync16(p, "utf8"));
     return o && typeof o === "object" ? o : {};
   } catch {
     return {};
@@ -6288,7 +6396,7 @@ function writeExplanation(sessionId, scope, id, contentHash, depth, text, root =
     if (k.startsWith(prefix) && !k.startsWith(`${prefix}${contentHash}:`) && k !== live) delete store[k];
   }
   store[live] = stripDashes(text);
-  mkdirSync7(join13(root, sessionId), { recursive: true });
+  mkdirSync7(join14(root, sessionId), { recursive: true });
   writeFileSync7(cachePath2(sessionId, root), JSON.stringify(store));
 }
 
@@ -6453,17 +6561,17 @@ function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINI
 }
 
 // src/store/dismissed-store.ts
-import { writeFileSync as writeFileSync8, readFileSync as readFileSync16, existsSync as existsSync16, mkdirSync as mkdirSync8 } from "node:fs";
-import { join as join14 } from "node:path";
+import { writeFileSync as writeFileSync8, readFileSync as readFileSync17, existsSync as existsSync17, mkdirSync as mkdirSync8 } from "node:fs";
+import { join as join15 } from "node:path";
 var FILE = "dismissed.json";
-function file5(root) {
-  return join14(root, FILE);
+function file6(root) {
+  return join15(root, FILE);
 }
 function readDismissed(root) {
-  const p = file5(root);
-  if (!existsSync16(p)) return /* @__PURE__ */ new Set();
+  const p = file6(root);
+  if (!existsSync17(p)) return /* @__PURE__ */ new Set();
   try {
-    const parsed = JSON.parse(readFileSync16(p, "utf8"));
+    const parsed = JSON.parse(readFileSync17(p, "utf8"));
     if (!Array.isArray(parsed)) return /* @__PURE__ */ new Set();
     return new Set(parsed.filter((x) => typeof x === "string"));
   } catch {
@@ -6472,7 +6580,7 @@ function readDismissed(root) {
 }
 function write(root, ids) {
   mkdirSync8(root, { recursive: true });
-  writeFileSync8(file5(root), JSON.stringify([...ids], null, 2));
+  writeFileSync8(file6(root), JSON.stringify([...ids], null, 2));
 }
 function dismiss(root, id) {
   const ids = readDismissed(root);
@@ -6490,7 +6598,7 @@ function restore(root, id) {
 function isRunning(dir, now, cancelledAt = 0) {
   let evMtime = 0;
   try {
-    evMtime = statSync2(join15(dir, "events.jsonl")).mtimeMs;
+    evMtime = statSync2(join16(dir, "events.jsonl")).mtimeMs;
   } catch {
     evMtime = 0;
   }
@@ -6549,7 +6657,8 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     now,
     seedDepth,
     genAuto,
-    cancelledAt
+    cancelledAt,
+    overhead: summarizeSpend(readSpend(store.dir))
   });
   const reconciled = reconcileErrors(events, turns);
   const withMeta = {
@@ -6585,7 +6694,7 @@ async function runExplain(sessionId, body, root = defaultRoot()) {
   return explain(
     snap,
     { sessionId, scope: b.scope, id: b.id, depth: b.depth },
-    { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join15(root, sessionId) }
+    { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join16(root, sessionId) }
   );
 }
 function loadLive(root = defaultRoot()) {
@@ -6630,14 +6739,14 @@ function loadLive(root = defaultRoot()) {
 }
 
 // src/intervene/file-io.ts
-import { writeFileSync as writeFileSync9, readFileSync as readFileSync17, existsSync as existsSync17, rmSync as rmSync4, mkdirSync as mkdirSync9 } from "node:fs";
-import { join as join16 } from "node:path";
+import { writeFileSync as writeFileSync9, readFileSync as readFileSync18, existsSync as existsSync18, rmSync as rmSync4, mkdirSync as mkdirSync9 } from "node:fs";
+import { join as join17 } from "node:path";
 function interventionPath(sessionId, root = defaultRoot()) {
-  return join16(root, sessionId, "intervene.json");
+  return join17(root, sessionId, "intervene.json");
 }
-function writeInterventionFile(sessionId, file6, root = defaultRoot()) {
-  mkdirSync9(join16(root, sessionId), { recursive: true });
-  writeFileSync9(interventionPath(sessionId, root), JSON.stringify(file6));
+function writeInterventionFile(sessionId, file7, root = defaultRoot()) {
+  mkdirSync9(join17(root, sessionId), { recursive: true });
+  writeFileSync9(interventionPath(sessionId, root), JSON.stringify(file7));
 }
 
 // src/intervene/record.ts
@@ -6660,8 +6769,8 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 }
 
 // src/store/session-prune.ts
-import { readdirSync as readdirSync3, statSync as statSync3, existsSync as existsSync18, rmSync as rmSync5 } from "node:fs";
-import { join as join17 } from "node:path";
+import { readdirSync as readdirSync3, statSync as statSync3, existsSync as existsSync19, rmSync as rmSync5 } from "node:fs";
+import { join as join18 } from "node:path";
 function newestMtime(dir) {
   let newest = statSync3(dir).mtimeMs;
   let entries;
@@ -6672,7 +6781,7 @@ function newestMtime(dir) {
   }
   for (const name of entries) {
     try {
-      const ms = statSync3(join17(dir, name)).mtimeMs;
+      const ms = statSync3(join18(dir, name)).mtimeMs;
       if (ms > newest) newest = ms;
     } catch {
     }
@@ -6680,7 +6789,7 @@ function newestMtime(dir) {
   return newest;
 }
 function pruneEventless(root, now, maxAgeMs) {
-  if (!existsSync18(root)) return [];
+  if (!existsSync19(root)) return [];
   let entries;
   try {
     entries = readdirSync3(root);
@@ -6689,10 +6798,10 @@ function pruneEventless(root, now, maxAgeMs) {
   }
   const removed = [];
   for (const name of entries) {
-    const dir = join17(root, name);
+    const dir = join18(root, name);
     try {
       if (!statSync3(dir).isDirectory()) continue;
-      if (existsSync18(join17(dir, "events.jsonl"))) continue;
+      if (existsSync19(join18(dir, "events.jsonl"))) continue;
       const age = now - newestMtime(dir);
       if (age < maxAgeMs) continue;
       rmSync5(dir, { recursive: true, force: true });
@@ -6706,7 +6815,7 @@ function pruneEventless(root, now, maxAgeMs) {
 // src/cli/serve.ts
 var here = dirname2(fileURLToPath(import.meta.url));
 function publicDir() {
-  return join18(here, "..", "serve", "public");
+  return join19(here, "..", "serve", "public");
 }
 function safeId2(id) {
   return !!id && !id.includes("/") && !id.includes("\\") && !id.includes("..");
@@ -6717,8 +6826,8 @@ function runServe(opts) {
   } catch {
   }
   const server = createServer({
-    pagePath: join18(publicDir(), "index.html"),
-    fontsDir: join18(publicDir(), "fonts"),
+    pagePath: join19(publicDir(), "index.html"),
+    fontsDir: join19(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
     getSnapshot: (id) => {
@@ -6734,7 +6843,7 @@ function runServe(opts) {
     rename: (id, name) => {
       if (!safeId2(id)) return false;
       try {
-        writeCustomName(join18(defaultRoot(), id), name);
+        writeCustomName(join19(defaultRoot(), id), name);
         return true;
       } catch {
         return false;
@@ -6743,7 +6852,7 @@ function runServe(opts) {
     remove: (id) => {
       if (!safeId2(id)) return false;
       try {
-        rmSync6(join18(defaultRoot(), id), { recursive: true, force: true });
+        rmSync6(join19(defaultRoot(), id), { recursive: true, force: true });
         return true;
       } catch {
         return false;
@@ -6784,8 +6893,8 @@ function runServe(opts) {
 }
 
 // src/cli/feed.ts
-import { existsSync as existsSync19, watchFile as watchFile3 } from "node:fs";
-import { join as join19 } from "node:path";
+import { existsSync as existsSync20, watchFile as watchFile3 } from "node:fs";
+import { join as join20 } from "node:path";
 
 // src/feed/render.ts
 var RESET3 = "\x1B[0m";
@@ -6883,15 +6992,15 @@ function promptTimes(chunks) {
 // src/cli/feed.ts
 function runFeed(sessionId) {
   const store = new SessionStore(sessionId);
-  const narrationPath = join19(store.dir, "narration.jsonl");
-  const promptsPath = join19(store.dir, "prompts.jsonl");
+  const narrationPath = join20(store.dir, "narration.jsonl");
+  const promptsPath = join20(store.dir, "prompts.jsonl");
   let cursor = { printedChunks: /* @__PURE__ */ new Set(), turnsHeadered: /* @__PURE__ */ new Set() };
   const build = () => {
     const mode = readSessionMode(store.dir) ?? "simple";
     return feedChunks(store.readAll(), readPrompts(store.dir), readWhys(store.dir), mode);
   };
   const flush = () => {
-    if (!existsSync19(store.path)) return;
+    if (!existsSync20(store.path)) return;
     const r = advanceFeed(build(), cursor);
     cursor = r.cursor;
     if (r.text) process.stdout.write(r.text + "\n");
@@ -6904,9 +7013,9 @@ function runFeed(sessionId) {
 }
 
 // src/cli/toggle.ts
-import { readFileSync as readFileSync18, writeFileSync as writeFileSync10, existsSync as existsSync20, mkdirSync as mkdirSync10, rmSync as rmSync7 } from "node:fs";
+import { readFileSync as readFileSync19, writeFileSync as writeFileSync10, existsSync as existsSync21, mkdirSync as mkdirSync10, rmSync as rmSync7 } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join20, dirname as dirname3 } from "node:path";
+import { join as join21, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
 function withStatusLine(s, command2) {
   return { ...s, statusLine: { type: "command", command: command2 } };
@@ -6917,13 +7026,13 @@ function withoutStatusLine(s) {
   return next;
 }
 function settingsPath() {
-  return join20(homedir2(), ".claude", "settings.json");
+  return join21(homedir2(), ".claude", "settings.json");
 }
 function readSettings() {
   const p = settingsPath();
-  if (!existsSync20(p)) return {};
+  if (!existsSync21(p)) return {};
   try {
-    return JSON.parse(readFileSync18(p, "utf8"));
+    return JSON.parse(readFileSync19(p, "utf8"));
   } catch {
     return {};
   }
@@ -6941,11 +7050,11 @@ function ensureStatusLine(self) {
   if (!s.statusLine) writeSettings(withStatusLine(s, statusLineCommand(self)));
 }
 function pidPath(sessionDir) {
-  return join20(sessionDir, "narrator.pid");
+  return join21(sessionDir, "narrator.pid");
 }
 function stopNarrator(path, kill = (pid) => process.kill(pid)) {
-  if (!existsSync20(path)) return;
-  const pid = Number(readFileSync18(path, "utf8").trim());
+  if (!existsSync21(path)) return;
+  const pid = Number(readFileSync19(path, "utf8").trim());
   if (pid > 0) {
     try {
       kill(pid);
@@ -6956,7 +7065,7 @@ function stopNarrator(path, kill = (pid) => process.kill(pid)) {
 }
 function turnOn(mode, session) {
   const self = process.argv[1];
-  const dir = join20(defaultRoot(), session);
+  const dir = join21(defaultRoot(), session);
   mkdirSync10(dir, { recursive: true });
   stopNarrator(pidPath(dir));
   writeSessionMode(mode, dir);
@@ -6971,7 +7080,7 @@ function turnOn(mode, session) {
   writeFileSync10(pidPath(dir), String(child.pid ?? ""));
 }
 function turnOff(session) {
-  const dir = join20(defaultRoot(), session);
+  const dir = join21(defaultRoot(), session);
   stopNarrator(pidPath(dir));
   clearBudget(dir);
   clearSessionMode(dir);
@@ -6982,8 +7091,8 @@ function turnOff(session) {
 import { spawn as spawn2 } from "node:child_process";
 import { connect } from "node:net";
 import { get as httpGet } from "node:http";
-import { readFileSync as readFileSync19, writeFileSync as writeFileSync11, existsSync as existsSync21 } from "node:fs";
-import { join as join21 } from "node:path";
+import { readFileSync as readFileSync20, writeFileSync as writeFileSync11, existsSync as existsSync22 } from "node:fs";
+import { join as join22 } from "node:path";
 var DEFAULT_PORT = 4317;
 function timelineDecision(lock, currentBuild, probe) {
   if (!lock) return { action: "spawn", port: DEFAULT_PORT };
@@ -6993,13 +7102,13 @@ function timelineDecision(lock, currentBuild, probe) {
   return { action: "replace", port: lock.port, pid: lock.pid };
 }
 function lockPath(root) {
-  return join21(root, "serve.lock");
+  return join22(root, "serve.lock");
 }
 function readLock(root) {
   const p = lockPath(root);
-  if (!existsSync21(p)) return null;
+  if (!existsSync22(p)) return null;
   try {
-    const o = JSON.parse(readFileSync19(p, "utf8"));
+    const o = JSON.parse(readFileSync20(p, "utf8"));
     if (typeof o.port === "number" && typeof o.pid === "number") {
       return { port: o.port, pid: o.pid, build: typeof o.build === "string" ? o.build : "" };
     }
@@ -7108,13 +7217,13 @@ async function runTimeline() {
 }
 
 // src/cli/index.ts
-import { join as join22 } from "node:path";
+import { join as join23 } from "node:path";
 function parseMode(m) {
   return ["simple", "deep", "teach"].includes(m) ? m : "simple";
 }
 function resolveWatchMode(opt, session) {
   if (opt) return parseMode(opt);
-  const snap = readStatus(join22(defaultRoot(), session));
+  const snap = readStatus(join23(defaultRoot(), session));
   return snap?.mode ?? "simple";
 }
 var program2 = new Command();

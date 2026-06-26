@@ -5,6 +5,9 @@ import type { StatusSnapshot } from "./state.js";
 import type { StatusView } from "./view.js";
 import type { WhyEntry } from "../narration/history.js";
 import { budgetLeftLabel, budgetPausedMessage, type Budget } from "../budget/budget.js";
+import { overheadFooter } from "../cost/format.js";
+import { summarizeSpend } from "../cost/spend-summary.js";
+import type { CodeyOverhead } from "../types.js";
 import { chunkEvents } from "../caption/chunks.js";
 import { buildCaption, type LiveCaption } from "../caption/caption.js";
 import { buildRecap } from "../caption/recap.js";
@@ -92,6 +95,7 @@ export function composeView(
   now: number,
   whys: WhyEntry[] = [],
   budget: Budget | null = null,
+  overhead: CodeyOverhead = summarizeSpend([]),
 ): StatusView {
   const budgetLeft = budgetLeftLabel(budget);
   const paused = budgetPausedMessage(budget);
@@ -123,7 +127,10 @@ export function composeView(
     // footer always sits beneath it, pointing at the fuller browser breakdown.
     const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
     const recap = buildRecap(events.filter((e) => e.timestamp >= turnStart));
-    return { ...base, state: "done", stage: "Done", sentence: recap.sentence, warning: null, hint: DONE_FOOTER };
+    // Lead the footer with what Codey itself cost this turn (when it ran), then the breakdown pointer.
+    const overheadLine = overheadFooter(overhead);
+    const hint = overheadLine ? `${overheadLine} ${DONE_FOOTER}` : DONE_FOOTER;
+    return { ...base, state: "done", stage: "Done", sentence: recap.sentence, warning: null, hint };
   }
 
   // The live phase is scoped to the current turn so it resets cleanly on each new prompt.

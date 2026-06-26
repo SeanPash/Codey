@@ -1381,6 +1381,27 @@
           + `<div class="pr"><span class="pn">${esc(snap.priciestTaskName)}</span>`
           + `<span class="pt num">${kfmt(snap.priciestTaskWork)}<small>tok</small></span></div></div>` : "";
 
+      // Codey's own cost: what its narration and timeline calls spent, kept separate from Claude's
+      // work above so it is obvious which tokens are the tool's overhead. Cost is a cache-aware
+      // estimate on Haiku rates; tokens are exact.
+      const ov = snap.codeyOverhead || { total: { calls: 0, tokens: 0, costUsd: 0 },
+        byKind: { narration: { calls: 0, tokens: 0, costUsd: 0 }, timeline: { calls: 0, tokens: 0, costUsd: 0 } } };
+      const usd = (n) => (!n ? "$0.00" : n < 0.01 ? "<$0.01" : "$" + n.toFixed(2));
+      const ovVal = (t) => `${kfmt(t.tokens)}<small>tok</small> &bull; ~${usd(t.costUsd)}`;
+      const ovRow = (label, t) =>
+        `<div class="pair"><span class="l">${label} <small class="dim">${t.calls} call${t.calls === 1 ? "" : "s"}</small></span>`
+        + `<span class="v num">${ovVal(t)}</span></div>`;
+      const overheadCard = ov.total.calls === 0
+        ? `<div class="scard"><div class="tokhd"><span class="k">Codey overhead</span></div>`
+          + `<div class="tokempty">Nothing yet. Codey narrates as Claude works.</div></div>`
+        : `<div class="scard"><div class="tokhd"><span class="k">Codey overhead</span>`
+          + `<span class="toktot">~${usd(ov.total.costUsd)}</span></div>`
+          + `<div class="toksub">What Codey itself cost this session</div>`
+          + ovRow("Live narration", ov.byKind.narration)
+          + ovRow("Timeline", ov.byKind.timeline)
+          + `<div class="pair"><span class="l">Total</span><span class="v num">${ovVal(ov.total)}</span></div>`
+          + `<div class="toksub">Cost as reported by Claude, billed to your plan.</div></div>`;
+
       document.getElementById("summary").innerHTML =
         `<div class="sidehd"><span class="t">Session stats</span>`
         + `<button class="tog" id="stats-tog" type="button" aria-label="${expanded ? "Collapse" : "Expand"} stats" aria-expanded="${expanded}">${glyph}</button></div>`
@@ -1398,7 +1419,9 @@
         + stackBar
         + `<div class="brk">${brkRows}</div>`
         + priciest
-        + `</div></div>`;
+        + `</div>`
+        + overheadCard
+        + `</div>`;
 
       // Apply collapse class and wire the toggle (survives per-tick re-render via JS state var).
       const aside = document.getElementById("summary");
