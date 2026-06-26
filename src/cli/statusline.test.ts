@@ -44,7 +44,8 @@ describe("lineForSession", () => {
     const out = plain(lineForSession("s1", root, 1000));
     expect(out).toContain("Codey");
     expect(out).toContain("off");
-    expect(out).toContain("/codey:simple");
+    // The nudge points at the two ways in: the live timeline and deep narration.
+    expect(out).toContain("/codey:timeline");
     expect(out).toContain("/codey:deep");
   });
 

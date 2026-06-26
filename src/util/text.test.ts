@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripDashes } from "./text.js";
+import { stripDashes, stripMarkdown } from "./text.js";
 
 describe("stripDashes", () => {
   it("turns an em dash into a comma", () => {
@@ -27,5 +27,21 @@ describe("stripDashes", () => {
     const out = stripDashes("first — second – third - fourth");
     expect(out).not.toMatch(/[—–]/);
     expect(out).toBe("first, second, third, fourth");
+  });
+});
+
+describe("stripMarkdown", () => {
+  it("removes inline code fences but keeps the name", () => {
+    expect(stripMarkdown("the `loss()` function in `helper.ts`")).toBe("the loss() function in helper.ts");
+  });
+
+  it("unwraps bold and italics", () => {
+    expect(stripMarkdown("this is **important** and *useful*")).toBe("this is important and useful");
+  });
+
+  it("leaves plain prose untouched", () => {
+    expect(stripMarkdown("Claude is editing helper.ts so the loss function runs.")).toBe(
+      "Claude is editing helper.ts so the loss function runs.",
+    );
   });
 });

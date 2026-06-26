@@ -149,6 +149,42 @@ describe("composeView live phase", () => {
     expect(view.sentence).toBe("Claude is checking how Codey records prompts.");
   });
 
+  it("keeps a rich two-sentence AI why whole in deep mode, past the one-line cap", () => {
+    const events = [pre("a", "Edit", { file_path: "helper.ts" }, 0)];
+    // A real deep explanation: two specific sentences that overflow a single line but should
+    // still show in full by wrapping to a second line, not get dropped for the generic template.
+    const why =
+      "Claude is editing helper.ts so the loss function subtracts one point of defense from the opponent it currently targets. This is how a player gains the upper hand right after winning an exchange in the match.";
+    // Over the old 200-char cap that used to drop the whole why for the generic template.
+    expect(why.length).toBeGreaterThan(200);
+    const view = composeView(events, snap({ mode: "deep", why }), 1000, []);
+    expect(view.sentence).toBe(why);
+  });
+
+  it("keeps the first whole AI sentence in deep mode when the full why overflows two lines", () => {
+    const events = [pre("a", "Edit", { file_path: "helper.ts" }, 0)];
+    const first = "Claude is editing helper.ts so the loss function removes one point of defense from the opponent.";
+    const why =
+      first +
+      " It then recalculates the round score and writes the corrected totals back so the next turn never starts from a stale value left over from before the change.";
+    const view = composeView(events, snap({ mode: "deep", why }), 1000, []);
+    // The specific first sentence survives rather than the line dropping to a generic template.
+    expect(view.sentence).toBe(first);
+    expect(hasBannedPhrase(view.sentence)).toBe(false);
+  });
+
+  it("keeps teach's full two-sentence explanation, including the concept sentence", () => {
+    const events = [pre("a", "Edit", { file_path: "helper.ts" }, 0)];
+    // Teach is the richest mode: the second sentence teaches the concept and must survive even
+    // though the pair runs past a deep-mode line. It still drops to the deterministic caption if
+    // it ever overflows teach's own larger budget.
+    const why =
+      "The win function in helper.ts was replaced by loss, which takes the opponent as a parameter and decreases its defense by one while raising the player's advantage. This models combat as tactical positioning, where defense and advantage matter more than a raw score.";
+    expect(why.length).toBeGreaterThan(240);
+    const view = composeView(events, snap({ mode: "teach", why }), 1000, []);
+    expect(view.sentence).toBe(why);
+  });
+
   it("makes deep mode meaningfully richer than simple for the same step, with no AI why", () => {
     const events = [pre("a", "Bash", { command: "git status" }, 0)];
     const simple = composeView(events, snap({ mode: "simple", why: null }), 1000, []);

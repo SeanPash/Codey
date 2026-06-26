@@ -37,7 +37,11 @@ export function parseMetered(stdout: string, prompt: string): MeteredResult | nu
 }
 
 // Runs the user's own Claude Code headless and reports both the text and the token spend.
-export function runClaudeMetered(prompt: string, timeoutMs = 15000): Promise<MeteredResult | null> {
+// The timeout has to clear a real haiku round trip: a cold call that creates the prompt cache
+// regularly takes 20+ seconds, so a tight 15s budget would drop most narrations and leave the
+// status line stuck on the free deterministic caption. 25s catches the slow calls; the in-flight
+// guard in the narrator keeps a slow call from stacking up more.
+export function runClaudeMetered(prompt: string, timeoutMs = 25000): Promise<MeteredResult | null> {
   return new Promise((resolve) => {
     execFile("claude", buildMeteredArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env: headlessEnv() }, (err, stdout) => {
       if (err) return resolve(null);

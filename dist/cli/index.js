@@ -3404,19 +3404,64 @@ function formatWarning(w) {
 }
 
 // src/narration/prompt.ts
+function clip(s, max) {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > max ? t.slice(0, max) + "\u2026" : t;
+}
 function summarizeEvent(e) {
-  const inputStr = JSON.stringify(e.input ?? null).slice(0, 200);
   const status = e.phase === "post" ? e.isError ? " [ERROR]" : " [done]" : "";
-  return `- ${e.tool}${status} ${inputStr}`;
+  const err = e.phase === "post" && e.isError && e.errorText ? ` error: ${clip(e.errorText, 140)}` : "";
+  const input = e.input ?? {};
+  const str2 = (k) => typeof input[k] === "string" ? input[k] : null;
+  const file6 = str2("file_path") ?? str2("path") ?? str2("notebook_path");
+  let line;
+  switch (e.tool) {
+    case "Edit":
+    case "MultiEdit": {
+      const newS = str2("new_string");
+      const oldS = str2("old_string");
+      if (file6 && newS != null) {
+        const from = oldS ? `, replacing "${clip(oldS, 80)}"` : "";
+        line = `- Edit ${file6}${status}: new code "${clip(newS, 220)}"${from}`;
+      } else line = `- ${e.tool} ${file6 ?? ""}${status}`;
+      break;
+    }
+    case "Write":
+    case "NotebookEdit": {
+      const content = str2("new_source") ?? str2("content");
+      line = `- Write ${file6 ?? "a file"}${status}: ${content ? `"${clip(content, 220)}"` : "new file"}`;
+      break;
+    }
+    case "Bash":
+    case "PowerShell": {
+      const cmd = str2("command");
+      line = cmd ? `- Run${status}: ${clip(cmd, 200)}` : `- ${e.tool}${status}`;
+      break;
+    }
+    case "Grep":
+    case "Glob": {
+      const pat = str2("pattern");
+      const where = file6 ?? str2("glob");
+      line = pat ? `- Search${status} for "${clip(pat, 80)}"${where ? ` in ${where}` : ""}` : `- ${e.tool}${status}`;
+      break;
+    }
+    case "Read": {
+      line = `- Read ${file6 ?? "a file"}${status}`;
+      break;
+    }
+    default:
+      line = `- ${e.tool}${status} ${clip(JSON.stringify(e.input ?? null), 200)}`;
+  }
+  return line + err;
 }
 function buildNarrationPrompt(events, mode) {
   const lines = events.map(summarizeEvent).join("\n");
-  const instruction2 = mode === "teach" ? "In two or three plain-English sentences for someone learning to code, first say what Claude is doing and the specific thing it is trying to verify, change, or protect, then teach the key concept behind this step and define any technical term you use. The concept sentence must add an idea, not just restate the what." : mode === "deep" ? "In one or two compact but rich plain-English sentences for a non-technical person, say what Claude is doing and, specifically, the purpose or relationship it is verifying, changing, or protecting, and how that connects to the request it is working on. Go beyond a bare description of the action: a reader should learn why this step matters here, not just that it happened." : "Write one sentence for a non-technical person saying what Claude is currently doing and, briefly, why. Keep it to a single concrete sentence.";
-  return `These are the most recent actions an AI coding agent took:
+  const instruction2 = mode === "teach" ? "Write exactly two sentences for someone learning to code, about 40 words total. Sentence one: the specific change, naming the real file and the function, value, or rule it changes and what that makes the code do differently. Sentence two: teach the one concept behind it and define any term you use. Lead with the change itself, not a throat-clearing intro, and never write a third sentence." : mode === "deep" ? `Write at most two sentences, no more than about 35 words total. Lead immediately with the specific change: name the real file and the actual function, value, or behavior being changed, say what the change makes the code do differently, and why that matters here. State the mechanism itself, not a filler intro like "implements new logic" or "updates the system". For example: "Claude is editing helper.ts so the loss function drops the opponent's defense by one and raises the player's advantage by one, the rule that lets a winner press their edge."` : "Write one sentence, no more than about 20 words, saying what Claude is doing right now, naming the real file and the specific function or command involved. Be concrete, not generic.";
+  return `These are the most recent actions an AI coding agent took, newest last:
 ${lines}
 
 ${instruction2}
-Do not list the tools; describe the goal. Be specific and concrete: name the actual files, search terms, or commands involved so the reader knows exactly what is happening. Avoid vague filler like "several files", "the code", "running shell commands", "checking the code", or "thinking it through" when the actions name a real file, term, or purpose. Write plain English. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
+Ground every claim in the actions above: name the actual files, functions, search terms, or commands involved. Never use vague filler like "several files", "the code", "the system", "various changes", "understand how it works", or "make sure everything is consistent". Be brief and specific, short enough to read at a glance. Write plain English with no markdown or backticks. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }
 
 // src/narration/throttle.ts
@@ -3433,6 +3478,9 @@ function shouldNarrate(mode, state) {
 // src/util/text.ts
 function stripDashes(s) {
   return s.replace(/\s*[—–]\s*/g, ", ").replace(/ - /g, ", ").replace(/ ,/g, ",").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
+}
+function stripMarkdown(s) {
+  return s.replace(/`+/g, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)\*([^*]+)\*/g, "$1$2").replace(/\s{2,}/g, " ").trim();
 }
 
 // src/narration/engine.ts
@@ -3454,7 +3502,7 @@ var NarrationEngine = class {
     const text = await this.narrate(prompt);
     this.lastCount = events.length;
     this.lastAtMs = nowMs;
-    return text ? stripDashes(text) : text;
+    return text ? stripMarkdown(stripDashes(text)) : text;
   }
 };
 
@@ -4637,7 +4685,7 @@ function parseMetered(stdout, prompt) {
     return { text: out, tokens: estimateTokens(prompt + out) };
   }
 }
-function runClaudeMetered(prompt, timeoutMs = 15e3) {
+function runClaudeMetered(prompt, timeoutMs = 25e3) {
   return new Promise((resolve) => {
     execFile2("claude", buildMeteredArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env: headlessEnv() }, (err, stdout) => {
       if (err) return resolve(null);
@@ -4870,9 +4918,9 @@ function pickSentence(caption, mode) {
   return caption.simple;
 }
 var SENTENCE_BUDGET = {
-  simple: { sentences: 1, chars: 120 },
-  deep: { sentences: 2, chars: 200 },
-  teach: { sentences: 2, chars: 200 }
+  simple: { sentences: 1, chars: 140 },
+  deep: { sentences: 2, chars: 240 },
+  teach: { sentences: 2, chars: 320 }
 };
 function splitSentences(text) {
   return text.trim().split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);

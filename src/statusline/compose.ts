@@ -17,14 +17,15 @@ function pickSentence(caption: LiveCaption, mode: Mode): string {
   return caption.simple;
 }
 
-// How much of the HUD's second line each mode gets. Simple is one short sentence; deep and
-// teach may carry a second. The char caps keep a long AI explanation from running off the
-// line: when even the first sentence overflows, we drop to the shorter deterministic caption
-// rather than truncate mid-thought. The teaching depth lives in the browser timeline instead.
+// How much of the HUD's body each mode gets. Simple is one short sentence on one line. Deep and
+// teach are the paid modes: they get two full sentences that may wrap onto a second line, so a
+// real mechanism explanation shows in full instead of being thrown away for the generic caption.
+// The cap matches roughly two wrapped terminal lines; only when even the first whole sentence
+// overflows that do we fall back to the shorter deterministic caption (never a mid-thought cut).
 const SENTENCE_BUDGET: Record<Mode, { sentences: number; chars: number }> = {
-  simple: { sentences: 1, chars: 120 },
-  deep: { sentences: 2, chars: 200 },
-  teach: { sentences: 2, chars: 200 },
+  simple: { sentences: 1, chars: 140 },
+  deep: { sentences: 2, chars: 240 },
+  teach: { sentences: 2, chars: 320 },
 };
 
 // Split on sentence ends, keeping the punctuation, so each piece is a whole thought.
