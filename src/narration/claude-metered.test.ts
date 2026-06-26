@@ -1,9 +1,29 @@
 import { describe, it, expect } from "vitest";
-import { buildMeteredArgs, parseMetered } from "./claude-metered.js";
+import { tmpdir } from "node:os";
+import { buildMeteredArgs, parseMetered, meteredExecOptions } from "./claude-metered.js";
 
 describe("buildMeteredArgs", () => {
-  it("asks claude for json output on haiku", () => {
-    expect(buildMeteredArgs("hi")).toEqual(["-p", "hi", "--model", "haiku", "--output-format", "json"]);
+  it("asks claude for json output on haiku and trims the per-call context", () => {
+    // The trailing flags keep narration cheap: no user/project settings means the superpowers and
+    // memory SessionStart hooks never fire (they slow the call and leak into the reply), and
+    // excluding the dynamic sections keeps the cached system prompt stable across calls.
+    expect(buildMeteredArgs("hi")).toEqual([
+      "-p", "hi",
+      "--model", "haiku",
+      "--output-format", "json",
+      "--setting-sources", "",
+      "--exclude-dynamic-system-prompt-sections",
+    ]);
+  });
+});
+
+describe("meteredExecOptions", () => {
+  it("runs from a neutral dir so the project's CLAUDE.md never loads, and marks the call headless", () => {
+    const opts = meteredExecOptions(1234);
+    expect(opts.cwd).toBe(tmpdir());
+    expect(opts.timeout).toBe(1234);
+    expect(opts.shell).toBe(false);
+    expect(opts.env?.CODEY_HEADLESS).toBe("1");
   });
 });
 
