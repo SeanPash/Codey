@@ -1,32 +1,20 @@
-import { execFile, type ExecFileOptionsWithStringEncoding } from "node:child_process";
-import { tmpdir } from "node:os";
-import { headlessEnv } from "./claude-spawn.js";
+import { execFile } from "node:child_process";
+import { trimArgs, headlessExecOptions, NARRATOR_SYSTEM_PROMPT } from "./headless-flags.js";
 
 export interface MeteredResult {
   text: string;
   tokens: number;
 }
 
-// The trailing flags exist to keep narration cheap and clean. `--setting-sources ""` loads no user
-// or project settings, so the superpowers and memory SessionStart hooks never fire: those add
-// seconds of latency and used to leak into the reply ("I've loaded the superpowers guidance").
-// `--exclude-dynamic-system-prompt-sections` moves the per-machine bits out of the system prompt so
-// its cache key stays stable across calls and the ~21k base prompt is read from cache, not rebuilt.
-// OAuth is unaffected (auth is read regardless of setting sources), so no API key is needed.
+// Ask for json output (so we can read real usage) on haiku, then apply the shared context trim so a
+// one-sentence narration costs ~4k cached tokens instead of ~27k. See headless-flags.ts.
 export function buildMeteredArgs(prompt: string): string[] {
   return [
     "-p", prompt,
     "--model", "haiku",
     "--output-format", "json",
-    "--setting-sources", "",
-    "--exclude-dynamic-system-prompt-sections",
+    ...trimArgs(NARRATOR_SYSTEM_PROMPT),
   ];
-}
-
-// Run the headless narrator from a neutral directory so the project's own CLAUDE.md/rules.md is not
-// auto-discovered into the prompt, and carry CODEY_HEADLESS so any hooks that do run skip capture.
-export function meteredExecOptions(timeoutMs: number): ExecFileOptionsWithStringEncoding {
-  return { timeout: timeoutMs, shell: false, windowsHide: true, cwd: tmpdir(), env: headlessEnv(), encoding: "utf8" };
 }
 
 // Rough token estimate when real usage is unavailable. ~4 chars per token is the usual
@@ -63,7 +51,7 @@ export function parseMetered(stdout: string, prompt: string): MeteredResult | nu
 // up more, and a real explanation a little late beats a generic line on time.
 export function runClaudeMetered(prompt: string, timeoutMs = 35000): Promise<MeteredResult | null> {
   return new Promise((resolve) => {
-    execFile("claude", buildMeteredArgs(prompt), meteredExecOptions(timeoutMs), (err, stdout) => {
+    execFile("claude", buildMeteredArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
       if (err) return resolve(null);
       resolve(parseMetered(stdout, prompt));
     });

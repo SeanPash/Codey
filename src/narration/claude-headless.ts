@@ -1,8 +1,10 @@
 import { execFile } from "node:child_process";
-import { headlessEnv } from "./claude-spawn.js";
+import { trimArgs, headlessExecOptions, SEGMENTER_SYSTEM_PROMPT } from "./headless-flags.js";
 
+// Timeline segmentation gets the same context trim as live narration, but keeps a neutral system
+// prompt because it must return strict JSON (see headless-flags.ts).
 export function buildClaudeArgs(prompt: string): string[] {
-  return ["-p", prompt, "--model", "haiku"];
+  return ["-p", prompt, "--model", "haiku", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
 }
 
 // Runs the user's own Claude Code headless. Resolves to trimmed stdout, or null on failure.
@@ -10,8 +12,7 @@ export function buildClaudeArgs(prompt: string): string[] {
 // narration pass would record itself as a phantom session.
 export function runClaude(prompt: string, timeoutMs = 15000): Promise<string | null> {
   return new Promise((resolve) => {
-    const env = headlessEnv();
-    execFile("claude", buildClaudeArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env }, (err, stdout) => {
+    execFile("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
       if (err) return resolve(null);
       const out = stdout.trim();
       resolve(out.length > 0 ? out : null);
