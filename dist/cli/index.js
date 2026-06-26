@@ -5352,7 +5352,7 @@ var BOLD2 = "\x1B[1m";
 var BRAND2 = "\x1B[38;5;75m";
 var DIM2 = "\x1B[38;5;244m";
 function offHint() {
-  return `${BOLD2}${BRAND2}Codey${RESET2} ${DIM2}off \xB7 run ${RESET2}${BRAND2}/codey:simple${RESET2}${DIM2} or ${RESET2}${BRAND2}/codey:deep${RESET2}${DIM2} to narrate this session${RESET2}`;
+  return `${BOLD2}${BRAND2}Codey${RESET2} ${DIM2}off \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}${DIM2} for a live timeline \xB7 ${RESET2}${BRAND2}/codey:deep${RESET2}${DIM2} to narrate this session${RESET2}`;
 }
 function lineForSession(session, root, now) {
   if (!session) return "";

@@ -43,11 +43,12 @@ const BOLD = "\x1b[1m";
 const BRAND = "\x1b[38;5;75m"; // the Codey name and the mode commands, sky blue
 const DIM = "\x1b[38;5;244m";  // the surrounding words sit quietly
 
-// Shown when Codey is wired but this session has no mode on. Rather than a blank line, nudge
-// the user toward a mode so they know narration is one command away.
+// Shown when Codey is wired but this session has no mode on. Rather than a blank line, point at
+// the two ways in: the timeline opens a live visual storyboard in the browser, while deep mode
+// narrates the work right here in the terminal. Naming both makes the difference obvious.
 function offHint(): string {
-  return `${BOLD}${BRAND}Codey${RESET} ${DIM}off · run ${RESET}${BRAND}/codey:simple${RESET}`
-    + `${DIM} or ${RESET}${BRAND}/codey:deep${RESET}${DIM} to narrate this session${RESET}`;
+  return `${BOLD}${BRAND}Codey${RESET} ${DIM}off · ${RESET}${BRAND}/codey:timeline${RESET}`
+    + `${DIM} for a live timeline · ${RESET}${BRAND}/codey:deep${RESET}${DIM} to narrate this session${RESET}`;
 }
 
 // Render the line for one specific session. When Codey is on for the session we show its live

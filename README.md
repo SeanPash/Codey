@@ -4,7 +4,7 @@
 
 ### See what Claude is doing, and why.
 
-Codey is a plugin for Claude Code. It turns every session into a visual story in your browser, a timeline where you can scroll through every task Claude did and follow along live as it happens. And while you work, a quiet line at the bottom of your terminal narrates each step in plain English, so you always know what Claude is doing and why. Want the exact reasoning behind a single step? Click it for a full explanation, or ask for a recap of a whole task.
+Codey is a plugin for Claude Code that displays Claude's actions in a story-like manner: a timeline of sorts that lets you break down every task Claude did, live, and actually understand it. And while you work, it can follow along with what Claude is doing and narrate its actions live, in varying modes.
 
 </div>
 
@@ -25,7 +25,12 @@ Then install the plugin:
 /plugin install codey@codey
 ```
 
-Restart your session so the hooks load, then run `/codey:timeline` to open the browser story, or `/codey:deep` (or any mode) to turn on terminal narration. Codey ships prebuilt, so there is no build step.
+Restart your session so the hooks load. Then pick how you want to follow along:
+
+- Run `/codey:timeline` for a live timeline in your browser, where you can break down every task Claude did step by step.
+- Run `/codey:deep` (or another mode) to narrate this session right in your terminal as Claude works.
+
+Codey ships prebuilt, so there is no build step.
 
 That's it. It uses the Claude Code login you already have. No API keys. No accounts. No setup.
 
