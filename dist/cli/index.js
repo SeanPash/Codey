@@ -3509,19 +3509,56 @@ var NarrationEngine = class {
 // src/narration/claude-headless.ts
 import { execFile } from "node:child_process";
 
+// src/narration/headless-flags.ts
+import { tmpdir } from "node:os";
+
 // src/narration/claude-spawn.ts
 function headlessEnv(base = process.env) {
   return { ...base, CODEY_HEADLESS: "1" };
 }
 
+// src/narration/headless-flags.ts
+var DISALLOWED_TOOLS = [
+  "Bash",
+  "Edit",
+  "Read",
+  "Write",
+  "Glob",
+  "Grep",
+  "WebFetch",
+  "WebSearch",
+  "Task",
+  "NotebookEdit",
+  "TodoWrite",
+  "MultiEdit",
+  "BashOutput",
+  "KillShell",
+  "SlashCommand"
+];
+var NARRATOR_SYSTEM_PROMPT = "You narrate what an AI coding agent is doing for someone watching it work. Reply with only the narration in plain English: no preamble, no markdown, no tool names as nouns.";
+var SEGMENTER_SYSTEM_PROMPT = "You are a precise assistant. Follow the user's instructions and output format exactly, with no extra text.";
+function trimArgs(systemPrompt) {
+  return [
+    "--setting-sources",
+    "",
+    "--exclude-dynamic-system-prompt-sections",
+    "--system-prompt",
+    systemPrompt,
+    "--disallowed-tools",
+    DISALLOWED_TOOLS.join(" ")
+  ];
+}
+function headlessExecOptions(timeoutMs) {
+  return { timeout: timeoutMs, shell: false, windowsHide: true, cwd: tmpdir(), env: headlessEnv(), encoding: "utf8" };
+}
+
 // src/narration/claude-headless.ts
 function buildClaudeArgs(prompt) {
-  return ["-p", prompt, "--model", "haiku"];
+  return ["-p", prompt, "--model", "haiku", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
 }
 function runClaude(prompt, timeoutMs = 15e3) {
   return new Promise((resolve) => {
-    const env = headlessEnv();
-    execFile("claude", buildClaudeArgs(prompt), { timeout: timeoutMs, shell: false, windowsHide: true, env }, (err, stdout) => {
+    execFile("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
       if (err) return resolve(null);
       const out = stdout.trim();
       resolve(out.length > 0 ? out : null);
@@ -4668,7 +4705,6 @@ function readWhys(dir) {
 
 // src/narration/claude-metered.ts
 import { execFile as execFile2 } from "node:child_process";
-import { tmpdir } from "node:os";
 function buildMeteredArgs(prompt) {
   return [
     "-p",
@@ -4677,13 +4713,8 @@ function buildMeteredArgs(prompt) {
     "haiku",
     "--output-format",
     "json",
-    "--setting-sources",
-    "",
-    "--exclude-dynamic-system-prompt-sections"
+    ...trimArgs(NARRATOR_SYSTEM_PROMPT)
   ];
-}
-function meteredExecOptions(timeoutMs) {
-  return { timeout: timeoutMs, shell: false, windowsHide: true, cwd: tmpdir(), env: headlessEnv(), encoding: "utf8" };
 }
 function estimateTokens(s) {
   return Math.ceil(s.length / 4);
@@ -4704,7 +4735,7 @@ function parseMetered(stdout, prompt) {
 }
 function runClaudeMetered(prompt, timeoutMs = 35e3) {
   return new Promise((resolve) => {
-    execFile2("claude", buildMeteredArgs(prompt), meteredExecOptions(timeoutMs), (err, stdout) => {
+    execFile2("claude", buildMeteredArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
       if (err) return resolve(null);
       resolve(parseMetered(stdout, prompt));
     });
