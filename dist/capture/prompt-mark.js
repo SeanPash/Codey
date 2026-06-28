@@ -2,9 +2,9 @@ import { createRequire as __createRequire } from 'node:module';
 const require = __createRequire(import.meta.url);
 
 // src/capture/prompt-mark.ts
-import { pathToFileURL } from "node:url";
-import { join as join5 } from "node:path";
-import { mkdirSync as mkdirSync2 } from "node:fs";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { join as join6, dirname as dirname3 } from "node:path";
+import { mkdirSync as mkdirSync3 } from "node:fs";
 
 // src/store/session-store.ts
 import { homedir } from "node:os";
@@ -59,6 +59,53 @@ function appendPrompt(dir, ts) {
   appendFileSync(file2(dir), JSON.stringify({ ts }) + "\n");
 }
 
+// src/cli/toggle.ts
+import { readFileSync as readFileSync4, writeFileSync as writeFileSync3, existsSync as existsSync4, mkdirSync as mkdirSync2, rmSync, openSync } from "node:fs";
+import { join as join5, dirname as dirname2 } from "node:path";
+import { homedir as homedir2 } from "node:os";
+function withStatusLine(s, command) {
+  return { ...s, statusLine: { type: "command", command } };
+}
+function settingsPath() {
+  return join5(homedir2(), ".claude", "settings.json");
+}
+function readSettings() {
+  const p = settingsPath();
+  if (!existsSync4(p)) return {};
+  try {
+    return JSON.parse(readFileSync4(p, "utf8"));
+  } catch {
+    return {};
+  }
+}
+function writeSettings(s) {
+  const p = settingsPath();
+  mkdirSync2(dirname2(p), { recursive: true });
+  writeFileSync3(p, JSON.stringify(s, null, 2));
+}
+function statusLineCommand(self) {
+  return `node "${self}" statusline`;
+}
+function pluginCacheBase(cliPath) {
+  const m = cliPath.match(/^(.*[\\/]codey[\\/]codey[\\/])[^\\/]+[\\/]dist[\\/]/);
+  return m ? m[1] : null;
+}
+function shouldRefreshStatusLine(existingCommand, currentCliPath) {
+  const m = existingCommand.match(/^node "(.+)" statusline$/);
+  if (!m) return false;
+  const existing = m[1];
+  if (existing === currentCliPath) return false;
+  const base = pluginCacheBase(currentCliPath);
+  return base !== null && existing.startsWith(base);
+}
+function refreshStatusLineIfStale(currentCliPath) {
+  const s = readSettings();
+  const cmd = s.statusLine?.command;
+  if (cmd && shouldRefreshStatusLine(cmd, currentCliPath)) {
+    writeSettings(withStatusLine(s, statusLineCommand(currentCliPath)));
+  }
+}
+
 // src/capture/prompt-mark.ts
 function handlePromptInput(rawJson, now = Date.now(), root = defaultRoot()) {
   if (process.env.CODEY_HEADLESS) return;
@@ -71,8 +118,8 @@ function handlePromptInput(rawJson, now = Date.now(), root = defaultRoot()) {
     return;
   }
   if (!raw.session_id) return;
-  const dir = join5(root, raw.session_id);
-  mkdirSync2(dir, { recursive: true });
+  const dir = join6(root, raw.session_id);
+  mkdirSync3(dir, { recursive: true });
   patchStatus(dir, { promptAt: now, why: null, action: null, warning: null, doneAt: null });
   appendPrompt(dir, now);
   writeMetaIfAbsent(
@@ -88,6 +135,13 @@ function main() {
     try {
       handlePromptInput(raw);
     } catch {
+    }
+    if (!process.env.CODEY_HEADLESS) {
+      try {
+        const cli = join6(dirname3(fileURLToPath(import.meta.url)), "..", "cli", "index.js");
+        refreshStatusLineIfStale(cli);
+      } catch {
+      }
     }
     process.exit(0);
   });
