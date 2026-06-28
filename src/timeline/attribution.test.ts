@@ -95,6 +95,21 @@ describe("actionSubtitle", () => {
     expect(actionSubtitle("Grep", { pattern: "validateUser" })).toMatch(/validateUser/);
   });
 
+  it("prefers Claude's own grounded reasoning as the subtitle when present", () => {
+    const sub = actionSubtitle(
+      "Edit",
+      { file_path: "/p/caption.ts" },
+      "Adding the purpose lookup so the statusline reads the new domain caption.",
+    );
+    expect(sub).toBe("Adding the purpose lookup so the statusline reads the new domain caption.");
+  });
+
+  it("ignores vacuous reasoning and falls back to the deterministic subtitle", () => {
+    const sub = actionSubtitle("Read", { file_path: "/p/render.ts" }, "Thinking it through before acting.");
+    expect(sub).toMatch(/render\.ts/);
+    expect(hasBannedPhrase(sub)).toBe(false);
+  });
+
   it("never falls back to the banned 'follow how it works' / 'adjust how it works' fillers", () => {
     const files = [
       "C:/Codey/src/statusline/render.ts",

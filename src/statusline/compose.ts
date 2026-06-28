@@ -12,6 +12,7 @@ import { chunkEvents } from "../caption/chunks.js";
 import { buildCaption, type LiveCaption } from "../caption/caption.js";
 import { buildRecap } from "../caption/recap.js";
 import { stripEllipsis, hasShellNoise } from "../caption/sanitize.js";
+import { hasBannedPhrase } from "../caption/banned.js";
 import { stripDashes, stripMarkdown } from "../util/text.js";
 
 // Pick the sentence for the current mode: simple is one line, deep and teach reach for the
@@ -151,7 +152,11 @@ export function composeView(
   // explanation always matches the work on screen.
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
   const rawWhy = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
-  const cleanWhy = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
+  const rawClean = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
+  // A generated why must clear the banned-filler guard before it touches any caption slot. The
+  // narrator sometimes slips out an empty "thinking it through" despite the prompt; when it does we
+  // drop it here so neither the verbatim display nor the buildCaption fallback can surface it.
+  const cleanWhy = rawClean && !hasBannedPhrase(rawClean) ? rawClean : null;
   // Deep and teach are the paid modes: the generated why is the whole point, so show it (clamped
   // to fit) and never swap it for the free deterministic caption. We only reject a why that is
   // literally raw shell text. The deterministic line shows for these modes only before the first

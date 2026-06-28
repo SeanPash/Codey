@@ -169,6 +169,32 @@ describe("buildCaption", () => {
     }
   });
 
+  it("uses a domain purpose for a token-label investigation instead of a bare read", () => {
+    const c = buildCaption(
+      chunk({
+        stage: "inspecting",
+        tool: "Bash",
+        count: 1,
+        raw: "diff <(curl -s localhost:4317 | grep tokenBreakdown) <(grep tokenBreakdown src/serve/public/index.html)",
+        targets: ["index.html"],
+      }),
+      "deep",
+    );
+    expect(c.simple).toMatch(/compar/i);
+    expect(c.deep).toMatch(/stale|cache|browser|build/i);
+    expect(c.title).toMatch(/timeline/i);
+    expect(hasBannedPhrase(c.simple)).toBe(false);
+  });
+
+  it("names the session storage when a run inspects the JSONL events file", () => {
+    const c = buildCaption(
+      chunk({ stage: "inspecting", tool: "Bash", count: 1, raw: "cat ~/.codey/sessions/abc/events.jsonl", targets: ["the session storage"] }),
+      "simple",
+    );
+    expect(c.simple).toMatch(/session/i);
+    expect(c.simple).toMatch(/jsonl|events|record/i);
+  });
+
   it("grows from simple to deep to teach", () => {
     const c = chunk({ stage: "editing", targets: ["statusline.ts"] });
     const simple = buildCaption(c, "simple");

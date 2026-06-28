@@ -4,6 +4,7 @@ import type { WorkChunk } from "./chunks.js";
 import type { Stage } from "./stage.js";
 import { humanFile, phrasePattern, phraseSearch, purposeTitle, joinNames } from "./subject.js";
 import { describeShellIntent } from "./shell.js";
+import { inferPurpose, type PurposeEvidence } from "./purpose.js";
 import { stripEllipsis, looksLikeEvidenceDump, tidySubject } from "./sanitize.js";
 
 // The one caption shape every surface renders from. `simple` is always a complete sentence;
@@ -61,7 +62,28 @@ function testModule(chunk: WorkChunk): string | null {
   return m ? m[1] : null;
 }
 
+// Pool the chunk's evidence for the domain recognizers: file and shell subjects, the literal
+// search terms, any symbols a change named, and the first command. This is what lets a caption
+// recognize a known investigation (a stale-cache hunt, a session-storage check) rather than
+// settling for "reading index.html".
+function purposeEvidence(chunk: WorkChunk): PurposeEvidence {
+  return {
+    stage: chunk.stage,
+    tool: chunk.tool,
+    targets: chunk.targets,
+    searches: chunk.searches,
+    symbols: chunk.symbols ?? [],
+    command: chunk.tool === "Bash" || chunk.tool === "PowerShell" ? chunk.raw : null,
+  };
+}
+
 function describe(chunk: WorkChunk): Described {
+  // A recognized investigation says what Claude is actually trying to confirm, with a fully
+  // differentiated simple/deep/teach. It is the strongest deterministic line we have, so it wins
+  // over the generic stage templates whenever its signals are present.
+  const purpose = inferPurpose(purposeEvidence(chunk));
+  if (purpose) return purpose;
+
   // A single shell command knows its own purpose better than any stage template can phrase it,
   // so use the shell intent's title and sentence directly instead of "reading X to understand
   // the code". The teach line adds why the step matters for that stage.

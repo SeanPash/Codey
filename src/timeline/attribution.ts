@@ -3,6 +3,7 @@ import type { AssistantTurn } from "./transcript.js";
 import { classifyStage } from "../caption/stage.js";
 import { humanFile, phrasePattern, purposeTitle, purposeSentence } from "../caption/subject.js";
 import { describeShellIntent } from "../caption/shell.js";
+import { cleanReasoning } from "../caption/reasoning.js";
 import { actionLabel, shortTarget } from "../statusline/labels.js";
 import { hasBannedPhrase } from "../caption/banned.js";
 
@@ -137,11 +138,16 @@ export function actionTitle(tool: string | null, input: unknown, text?: string |
   return purposeTitle(tool, classifyStage(tool, input), actionSubject(tool, input), 1);
 }
 
-// One plain sentence under the title, always distinct from the title. A shell command is described
-// by its intent sentence ("Claude is checking ...") rather than echoing the raw description, so the
-// subtitle never repeats the title verbatim. A thinking row uses Claude's own decision text.
+// One plain sentence under the title, always distinct from the title. The browser timeline has
+// Claude's own progress note for the turn (its assistant text), which is the most grounded "why"
+// there is, so when it survives the filler guards it becomes the subtitle directly. That is what
+// makes a timeline row read like Claude's own update rather than a template. Failing that, a shell
+// command is described by its intent sentence and a file action by its purpose, so the subtitle
+// never repeats the title verbatim. A thinking row uses Claude's own decision text.
 export function actionSubtitle(tool: string | null, input: unknown, text?: string | null): string {
   if (!tool || tool === "thinking") return thinkingSubtitle(text);
+  const reasoned = cleanReasoning(text, { file: fileFrom(input) });
+  if (reasoned) return reasoned;
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd, descFrom(input)).sentence;

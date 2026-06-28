@@ -211,6 +211,14 @@ describe("composeView live phase", () => {
     expect(view.sentence).not.toContain("| tail");
   });
 
+  it("rejects a generated why that is banned filler and falls back to the deterministic caption", () => {
+    const events = [pre("a", "Read", { file_path: "render.ts" }, 0)];
+    const view = composeView(events, snap({ mode: "deep", why: "Claude is just thinking it through before acting." }), 1000, []);
+    expect(hasBannedPhrase(view.sentence)).toBe(false);
+    expect(view.sentence).not.toMatch(/thinking it through/i);
+    expect(view.sentence).toMatch(/render\.ts/);
+  });
+
   it("makes deep mode meaningfully richer than simple for the same step, with no AI why", () => {
     const events = [pre("a", "Bash", { command: "git status" }, 0)];
     const simple = composeView(events, snap({ mode: "simple", why: null }), 1000, []);

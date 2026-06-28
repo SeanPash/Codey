@@ -3464,12 +3464,12 @@ function summarizeEvent(e) {
 }
 function buildNarrationPrompt(events, mode) {
   const lines = events.map(summarizeEvent).join("\n");
-  const instruction2 = mode === "teach" ? "Write exactly two sentences for someone learning to code, about 40 words total. Sentence one: the specific change, naming the real file and the function, value, or rule it changes and what that makes the code do differently. Sentence two: teach the one concept behind it and define any term you use. Lead with the change itself, not a throat-clearing intro, and never write a third sentence." : mode === "deep" ? `Write exactly two sentences, each ending in a period and each about 18 words or fewer. First sentence: what Claude is doing and why, naming the real file and the actual function, value, or behavior being changed and what it now does differently. Second sentence: how that works or what it connects to. Do not merge them into one long sentence with "while" or "and". State the mechanism itself, not filler like "implements new logic" or "updates the system". For example: "Claude is editing helper.ts so the loss function drops the opponent's defense by one. That is the rule that lets a winner press their edge after an exchange."` : "Write one sentence, no more than about 20 words, saying what Claude is doing right now, naming the real file and the specific function or command involved. Be concrete, not generic.";
+  const instruction2 = mode === "teach" ? "Write exactly two sentences for someone learning to code, about 40 words total. Sentence one: the specific change or check, naming the real file and the function, value, or rule it touches and what that makes the code do differently. Sentence two: teach the one concept behind it and define any term you use. Lead with the work itself, not a throat-clearing intro, and never write a third sentence." : mode === "deep" ? `Write exactly two sentences, each ending in a period and each about 18 words or fewer. First sentence: what Claude is doing and why, naming the real file and the actual function, value, or behavior involved. Second sentence: when this is a change, how it works or what it connects to; when this is an investigation, the hypothesis it is testing and what the result would confirm or rule out. Do not merge them into one long sentence with "while" or "and". State the mechanism itself, not filler like "implements new logic" or "updates the system". For example: "Claude is editing helper.ts so the loss function drops the opponent's defense by one. That is the rule that lets a winner press their edge after an exchange." Or: "Claude is comparing the served timeline page with the source file to see why the token labels are missing. A match in source would point at a stale browser tab, not a markup bug."` : "Write one sentence, no more than about 20 words, saying what Claude is doing right now, naming the real file and the specific function or command involved, and what it is checking or changing. Be concrete, not generic.";
   return `These are the most recent actions an AI coding agent took, newest last:
 ${lines}
 
 ${instruction2}
-Ground every claim in the actions above: name the actual files, functions, search terms, or commands involved. Never use vague filler like "several files", "the code", "the system", "various changes", "understand how it works", or "make sure everything is consistent". Be brief and specific, short enough to read at a glance. Write plain English with no markdown or backticks. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
+Ground every claim in the actions above: name the actual files, functions, search terms, or commands involved. Never use vague filler like "several files", "the code", "the system", "various changes", "understand how it works", or "make sure everything is consistent". Never narrate the agent as merely "thinking it through", "working through the approach", "reading files to understand them", or "running shell commands"; say the concrete thing it is checking or changing instead. Be brief and specific, short enough to read at a glance. Write plain English with no markdown or backticks. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
 }
 
 // src/caption/subject.ts
@@ -4558,6 +4558,74 @@ function renderCaption(caption) {
     ${caption.simple}`;
 }
 
+// src/caption/purpose.ts
+function haystack(ev) {
+  return [...ev.targets, ...ev.searches, ...ev.symbols, ev.command ?? "", ev.prompt ?? ""].join(" ").toLowerCase();
+}
+function any(text, res) {
+  return res.some((re) => re.test(text));
+}
+var TIMELINE_PAGE = [/index\.html/, /timeline page/, /served page/, /\blocalhost\b/, /:\d{4}\b/];
+var TOKEN_LABELS = [/token\s*breakdown/, /tokenbreakdown/, /breakdown row/, /token label/, /\btoken[s]?\b.*\blabel/, /\blabel[s]?\b.*\btoken/];
+var COMPARISON = [/\bcurl\b/, /\blocalhost\b/, /:\d{4}\b/, /\bdiff\b/, /cache copy/, /\bserved\b/];
+function hasComparison(h) {
+  if (any(h, COMPARISON)) return true;
+  return /\bdist\b/.test(h) && /\bsrc\b/.test(h);
+}
+function timelinePagePurpose(ev) {
+  const h = haystack(ev);
+  if (!any(h, TIMELINE_PAGE) || !any(h, TOKEN_LABELS)) return null;
+  if (!hasComparison(h)) return null;
+  return {
+    title: "Checking the live timeline",
+    simple: "Claude is comparing the served timeline page with the source file to find why the token labels are missing.",
+    deep: "Claude is comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or a build that was never refreshed.",
+    teach: "Claude is comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or an old build. A browser can keep old code loaded even after the server is fixed, so a page can look broken while the source is already correct."
+  };
+}
+var SESSION_STORE = [
+  /\.codey/,
+  /sessions[\\/]/,
+  /events\.jsonl/,
+  /\.jsonl\b/,
+  /narrator[-_]?log/,
+  /session storage/,
+  /session store/
+];
+function sessionStoragePurpose(ev) {
+  const h = haystack(ev);
+  if (!any(h, SESSION_STORE)) return null;
+  return {
+    title: "Checking session storage",
+    simple: "Claude is checking the local session storage, the JSONL file where Codey records each tool call, to see whether this prompt's events were captured.",
+    deep: "Claude is reading the session's events and narration log to confirm whether the data is being written. A missing prompt would point at capture, a present one at rendering or live polling.",
+    teach: "Claude is reading the session's events and narration log to confirm whether the data is being written. A missing prompt would point at capture, a present one at rendering. Codey stores each session as a JSONL file, one event per line, which is the shared record the status line and timeline both read from."
+  };
+}
+var NARRATION_OUTPUT = [
+  /index\.js\b[^\n]*\b(feed|narrate|watch|timeline)\b/,
+  /\b(feed|narrate|watch)\b[^\n]*index\.js/,
+  /codey\s+(feed|narrate|watch)/
+];
+function narrationOutputPurpose(ev) {
+  const cmd = (ev.command ?? "").toLowerCase();
+  if (!any(cmd, NARRATION_OUTPUT)) return null;
+  return {
+    title: "Checking live narration",
+    simple: "Claude is running Codey's feed to read the live narration output and see what the watcher actually prints.",
+    deep: "Claude is running Codey's feed against the current session to read the narration it produces, confirming whether the captions update as new tool calls arrive.",
+    teach: "Claude is running Codey's feed against the current session to read the narration it produces, confirming whether the captions update as new tool calls arrive. The feed replays the same captions the status line shows, so running it is how you see the narration without watching the status bar live."
+  };
+}
+var RECOGNIZERS = [timelinePagePurpose, sessionStoragePurpose, narrationOutputPurpose];
+function inferPurpose(ev) {
+  for (const r of RECOGNIZERS) {
+    const p = r(ev);
+    if (p) return p;
+  }
+  return null;
+}
+
 // src/caption/caption.ts
 function subjectOf(chunk) {
   if (chunk.tool === "Grep" || chunk.tool === "Glob") return phrasePattern(chunk.raw ?? "");
@@ -4577,7 +4645,19 @@ function testModule(chunk) {
   const m = /^(.+)\.(test|spec)\.[jt]sx?$/.exec(chunk.targets[0] ?? "");
   return m ? m[1] : null;
 }
+function purposeEvidence(chunk) {
+  return {
+    stage: chunk.stage,
+    tool: chunk.tool,
+    targets: chunk.targets,
+    searches: chunk.searches,
+    symbols: chunk.symbols ?? [],
+    command: chunk.tool === "Bash" || chunk.tool === "PowerShell" ? chunk.raw : null
+  };
+}
 function describe(chunk) {
+  const purpose = inferPurpose(purposeEvidence(chunk));
+  if (purpose) return purpose;
   if ((chunk.tool === "Bash" || chunk.tool === "PowerShell") && chunk.count === 1 && chunk.raw) {
     const intent2 = describeShellIntent(chunk.raw);
     return { title: intent2.title, simple: intent2.sentence, deep: intent2.deep, teach: intent2.teach };
@@ -5161,6 +5241,65 @@ function buildRecap(events) {
   return { sentence, changed, verified, inspected };
 }
 
+// src/caption/banned.ts
+var BANNED_PHRASES = [
+  /see how it works/i,
+  /follow how it works/i,
+  /adjust how it works/i,
+  /see how the pieces fit together/i,
+  // Empty "thinking" filler: a row or explanation that says the agent thought without saying
+  // about what. These are the exact strings the old timeline emitted for a bare thinking turn.
+  /thinking it through/i,
+  /working through the approach before acting/i,
+  /paused and reflected/i,
+  /figure out what the right next step should be/i,
+  // A status line once collapsed two git reads into "git state and git state"; never again.
+  /git state and git state/i,
+  /\bbefore changing anything\b/i,
+  /\bchanging specific lines\b/i,
+  /\bchanging files in place\b/i,
+  /\bfind the part it needs\b/i,
+  /\bmap how they connect\b/i,
+  /\bchecking the code\b/i,
+  /\bsearching the project for the code\b/i,
+  /\breading files to understand them\b/i,
+  /\bseveral files\b/i,
+  /\ba few files\b/i,
+  /\bvarious files\b/i,
+  /\bseveral related files\b/i,
+  /\brelated project files\b/i,
+  /\bin one change\b/i,
+  /\brunning shell commands\b/i,
+  /\bchecking shell commands\b/i,
+  /\ba few shell commands\b/i,
+  /\bediting files\b/i,
+  /\bupdating files\b/i,
+  /\bmaking changes\b/i,
+  /\bimproving the implementation\b/i,
+  /\bworking on the task\b/i
+];
+function firstBannedPhrase(text) {
+  for (const re of BANNED_PHRASES) {
+    const m = re.exec(text);
+    if (m) return m[0];
+  }
+  return null;
+}
+function hasBannedPhrase(text) {
+  return firstBannedPhrase(text) !== null;
+}
+var VACUOUS_EXPLANATION = [
+  /\bpaused (to|and) (think|reflect)/i,
+  /\b(the agent|claude) (paused|stopped) (to|and)\b/i,
+  /\breflected on (its|the|what)/i,
+  /\bno (specific|concrete|clear|particular) (reason|detail|information|context)\b/i,
+  /\bnothing (specific|concrete|particular) (to (say|add|explain)|here)\b/i
+];
+function isVacuousExplanation(text) {
+  if (hasBannedPhrase(text)) return true;
+  return VACUOUS_EXPLANATION.some((re) => re.test(text));
+}
+
 // src/statusline/compose.ts
 function pickSentence(caption, mode) {
   if (mode === "deep") return caption.deep ?? caption.simple;
@@ -5175,10 +5314,10 @@ var SENTENCE_BUDGET = {
 function splitSentences(text) {
   return text.trim().split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
 }
-function fitWithin(text, sentences, chars) {
+function fitWithin(text, sentences2, chars) {
   const kept = [];
   for (const s of splitSentences(text)) {
-    if (kept.length >= sentences) break;
+    if (kept.length >= sentences2) break;
     const joined = [...kept, s].join(" ");
     if (joined.length > chars) break;
     kept.push(s);
@@ -5193,14 +5332,14 @@ function clampToChars(text, chars) {
   return (sp > chars * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
 }
 function fitWhy(text, mode) {
-  const { sentences, chars } = SENTENCE_BUDGET[mode];
-  return fitWithin(text, sentences, chars) || clampToChars(text, chars);
+  const { sentences: sentences2, chars } = SENTENCE_BUDGET[mode];
+  return fitWithin(text, sentences2, chars) || clampToChars(text, chars);
 }
 function fitSentence(primary, fallback, mode) {
-  const { sentences, chars } = SENTENCE_BUDGET[mode];
-  const fit = fitWithin(primary, sentences, chars);
+  const { sentences: sentences2, chars } = SENTENCE_BUDGET[mode];
+  const fit = fitWithin(primary, sentences2, chars);
   if (fit) return fit;
-  const fb = fitWithin(fallback, sentences, chars);
+  const fb = fitWithin(fallback, sentences2, chars);
   return fb || fallback;
 }
 var DONE_FOOTER = "Run /codey:timeline for the full breakdown.";
@@ -5234,7 +5373,8 @@ function composeView(events, snap, now, whys = [], budget = null, overhead = sum
   const current = chunks[chunks.length - 1];
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
   const rawWhy = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
-  const cleanWhy = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
+  const rawClean = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
+  const cleanWhy = rawClean && !hasBannedPhrase(rawClean) ? rawClean : null;
   const richMode = snap.mode === "deep" || snap.mode === "teach";
   const whyForDisplay = cleanWhy && !hasShellNoise(cleanWhy) ? cleanWhy : null;
   const title = buildCaption(current, snap.mode, null).title;
@@ -5908,63 +6048,23 @@ function buildIdFrom(entryPath) {
 import { statSync as statSync2 } from "node:fs";
 import { join as join17 } from "node:path";
 
-// src/caption/banned.ts
-var BANNED_PHRASES = [
-  /see how it works/i,
-  /follow how it works/i,
-  /adjust how it works/i,
-  /see how the pieces fit together/i,
-  // Empty "thinking" filler: a row or explanation that says the agent thought without saying
-  // about what. These are the exact strings the old timeline emitted for a bare thinking turn.
-  /thinking it through/i,
-  /working through the approach before acting/i,
-  /paused and reflected/i,
-  /figure out what the right next step should be/i,
-  // A status line once collapsed two git reads into "git state and git state"; never again.
-  /git state and git state/i,
-  /\bbefore changing anything\b/i,
-  /\bchanging specific lines\b/i,
-  /\bchanging files in place\b/i,
-  /\bfind the part it needs\b/i,
-  /\bmap how they connect\b/i,
-  /\bchecking the code\b/i,
-  /\bsearching the project for the code\b/i,
-  /\breading files to understand them\b/i,
-  /\bseveral files\b/i,
-  /\ba few files\b/i,
-  /\bvarious files\b/i,
-  /\bseveral related files\b/i,
-  /\brelated project files\b/i,
-  /\bin one change\b/i,
-  /\brunning shell commands\b/i,
-  /\bchecking shell commands\b/i,
-  /\ba few shell commands\b/i,
-  /\bediting files\b/i,
-  /\bupdating files\b/i,
-  /\bmaking changes\b/i,
-  /\bimproving the implementation\b/i,
-  /\bworking on the task\b/i
-];
-function firstBannedPhrase(text) {
-  for (const re of BANNED_PHRASES) {
-    const m = re.exec(text);
-    if (m) return m[0];
-  }
-  return null;
+// src/caption/reasoning.ts
+function sentences(text) {
+  return text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
 }
-function hasBannedPhrase(text) {
-  return firstBannedPhrase(text) !== null;
-}
-var VACUOUS_EXPLANATION = [
-  /\bpaused (to|and) (think|reflect)/i,
-  /\b(the agent|claude) (paused|stopped) (to|and)\b/i,
-  /\breflected on (its|the|what)/i,
-  /\bno (specific|concrete|clear|particular) (reason|detail|information|context)\b/i,
-  /\bnothing (specific|concrete|particular) (to (say|add|explain)|here)\b/i
-];
-function isVacuousExplanation(text) {
-  if (hasBannedPhrase(text)) return true;
-  return VACUOUS_EXPLANATION.some((re) => re.test(text));
+var MAX_SENTENCES = 2;
+var MAX_CHARS = 200;
+function cleanReasoning(text, _ctx = {}) {
+  if (!text) return null;
+  const normalized = stripEllipsis(stripDashes(stripMarkdown(text.replace(/\s+/g, " ").trim())));
+  if (!normalized) return null;
+  const kept = sentences(normalized).slice(0, MAX_SENTENCES).join(" ");
+  if (!kept) return null;
+  if (kept.replace(/[^A-Za-z]/g, "").length < 12) return null;
+  if (isVacuousExplanation(kept)) return null;
+  const clamped = kept.length > MAX_CHARS ? kept.slice(0, MAX_CHARS).replace(/\s+\S*$/, "").trim() : kept;
+  const ended = /[.!?]$/.test(clamped) ? clamped : clamped + ".";
+  return stripEllipsis(ended);
 }
 
 // src/timeline/attribution.ts
@@ -6073,6 +6173,8 @@ function actionTitle(tool, input, text) {
 }
 function actionSubtitle(tool, input, text) {
   if (!tool || tool === "thinking") return thinkingSubtitle(text);
+  const reasoned = cleanReasoning(text, { file: fileFrom(input) });
+  if (reasoned) return reasoned;
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd, descFrom(input)).sentence;
@@ -6466,20 +6568,24 @@ function instruction(depth) {
       return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found.";
     case "teach":
       return [
-        "Recap what Claude accomplished, for someone learning to code, using these sections with a blank line between them:",
+        "Recap what Claude accomplished, for someone learning to code, as a compact work report using these sections with a blank line between them:",
         "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
+        "What's left: anything still open or unverified, or omit this section if the work is complete.",
         "Then add one short plain-English note teaching the key concept involved (define any technical term you use).",
-        "Only say fixed, updated, reinstalled, or verified when the evidence supports it."
+        "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back."
       ].join("\n");
     default:
       return [
-        "Recap what Claude accomplished for a non-technical person, using these sections with a blank line between them:",
+        "Recap what Claude accomplished for a non-technical person, as a compact work report using these sections with a blank line between them:",
         "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
-        "Only say fixed, updated, reinstalled, or verified when the evidence supports it."
+        "What's left: anything still open or unverified, or omit this section if the work is complete.",
+        "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back."
       ].join("\n");
   }
 }
