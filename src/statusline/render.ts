@@ -9,6 +9,7 @@ const DIM = "\x1b[38;5;244m";   // separators, timer, and hints sit quietly behi
 const TEXT = "\x1b[38;5;253m";  // the live sentence, the line the eye lands on
 const GREEN = "\x1b[38;5;114m"; // the done state
 const RED = "\x1b[38;5;203m";   // a stuck warning
+const AMBER = "\x1b[38;5;214m"; // the live badge, matching the timeline's amber-means-live convention
 
 // Each mode carries its own accent so the line reads differently at a glance.
 const MODE_COLOR: Record<Mode, string> = {
@@ -48,6 +49,13 @@ const SEP = `${DIM}│${RESET}`;
 // quietly. Done drops the mode and adds a "Summary" chip so it is clear line two is a completion
 // summary, not live narration. While live, a short hint (the explain pointer, a paused notice)
 // rides on this line too, so the body stays two lines.
+// While the turn is in flight (live or thinking), lead the bar with an amber "● Live" badge so it
+// is obvious at a glance that Codey is still following the work. It drops away on done and idle.
+function liveBadge(state: StatusState): string {
+  if (state !== "live" && state !== "thinking") return "";
+  return `${BOLD}${AMBER}● Live${RESET}  `;
+}
+
 function statusBar(view: StatusView): string {
   const accent = stageColor(view.state, view.mode);
   const parts = [`${BOLD}${BRAND}Codey${RESET}`];
@@ -57,7 +65,7 @@ function statusBar(view: StatusView): string {
   if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
   const budget = view.budgetLeft ? ` ${DIM}· ${view.budgetLeft}${RESET}` : "";
   const hint = view.state !== "done" && view.hint ? ` ${DIM}· ${view.hint}${RESET}` : "";
-  return parts.join(` ${SEP} `) + budget + hint;
+  return liveBadge(view.state) + parts.join(` ${SEP} `) + budget + hint;
 }
 
 export function renderStatus(view: StatusView, _width = WRAP): string {

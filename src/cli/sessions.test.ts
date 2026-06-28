@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { latestSessionId, listSessions, dayBucket } from "./sessions.js";
+import { latestSessionId, listSessions, dayBucket, turnInFlight, TURN_BACKSTOP_MS } from "./sessions.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -12,6 +12,31 @@ afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
 function setMtime(p: string, epochSec: number): void {
   utimesSync(p, epochSec, epochSec);
 }
+
+describe("turnInFlight", () => {
+  const NOW = 10_000_000;
+
+  it("is in flight when the prompt is newer than the last Stop", () => {
+    expect(turnInFlight(NOW - 1000, NOW - 5000, NOW - 1000, NOW)).toBe(true);
+  });
+
+  it("is not in flight once Stop lands at or after the prompt", () => {
+    expect(turnInFlight(NOW - 5000, NOW - 1000, NOW - 5000, NOW)).toBe(false);
+    expect(turnInFlight(null, null, 0, NOW)).toBe(false);
+  });
+
+  it("stays in flight for a long turn, measuring the backstop from the latest activity", () => {
+    // The prompt is old, but a tool fired recently: the turn is alive, not timed out.
+    const promptAt = NOW - 25 * 60_000;
+    const recentTool = NOW - 1000;
+    expect(turnInFlight(promptAt, null, recentTool, NOW)).toBe(true);
+  });
+
+  it("self-heals only after the backstop of total silence", () => {
+    const silentSince = NOW - TURN_BACKSTOP_MS - 1;
+    expect(turnInFlight(silentSince, null, silentSince, NOW)).toBe(false);
+  });
+});
 
 describe("dayBucket", () => {
   it("returns 'Today' when mtime is on the same calendar day as now", () => {

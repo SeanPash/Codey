@@ -12,7 +12,7 @@ import { readSpend } from "../cost/spend-log.js";
 import { summarizeSpend } from "../cost/spend-summary.js";
 import { resolveActiveWarning } from "../intervene/active-warning.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
-import { listSessions, RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
+import { listSessions, RUNNING_WINDOW_MS, turnInFlight } from "../cli/sessions.js";
 import { selectActive } from "./active.js";
 import { readStatus } from "../statusline/state.js";
 import { readSessionMode } from "../statusline/active-mode.js";
@@ -35,14 +35,14 @@ export function isRunning(dir: string, now: number, cancelledAt = 0): boolean {
   const lastPrompt = prompts.length ? prompts[prompts.length - 1] : 0;
   const lastActivity = Math.max(evMtime, lastPrompt);
   const withinWindow = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  // A prompt newer than the last stop means Claude is mid-response (thinking or tool calls),
-  // but only count it for a bounded window so a terminal closed mid-turn (which never fired
-  // Stop) does not stay live forever.
+  // A prompt newer than the last stop means Claude is mid-response (thinking or tool calls). That
+  // holds for the whole turn, however long it runs: the live state ends on the real signals below
+  // (a finish, a cancel, a close), not a short timer. Only a terminal that crashed mid-turn and
+  // fired none of them self-heals, once it is silent past the generous backstop.
   const status = readStatus(dir);
   // A SessionEnd stamp newer than any activity means the terminal closed; it is not live.
   if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
-  const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0)
-    && now - status.promptAt < THINKING_WINDOW_MS;
+  const isThinking = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
   // The Stop hook stamps doneAt when Claude finishes a turn. If that stamp is newer than every
   // other signal (last tool event and last prompt), the turn is over: drop live at once rather
   // than waiting out the recent-activity window, so a finished session stops pulsing right away.

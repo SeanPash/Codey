@@ -64,6 +64,19 @@ describe("renderStatus", () => {
     expect(out).toContain("thinking through your request");
   });
 
+  it("leads with a Live badge while the turn is in flight, so the HUD reads as following", () => {
+    // Live and thinking are both mid-turn: the badge says Codey is still tracking.
+    expect(plain(renderStatus({ ...base, state: "live" })).split("\n")[0]).toMatch(/^●\s*Live/);
+    expect(plain(renderStatus({ ...base, state: "thinking", stage: "Thinking" })).split("\n")[0]).toMatch(/^●\s*Live/);
+    // The badge sits before the Codey name.
+    expect(plain(renderStatus({ ...base, state: "live" })).split("\n")[0]).toMatch(/^●\s*Live.*Codey/);
+  });
+
+  it("drops the Live badge once the turn is done or idle", () => {
+    expect(plain(renderStatus({ ...base, state: "done", stage: "Done" }))).not.toContain("Live");
+    expect(plain(renderStatus({ ...base, state: "idle", stage: "Idle" }))).not.toContain("Live");
+  });
+
   it("lets a stuck warning take over the second line", () => {
     const out = plain(renderStatus({ ...base, warning: "stuck: same edit x3" }));
     const lines = out.split("\n");

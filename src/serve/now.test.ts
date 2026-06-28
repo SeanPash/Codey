@@ -102,6 +102,28 @@ describe("buildNowView", () => {
     expect(v.thinking).toBe(false);
   });
 
+  it("stays live for a long turn, far past the old short window, until the prompt finishes", () => {
+    // A tool ran, then a long stretch of reasoning. No open call, no Stop: the turn is still in
+    // flight ten minutes on, so the strip must stay lit instead of going dark on a 3-minute timer.
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 }),
+      ev({ phase: "post", tool: "Read", timestamp: 1500 }),
+    ];
+    const tenMinutes = 1500 + 10 * 60_000;
+    expect(buildNowView(events, status({ promptAt: 1000 }), tenMinutes).live).toBe(true);
+  });
+
+  it("self-heals only after a long silence, so a crashed terminal eventually goes quiet", () => {
+    // Prompt in flight (no Stop) but no activity at all for over half an hour: assume the terminal
+    // died mid-turn and drop the strip, since no finish or close signal ever landed.
+    const events: ToolEvent[] = [
+      ev({ phase: "pre", tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 }),
+      ev({ phase: "post", tool: "Read", timestamp: 1500 }),
+    ];
+    const wayLater = 1500 + 31 * 60_000;
+    expect(buildNowView(events, status({ promptAt: 1000 }), wayLater).live).toBe(false);
+  });
+
   it("goes quiet the instant Claude finishes the turn, not after the window", () => {
     const events: ToolEvent[] = [
       ev({ phase: "pre", tool: "Bash", input: { command: "npm test" }, timestamp: 1000 }),

@@ -23,8 +23,8 @@ const mockStatSync = statSync as ReturnType<typeof vi.fn>;
 const mockReadPrompts = readPrompts as ReturnType<typeof vi.fn>;
 const mockReadStatus = readStatus as ReturnType<typeof vi.fn>;
 
-// Import RUNNING_WINDOW_MS to avoid hardcoding the threshold.
-import { RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
+// Import the thresholds to avoid hardcoding them.
+import { RUNNING_WINDOW_MS, TURN_BACKSTOP_MS } from "../cli/sessions.js";
 
 describe("isRunning", () => {
   const DIR = "/fake/session";
@@ -75,8 +75,16 @@ describe("isRunning", () => {
     expect(isRunning(DIR, NOW)).toBe(true);
   });
 
-  it("returns false for a stale prompt past the thinking window (terminal closed mid-turn)", () => {
-    mockReadStatus.mockReturnValue({ promptAt: NOW - THINKING_WINDOW_MS - 1, doneAt: null, updatedAt: NOW });
+  it("stays live for a long in-flight turn, well past the old short window", () => {
+    // A prompt with no Stop, ten minutes on: Claude can work one prompt this long, so it is still
+    // live. The turn ends on a real finish/cancel/close signal, not a short timer.
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 10 * 60_000, doneAt: null, updatedAt: NOW });
+    expect(isRunning(DIR, NOW)).toBe(true);
+  });
+
+  it("self-heals a crashed terminal only after the long backstop", () => {
+    // No activity and no Stop for over the backstop: assume the terminal died mid-turn, drop live.
+    mockReadStatus.mockReturnValue({ promptAt: NOW - TURN_BACKSTOP_MS - 1, doneAt: null, updatedAt: NOW });
     expect(isRunning(DIR, NOW)).toBe(false);
   });
 
