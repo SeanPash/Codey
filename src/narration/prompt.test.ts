@@ -64,6 +64,16 @@ describe("buildNarrationPrompt", () => {
     const p = buildNarrationPrompt([ev({})], "simple");
     expect(p).toContain("Never use em dashes");
   });
+
+  it("asks deep mode to say what the step confirms or rules out", () => {
+    const p = buildNarrationPrompt([ev({})], "deep").toLowerCase();
+    expect(p).toMatch(/confirm|rule out|ruling out/);
+  });
+
+  it("forbids the empty 'thinking it through' style filler explicitly", () => {
+    const p = buildNarrationPrompt([ev({})], "deep").toLowerCase();
+    expect(p).toContain("thinking it through");
+  });
 });
 
 describe("teach prompt", () => {

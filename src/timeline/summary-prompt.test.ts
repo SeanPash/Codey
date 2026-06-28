@@ -60,6 +60,18 @@ describe("buildSummaryPrompt", () => {
     expect(simple).not.toContain("What changed");
   });
 
+  it("asks deep and teach to note what is left when the work is unfinished", () => {
+    for (const d of ["deep", "teach"] as const) {
+      const p = buildSummaryPrompt("p", tasks, d).toLowerCase();
+      expect(p).toMatch(/what(?:'s| is)? left|remain|still open|unfinished/);
+    }
+  });
+
+  it("tells deep and teach not to just echo Claude's closing chat message", () => {
+    const p = buildSummaryPrompt("p", tasks, "deep").toLowerCase();
+    expect(p).toMatch(/do not (just )?(repeat|echo|copy)/);
+  });
+
   it("only offers verification as grounding when a check actually ran", () => {
     const verified: SummaryTask[] = [
       { name: "Fix the recap", lines: [line("the change"), bashLine("npx vitest run")] },

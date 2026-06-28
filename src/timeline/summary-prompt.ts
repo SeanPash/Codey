@@ -72,20 +72,24 @@ function instruction(depth: ExplainDepth): string {
       return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found.";
     case "teach":
       return [
-        "Recap what Claude accomplished, for someone learning to code, using these sections with a blank line between them:",
+        "Recap what Claude accomplished, for someone learning to code, as a compact work report using these sections with a blank line between them:",
         "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
+        "What's left: anything still open or unverified, or omit this section if the work is complete.",
         "Then add one short plain-English note teaching the key concept involved (define any technical term you use).",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back.",
       ].join("\n");
     default:
       return [
-        "Recap what Claude accomplished for a non-technical person, using these sections with a blank line between them:",
+        "Recap what Claude accomplished for a non-technical person, as a compact work report using these sections with a blank line between them:",
         "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
+        "What's left: anything still open or unverified, or omit this section if the work is complete.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back.",
       ].join("\n");
   }
 }
