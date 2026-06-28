@@ -50,6 +50,38 @@ export function ensureStatusLine(self: string): void {
   if (!s.statusLine) writeSettings(withStatusLine(s, statusLineCommand(self)));
 }
 
+// The prefix every installed build of this plugin shares: the cache keys each build by its commit
+// SHA, so .../codey/codey/<sha>/dist/cli/index.js collapses to .../codey/codey/. Returns null for
+// any path that isn't a plugin-cache build (a hand-set local dist, say), which we never touch.
+export function pluginCacheBase(cliPath: string): string | null {
+  const m = cliPath.match(/^(.*[\\/]codey[\\/]codey[\\/])[^\\/]+[\\/]dist[\\/]/);
+  return m ? m[1] : null;
+}
+
+// True when the installed status line still points at an older build of this same plugin. We only
+// recognize our own command (node "<path>" statusline), and only refresh when the old and new paths
+// are sibling builds under the same cache root. That leaves a custom status line, or a path the user
+// set by hand, alone.
+export function shouldRefreshStatusLine(existingCommand: string, currentCliPath: string): boolean {
+  const m = existingCommand.match(/^node "(.+)" statusline$/);
+  if (!m) return false;
+  const existing = m[1];
+  if (existing === currentCliPath) return false;
+  const base = pluginCacheBase(currentCliPath);
+  return base !== null && existing.startsWith(base);
+}
+
+// Self-heal after a plugin update: when a new build lands, the hooks run from it (via
+// CLAUDE_PLUGIN_ROOT) but the hardcoded status-line path in settings still aims at the old build.
+// Called from the prompt hook, this repoints it at the build running now so the line never lags.
+export function refreshStatusLineIfStale(currentCliPath: string): void {
+  const s = readSettings();
+  const cmd = s.statusLine?.command;
+  if (cmd && shouldRefreshStatusLine(cmd, currentCliPath)) {
+    writeSettings(withStatusLine(s, statusLineCommand(currentCliPath)));
+  }
+}
+
 // One narrator per session, so two terminals can run Codey without fighting over a
 // single shared pidfile.
 function pidPath(sessionDir: string): string {

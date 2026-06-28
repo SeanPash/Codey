@@ -1,10 +1,11 @@
-import { pathToFileURL } from "node:url";
-import { join } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
+import { join, dirname } from "node:path";
 import { mkdirSync } from "node:fs";
 import { defaultRoot } from "../store/session-store.js";
 import { patchStatus } from "../statusline/state.js";
 import { writeMetaIfAbsent } from "../store/session-meta.js";
 import { appendPrompt } from "./prompts.js";
+import { refreshStatusLineIfStale } from "../cli/toggle.js";
 
 // Records when the user last submitted a prompt so the status line can show a
 // "thinking" state in the gap before Claude's first tool call. Kept separate from
@@ -48,6 +49,15 @@ function main(): void {
   process.stdin.on("data", (c) => (raw += c));
   process.stdin.on("end", () => {
     try { handlePromptInput(raw); } catch { /* swallow */ }
+    // This hook always runs from the build that is current (CLAUDE_PLUGIN_ROOT resolves it), so it
+    // can fix a status-line path left pointing at a previous build after an update. Skip Codey's own
+    // headless calls. Derive the sibling CLI from this file's location: dist/capture -> dist/cli.
+    if (!process.env.CODEY_HEADLESS) {
+      try {
+        const cli = join(dirname(fileURLToPath(import.meta.url)), "..", "cli", "index.js");
+        refreshStatusLineIfStale(cli);
+      } catch { /* never break the prompt flow */ }
+    }
     process.exit(0);
   });
 }
