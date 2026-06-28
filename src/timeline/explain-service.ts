@@ -1,10 +1,11 @@
-import type { SessionSnapshot, ReceiptLine } from "../types.js";
+import type { SessionSnapshot, ReceiptLine, Usage } from "../types.js";
 import type { ExplainDepth } from "./explain-prompt.js";
 import { buildTaskExplainPrompt, buildActionExplainPrompt } from "./explain-prompt.js";
 import { buildSummaryPrompt, type SummaryTask } from "./summary-prompt.js";
 import { readExplanation, writeExplanation, type ExplainScope } from "./explain-cache.js";
 import { hashContent } from "../util/hash.js";
 import { readBudget, addSpend, budgetAllows } from "../budget/budget.js";
+import { appendSpend } from "../cost/spend-log.js";
 import { stripDashes } from "../util/text.js";
 import { isVacuousExplanation } from "../caption/banned.js";
 
@@ -22,8 +23,11 @@ export interface ExplainResult {
 }
 
 // Generation through the user's own metered headless Claude. Injected so the server wires
-// the real call and tests never spawn a process.
-export type Narrate = (prompt: string) => Promise<{ text: string; tokens: number } | null>;
+// the real call and tests never spawn a process. The real path also reports usage and the
+// CLI's own cost; both are optional so a thin test stub can return just text and a token count.
+export type Narrate = (
+  prompt: string,
+) => Promise<{ text: string; tokens: number; usage?: Usage; costUsd?: number } | null>;
 
 export interface ExplainDeps {
   narrate: Narrate;
@@ -105,7 +109,12 @@ export async function explain(snap: SessionSnapshot, req: ExplainRequest, deps: 
 
   const res = await deps.narrate(loc.prompt);
   if (!res || !res.text.trim()) return { text: null, cached: false, paused: false };
+  // The call cost real tokens whether or not we end up showing it, so record it now: once against
+  // the per-session budget, and once in the shared spend log so the timeline's Codey overhead card
+  // counts summaries and explanations alongside live narration and the segmenter.
   addSpend(deps.sessionDir, res.tokens);
+  const usage: Usage = res.usage ?? { input: res.tokens, output: 0, cacheRead: 0, cacheWrite: 0 };
+  appendSpend(deps.sessionDir, { ts: Date.now(), kind: "summary", mode: null, usage, costUsd: res.costUsd ?? 0 });
   const text = stripDashes(res.text.trim());
   // A generation that came back as empty filler ("the agent paused and reflected") says nothing,
   // so we show no panel rather than print it. It is left uncached so a later retry can do better.

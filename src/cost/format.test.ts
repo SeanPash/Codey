@@ -18,7 +18,7 @@ describe("formatUsd", () => {
 describe("overheadFooter", () => {
   const o = (tokens: number, costUsd: number): CodeyOverhead => ({
     total: { calls: 1, tokens, costUsd },
-    byKind: { narration: { calls: 1, tokens, costUsd }, timeline: { calls: 0, tokens: 0, costUsd: 0 } },
+    byKind: { narration: { calls: 1, tokens, costUsd }, timeline: { calls: 0, tokens: 0, costUsd: 0 }, summary: { calls: 0, tokens: 0, costUsd: 0 } },
     byMode: {},
   });
 

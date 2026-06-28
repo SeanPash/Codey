@@ -4986,7 +4986,7 @@ function zero() {
 function summarizeSpend(entries) {
   const out = {
     total: zero(),
-    byKind: { narration: zero(), timeline: zero() },
+    byKind: { narration: zero(), timeline: zero(), summary: zero() },
     byMode: {}
   };
   for (const e of entries) {
@@ -6503,6 +6503,8 @@ async function explain(snap, req, deps) {
   const res = await deps.narrate(loc.prompt);
   if (!res || !res.text.trim()) return { text: null, cached: false, paused: false };
   addSpend(deps.sessionDir, res.tokens);
+  const usage = res.usage ?? { input: res.tokens, output: 0, cacheRead: 0, cacheWrite: 0 };
+  appendSpend(deps.sessionDir, { ts: Date.now(), kind: "summary", mode: null, usage, costUsd: res.costUsd ?? 0 });
   const text = stripDashes(res.text.trim());
   if (isVacuousExplanation(text)) return { text: null, cached: false, paused: false };
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);

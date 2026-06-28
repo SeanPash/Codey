@@ -1381,11 +1381,12 @@
           + `<div class="pr"><span class="pn">${esc(snap.priciestTaskName)}</span>`
           + `<span class="pt num">${kfmt(snap.priciestTaskWork)}<small>tok</small></span></div></div>` : "";
 
-      // Codey's own cost: what its narration and timeline calls spent, kept separate from Claude's
-      // work above so it is obvious which tokens are the tool's overhead. Cost is a cache-aware
+      // Codey's own cost: what its narration, timeline, and summary calls spent, kept separate from
+      // Claude's work above so it is obvious which tokens are the tool's overhead. Cost is a cache-aware
       // estimate on Haiku rates; tokens are exact.
-      const ov = snap.codeyOverhead || { total: { calls: 0, tokens: 0, costUsd: 0 },
-        byKind: { narration: { calls: 0, tokens: 0, costUsd: 0 }, timeline: { calls: 0, tokens: 0, costUsd: 0 } } };
+      const zeroTot = { calls: 0, tokens: 0, costUsd: 0 };
+      const ov = snap.codeyOverhead || { total: { ...zeroTot },
+        byKind: { narration: { ...zeroTot }, timeline: { ...zeroTot }, summary: { ...zeroTot } } };
       const usd = (n) => (!n ? "$0.00" : n < 0.01 ? "<$0.01" : "$" + n.toFixed(2));
       const ovVal = (t) => `${kfmt(t.tokens)}<small>tok</small> &bull; ~${usd(t.costUsd)}`;
       const ovRow = (label, t) =>
@@ -1399,6 +1400,7 @@
           + `<div class="toksub">What Codey itself cost this session</div>`
           + ovRow("Live narration", ov.byKind.narration)
           + ovRow("Timeline", ov.byKind.timeline)
+          + (ov.byKind.summary && ov.byKind.summary.calls ? ovRow("Summaries", ov.byKind.summary) : "")
           + `<div class="pair"><span class="l">Total</span><span class="v num">${ovVal(ov.total)}</span></div>`
           + `<div class="toksub">Cost as reported by Claude, billed to your plan.</div></div>`;
 

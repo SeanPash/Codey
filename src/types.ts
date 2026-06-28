@@ -124,11 +124,12 @@ export interface Usage {
   cacheWrite: number;
 }
 
-// One logged headless call. kind separates live narration from the timeline segmenter.
+// One logged headless call. kind separates live narration, the timeline segmenter, and the
+// on-demand summaries/explanations the timeline generates.
 export interface SpendEntry {
   ts: number;
-  kind: "narration" | "timeline";
-  mode: Mode | null; // the narration mode, or null for the segmenter
+  kind: "narration" | "timeline" | "summary";
+  mode: Mode | null; // the narration mode, or null for the segmenter and summaries
   usage: Usage;
   costUsd: number;
 }
@@ -142,7 +143,7 @@ export interface SpendTotals {
 // The whole-session rollup Codey shows so users see exactly what Codey itself cost.
 export interface CodeyOverhead {
   total: SpendTotals;
-  byKind: { narration: SpendTotals; timeline: SpendTotals };
+  byKind: { narration: SpendTotals; timeline: SpendTotals; summary: SpendTotals };
   byMode: Partial<Record<Mode, SpendTotals>>;
 }
 
