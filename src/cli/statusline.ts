@@ -10,7 +10,8 @@ import { readWhys } from "../narration/history.js";
 import { readBudget } from "../budget/budget.js";
 import { readSpend } from "../cost/spend-log.js";
 import { summarizeSpend } from "../cost/spend-summary.js";
-import type { ToolEvent, Mode } from "../types.js";
+import { activeWarning } from "../warnings/active.js";
+import type { ToolEvent, Mode, Warning } from "../types.js";
 
 function readEvents(dir: string): ToolEvent[] {
   const p = join(dir, "events.jsonl");
@@ -48,6 +49,7 @@ const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const BRAND = "\x1b[38;5;75m"; // the Codey name and the mode commands, sky blue
 const DIM = "\x1b[38;5;244m";  // the surrounding words sit quietly
+const AMBER = "\x1b[38;5;214m"; // a tripped warning, the one thing off mode still speaks up about
 
 // Shown when Codey is wired but this session has no mode on. Rather than a blank line, point at
 // the two ways in: the timeline opens a live visual storyboard in the browser, while deep mode
@@ -55,6 +57,21 @@ const DIM = "\x1b[38;5;244m";  // the surrounding words sit quietly
 function offHint(): string {
   return `${BOLD}${BRAND}Codey${RESET} ${DIM}off · ${RESET}${BRAND}/codey:timeline${RESET}`
     + `${DIM} for a live timeline · ${RESET}${BRAND}/codey:deep${RESET}${DIM} to narrate this session${RESET}`;
+}
+
+// The short phrase for a tripped detector. loop/repeat_error count repetitions; hang counts seconds.
+function offWarningText(w: Warning): string {
+  if (w.kind === "loop") return `Possible loop: ${w.tool} x${w.count}`;
+  if (w.kind === "repeat_error") return `Repeat error: ${w.tool} x${w.count}`;
+  return `Possible hang: ${w.tool} ${w.count}s`;
+}
+
+// The one line off mode still shows: a free warning. It replaces the plain nudge while a detector
+// is tripped, and still points at the timeline so the user can see what happened. No action line,
+// no stage, nothing paid.
+function renderOffWarning(w: Warning): string {
+  return `${BOLD}${AMBER}!${RESET} ${AMBER}${offWarningText(w)}${RESET}`
+    + `${DIM} · ${RESET}${BRAND}/codey:timeline${RESET}`;
 }
 
 // Render the line for one specific session. When Codey is on for the session we show its live
@@ -65,7 +82,12 @@ export function lineForSession(session: string | null, root: string, now: number
   if (!session) return "";
   const dir = join(root, session);
   const mode = readSessionMode(dir);
-  if (!mode) return offHint();
+  if (!mode) {
+    // Off mode stays free, but the free detectors still run: a tripped warning is the one thing
+    // worth speaking up about, so it replaces the plain nudge until the detector resets.
+    const w = activeWarning(readEvents(dir), now);
+    return w ? renderOffWarning(w) : offHint();
+  }
   return statusLineFor(dir, now, mode);
 }
 

@@ -61,4 +61,29 @@ describe("lineForSession", () => {
   it("renders blank when no session is given (no payload session id)", () => {
     expect(lineForSession(null, tmpdir(), 1000)).toBe("");
   });
+
+  it("surfaces a free warning even when Codey is off, with no mode set", () => {
+    const root = mkdtempSync(join(tmpdir(), "codey-sl-"));
+    const dir = join(root, "s1");
+    mkdirSync(dir, { recursive: true });
+    // Five identical steps in a row: a loop the free detector catches, no mode on.
+    const lines = Array.from({ length: 5 }, (_, i) => JSON.stringify({
+      id: String(i), phase: "pre", tool: "Read", server: null,
+      input: { file_path: "auth.ts" }, inputHash: "same", isError: false,
+      errorText: null, timestamp: i, sessionId: "s1",
+    })).join("\n");
+    writeFileSync(join(dir, "events.jsonl"), lines + "\n");
+    const out = plain(lineForSession("s1", root, 1000));
+    expect(out.toLowerCase()).toContain("loop");
+    expect(out).toContain("Read");
+    expect(out).toContain("/codey:timeline"); // still points at the visual view
+    expect(out).not.toContain("/codey:deep"); // the plain nudge is replaced by the warning
+  });
+
+  it("falls back to the plain off hint once the warning clears", () => {
+    const dir = seed(); // a single edit, no warning, no mode
+    const root = dirname(dir);
+    const out = plain(lineForSession("s1", root, 1000));
+    expect(out).toContain("off");
+  });
 });

@@ -3,19 +3,16 @@ import type { ToolEvent, Mode, Warning } from "../types.js";
 import { SessionStore } from "../store/session-store.js";
 import { readMeta } from "../store/session-meta.js";
 import { readTranscriptTurns } from "../timeline/transcript.js";
-import { computeOpenCalls } from "../warnings/open-calls.js";
-import { detectLoop, detectRepeatError, detectHang } from "../warnings/detectors.js";
-import { hangThreshold } from "../warnings/hang-config.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
 import { formatWarning } from "../warnings/format.js";
+import { activeWarning } from "../warnings/active.js";
 import { NarrationEngine, type NarrateFn } from "../narration/engine.js";
 import { runClaude } from "../narration/claude-headless.js";
 import { renderNarration, renderHeader, renderCaption } from "../terminal/render.js";
 import { chunkEvents } from "../caption/chunks.js";
 import { buildCaption } from "../caption/caption.js";
 
-const LOOP_THRESHOLD = 5;
-const REPEAT_ERROR_THRESHOLD = 3;
+export { activeWarning };
 
 export interface WatchState {
   engine: NarrationEngine;
@@ -26,15 +23,6 @@ export interface WatchState {
 
 export function createWatchState(mode: Mode, narrate: NarrateFn): WatchState {
   return { engine: new NarrationEngine(mode, narrate), mode, lastWarningKey: null, lastActionKey: null };
-}
-
-export function activeWarning(events: ToolEvent[], now: number): Warning | null {
-  const lastActivityTs = events.reduce((m, e) => Math.max(m, e.timestamp), 0) || undefined;
-  return (
-    detectLoop(events, LOOP_THRESHOLD) ??
-    detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ??
-    detectHang(computeOpenCalls(events), now, hangThreshold, lastActivityTs)
-  );
 }
 
 function warningKey(w: Warning): string {
@@ -68,7 +56,7 @@ export async function processTick(events: ToolEvent[], state: WatchState, now: n
     }
   }
 
-  const narration = await state.engine.onEvents(events, now);
+  const narration = await state.engine.onEvents(events, now, !!w);
   if (narration) lines.push(renderNarration(narration));
 
   return { lines };
@@ -83,7 +71,7 @@ export function runWatch(sessionId: string, mode: Mode): void {
   console.log(`(session: ${sessionId})`);
 
   // Skip a tick while the previous one is still narrating, so a burst of file changes cannot
-  // start overlapping claude passes before the throttle state has caught up.
+  // start overlapping claude passes before the cadence state has caught up.
   let inFlight = false;
   const tick = async () => {
     if (inFlight) return;
