@@ -57,11 +57,11 @@ export function parseMetered(stdout: string, prompt: string): MeteredResult | nu
 }
 
 // Runs the user's own Claude Code headless and reports both the text and the token spend.
-// The timeout has to clear a real haiku round trip. Each call is cold (no cache reuse across
-// separate processes), and a deep why reasons before answering, so calls land in the 25 to 40
-// second band. 45s catches the slow tail instead of dropping it to a timeout (the old 35s budget,
-// plus a ~3s stdin wait since removed, was tipping deep calls over and leaving 0 narrations). The
-// in-flight guard keeps one slow call from stacking up more, and a late explanation beats none.
+// The timeout has to clear a real haiku round trip from a cold process (no cache reuse across
+// separate spawns). Extended thinking is off (see headlessEnv), so calls now finish in a few
+// seconds rather than the old 25 to 40 second band, but 45s stays as a generous ceiling for a
+// slow network or cold start: a late explanation still beats a dropped one. The in-flight guard
+// keeps one slow call from stacking up more.
 export function runClaudeMetered(
   prompt: string, timeoutMs = 45000, onError?: (info: string) => void,
 ): Promise<MeteredResult | null> {
