@@ -51,12 +51,13 @@ const BRAND = "\x1b[38;5;75m"; // the Codey name and the mode commands, sky blue
 const DIM = "\x1b[38;5;244m";  // the surrounding words sit quietly
 const AMBER = "\x1b[38;5;214m"; // a tripped warning, the one thing off mode still speaks up about
 
-// Shown when Codey is wired but this session has no mode on. Rather than a blank line, point at
-// the two ways in: the timeline opens a live visual storyboard in the browser, while deep mode
-// narrates the work right here in the terminal. Naming both makes the difference obvious.
+// Shown when this session has no narration mode on. Codey is never really "off" here: it is still
+// capturing every step to the timeline in the background. Saying "off" made that look dead, so we
+// say what is true instead, then point at the two ways to look: the timeline shows the live run plus
+// past sessions in the browser, while deep mode narrates the work right here in the terminal.
 function offHint(): string {
-  return `${BOLD}${BRAND}Codey${RESET} ${DIM}off · ${RESET}${BRAND}/codey:timeline${RESET}`
-    + `${DIM} for a live timeline · ${RESET}${BRAND}/codey:deep${RESET}${DIM} to narrate this session${RESET}`;
+  return `${BOLD}${BRAND}Codey${RESET} ${DIM}recording in background · ${RESET}${BRAND}/codey:timeline${RESET}`
+    + `${DIM} for the live timeline · ${RESET}${BRAND}/codey:deep${RESET}${DIM} to narrate here${RESET}`;
 }
 
 // The short phrase for a tripped detector. loop/repeat_error count repetitions; hang counts seconds.

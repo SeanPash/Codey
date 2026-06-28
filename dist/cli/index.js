@@ -5699,7 +5699,7 @@ var BRAND2 = "\x1B[38;5;75m";
 var DIM2 = "\x1B[38;5;244m";
 var AMBER2 = "\x1B[38;5;214m";
 function offHint() {
-  return `${BOLD2}${BRAND2}Codey${RESET2} ${DIM2}off \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}${DIM2} for a live timeline \xB7 ${RESET2}${BRAND2}/codey:deep${RESET2}${DIM2} to narrate this session${RESET2}`;
+  return `${BOLD2}${BRAND2}Codey${RESET2} ${DIM2}recording in background \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}${DIM2} for the live timeline \xB7 ${RESET2}${BRAND2}/codey:deep${RESET2}${DIM2} to narrate here${RESET2}`;
 }
 function offWarningText(w) {
   if (w.kind === "loop") return `Possible loop: ${w.tool} x${w.count}`;

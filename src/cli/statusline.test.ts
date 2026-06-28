@@ -43,8 +43,9 @@ describe("lineForSession", () => {
     const root = dirname(dir);
     const out = plain(lineForSession("s1", root, 1000));
     expect(out).toContain("Codey");
-    expect(out).toContain("off");
-    // The nudge points at the two ways in: the live timeline and deep narration.
+    // It is recording in the background, not "off"; the nudge points at the two ways to look:
+    // the live timeline and deep narration.
+    expect(out).toContain("recording in background");
     expect(out).toContain("/codey:timeline");
     expect(out).toContain("/codey:deep");
   });
@@ -80,10 +81,10 @@ describe("lineForSession", () => {
     expect(out).not.toContain("/codey:deep"); // the plain nudge is replaced by the warning
   });
 
-  it("falls back to the plain off hint once the warning clears", () => {
+  it("falls back to the plain nudge once the warning clears", () => {
     const dir = seed(); // a single edit, no warning, no mode
     const root = dirname(dir);
     const out = plain(lineForSession("s1", root, 1000));
-    expect(out).toContain("off");
+    expect(out).toContain("recording in background");
   });
 });
