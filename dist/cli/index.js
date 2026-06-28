@@ -3514,7 +3514,7 @@ import { tmpdir } from "node:os";
 
 // src/narration/claude-spawn.ts
 function headlessEnv(base = process.env) {
-  return { ...base, CODEY_HEADLESS: "1" };
+  return { ...base, CODEY_HEADLESS: "1", MAX_THINKING_TOKENS: "0" };
 }
 
 // src/narration/headless-flags.ts
