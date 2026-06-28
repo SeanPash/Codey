@@ -354,6 +354,26 @@
     .brkrow .bc small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:3px; }
     .brkrow .pct { grid-column:3; grid-row:2; justify-self:end; color:var(--muted); font-weight:500; font-size:11px; }
     .tokempty { font-size:11px; color:var(--muted); margin-top:12px; }
+    /* Codey overhead: a small receipt of what the tool itself spent. Each section is two stacked
+       columns so nothing ever wraps in the narrow sidebar: the name and its call count on the left,
+       the token count and approximate cost lined up on the right. */
+    .tokhd .toktot.cost { white-space:nowrap; }
+    .tokhd .toktot .approx { font-size:11px; font-weight:600; color:var(--muted); margin-right:2px; vertical-align:1px; }
+    .ovbody { margin-top:12px; }
+    .ovrow { display:grid; grid-template-columns:1fr auto; align-items:start; column-gap:12px; padding:9px 0; }
+    .ovrow + .ovrow { border-top:1px solid var(--hair); }
+    .ovrow .ovname { font-size:12px; color:var(--ink2); font-weight:600; }
+    .ovrow .ovcalls { font-size:9.5px; color:var(--muted); margin-top:3px; letter-spacing:.02em; }
+    .ovrow .ovtok { font-size:12.5px; color:var(--ink); font-weight:700; letter-spacing:-0.01em;
+      text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .ovrow .ovtok small { font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-left:3px; }
+    .ovrow .ovcost { font-size:10.5px; color:var(--muted); margin-top:3px; text-align:right;
+      font-variant-numeric:tabular-nums; white-space:nowrap; }
+    /* the Total line is the receipt subtotal: a firmer rule above it and brighter ink. */
+    .ovrow.ovtot { border-top:1px solid var(--line); margin-top:3px; padding-top:11px; }
+    .ovrow.ovtot .ovname { color:var(--ink); font-weight:700; }
+    .ovrow.ovtot .ovcost { color:var(--body); }
+    .ovnote { font-size:10px; color:var(--muted); margin-top:12px; line-height:1.45; }
     /* priciest-task footer: its own labelled row below the breakdown, name on the left (truncated),
        spend on the right, so it reads as a separate receipt line and not part of the chart. */
     .tokfoot { margin-top:15px; padding-top:12px; border-top:1px solid var(--hair); }
@@ -1388,21 +1408,30 @@
       const ov = snap.codeyOverhead || { total: { ...zeroTot },
         byKind: { narration: { ...zeroTot }, timeline: { ...zeroTot }, summary: { ...zeroTot } } };
       const usd = (n) => (!n ? "$0.00" : n < 0.01 ? "<$0.01" : "$" + n.toFixed(2));
-      const ovVal = (t) => `${kfmt(t.tokens)}<small>tok</small> &bull; ~${usd(t.costUsd)}`;
-      const ovRow = (label, t) =>
-        `<div class="pair"><span class="l">${label} <small class="dim">${t.calls} call${t.calls === 1 ? "" : "s"}</small></span>`
-        + `<span class="v num">${ovVal(t)}</span></div>`;
+      // approximate cost marker, kept as a quiet prefix so the dollar figure stays the focus
+      const approxCost = (n) => `<span class="approx">~</span>${usd(n)}`;
+      const callsText = (t) => `${t.calls} call${t.calls === 1 ? "" : "s"}`;
+      // one ledger line: name + call count on the left, tokens + cost stacked on the right
+      const ovRow = (label, t, extra) =>
+        `<div class="ovrow${extra || ""}">`
+        + `<div><div class="ovname">${label}</div><div class="ovcalls">${callsText(t)}</div></div>`
+        + `<div><div class="ovtok">${kfmt(t.tokens)}<small>tok</small></div>`
+        + `<div class="ovcost">${approxCost(t.costUsd)}</div></div>`
+        + `</div>`;
       const overheadCard = ov.total.calls === 0
         ? `<div class="scard"><div class="tokhd"><span class="k">Codey overhead</span></div>`
+          + `<div class="toksub">What Codey itself cost this session</div>`
           + `<div class="tokempty">Nothing yet. Codey narrates as Claude works.</div></div>`
         : `<div class="scard"><div class="tokhd"><span class="k">Codey overhead</span>`
-          + `<span class="toktot">~${usd(ov.total.costUsd)}</span></div>`
+          + `<span class="toktot cost">${approxCost(ov.total.costUsd)}</span></div>`
           + `<div class="toksub">What Codey itself cost this session</div>`
+          + `<div class="ovbody">`
           + ovRow("Live narration", ov.byKind.narration)
           + ovRow("Timeline", ov.byKind.timeline)
-          + (ov.byKind.summary && ov.byKind.summary.calls ? ovRow("Summaries", ov.byKind.summary) : "")
-          + `<div class="pair"><span class="l">Total</span><span class="v num">${ovVal(ov.total)}</span></div>`
-          + `<div class="toksub">Cost as reported by Claude, billed to your plan.</div></div>`;
+          + ovRow("Summaries", ov.byKind.summary || zeroTot)
+          + ovRow("Total", ov.total, " ovtot")
+          + `</div>`
+          + `<div class="ovnote">Cost as reported by Claude, billed to your plan. Tokens are exact.</div></div>`;
 
       document.getElementById("summary").innerHTML =
         `<div class="sidehd"><span class="t">Session stats</span>`
