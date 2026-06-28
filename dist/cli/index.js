@@ -5267,6 +5267,7 @@ var DIM = "\x1B[38;5;244m";
 var TEXT = "\x1B[38;5;253m";
 var GREEN = "\x1B[38;5;114m";
 var RED = "\x1B[38;5;203m";
+var AMBER = "\x1B[38;5;214m";
 var MODE_COLOR = {
   simple: "\x1B[38;5;75m",
   deep: "\x1B[38;5;141m",
@@ -5289,6 +5290,10 @@ function clipStage(stage) {
   return (sp > STAGE_MAX * 0.6 ? cut.slice(0, sp) : cut).trimEnd() + "\u2026";
 }
 var SEP = `${DIM}\u2502${RESET}`;
+function liveBadge(state) {
+  if (state !== "live" && state !== "thinking") return "";
+  return `${BOLD}${AMBER}\u25CF Live${RESET}  `;
+}
 function statusBar(view) {
   const accent = stageColor(view.state, view.mode);
   const parts = [`${BOLD}${BRAND}Codey${RESET}`];
@@ -5298,7 +5303,7 @@ function statusBar(view) {
   if (view.elapsed) parts.push(`${DIM}${view.elapsed}${RESET}`);
   const budget = view.budgetLeft ? ` ${DIM}\xB7 ${view.budgetLeft}${RESET}` : "";
   const hint = view.state !== "done" && view.hint ? ` ${DIM}\xB7 ${view.hint}${RESET}` : "";
-  return parts.join(` ${SEP} `) + budget + hint;
+  return liveBadge(view.state) + parts.join(` ${SEP} `) + budget + hint;
 }
 function renderStatus(view, _width = WRAP) {
   const out = [statusBar(view)];
@@ -5571,6 +5576,11 @@ function latestSessionId(root = defaultRoot()) {
 var RUNNING_WINDOW_MS = 15e3;
 var OPEN_WINDOW_MS = 10 * 6e4;
 var THINKING_WINDOW_MS = 3 * 6e4;
+var TURN_BACKSTOP_MS = 30 * 6e4;
+function turnInFlight(promptAt, doneAt, lastActivity, now) {
+  if (promptAt == null || promptAt <= (doneAt ?? 0)) return false;
+  return now - Math.max(promptAt, lastActivity) < TURN_BACKSTOP_MS;
+}
 function dayBucket(mtime, now) {
   const d = new Date(mtime);
   const n = new Date(now);
@@ -5601,7 +5611,7 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
       customName: readCustomName(dir)
     });
     const status = readStatus(dir);
-    const thinking = evMtime != null && status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
+    const thinking = evMtime != null && turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
     const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
     const closed = status?.closedAt != null && status.closedAt >= lastActivity;
     const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
@@ -5687,7 +5697,7 @@ var RESET2 = "\x1B[0m";
 var BOLD2 = "\x1B[1m";
 var BRAND2 = "\x1B[38;5;75m";
 var DIM2 = "\x1B[38;5;244m";
-var AMBER = "\x1B[38;5;214m";
+var AMBER2 = "\x1B[38;5;214m";
 function offHint() {
   return `${BOLD2}${BRAND2}Codey${RESET2} ${DIM2}off \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}${DIM2} for a live timeline \xB7 ${RESET2}${BRAND2}/codey:deep${RESET2}${DIM2} to narrate this session${RESET2}`;
 }
@@ -5697,7 +5707,7 @@ function offWarningText(w) {
   return `Possible hang: ${w.tool} ${w.count}s`;
 }
 function renderOffWarning(w) {
-  return `${BOLD2}${AMBER}!${RESET2} ${AMBER}${offWarningText(w)}${RESET2}${DIM2} \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}`;
+  return `${BOLD2}${AMBER2}!${RESET2} ${AMBER2}${offWarningText(w)}${RESET2}${DIM2} \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}`;
 }
 function lineForSession(session, root, now) {
   if (!session) return "";
@@ -6669,10 +6679,10 @@ function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINI
   if (finished || cancelled) return { ...empty, steps };
   const openCalls = computeOpenCalls(events);
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
-  const thinking = !current && status?.promptAt != null && status.promptAt > lastActivity && now - status.promptAt < THINKING_WINDOW_MS;
+  const inFlight = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
+  const thinking = !current && inFlight && status?.promptAt != null && status.promptAt > lastActivity;
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  const turnInFlight = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
-  const live = !!current || thinking || recent || turnInFlight;
+  const live = !!current || recent || inFlight;
   if (current) {
     const action = {
       label: currentLabel(current.tool, current.input),
@@ -6735,7 +6745,7 @@ function isRunning(dir, now, cancelledAt = 0) {
   const withinWindow = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
   const status = readStatus(dir);
   if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
-  const isThinking = status?.promptAt != null && status.promptAt > (status.doneAt ?? 0) && now - status.promptAt < THINKING_WINDOW_MS;
+  const isThinking = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
   const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
   const finished = status?.doneAt != null && status.doneAt >= lastSignal;
   if (finished) return false;

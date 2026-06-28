@@ -2,7 +2,7 @@ import type { ToolEvent } from "../types.js";
 import type { StatusSnapshot } from "../statusline/state.js";
 import { actionLabel, pastTense, shortTarget, rawTarget } from "../statusline/labels.js";
 import { computeOpenCalls } from "../warnings/open-calls.js";
-import { RUNNING_WINDOW_MS, THINKING_WINDOW_MS } from "../cli/sessions.js";
+import { RUNNING_WINDOW_MS, turnInFlight } from "../cli/sessions.js";
 
 export interface NowStep {
   label: string;
@@ -112,22 +112,20 @@ export function buildNowView(
 
   const openCalls = computeOpenCalls(events);
   const current = openCalls.length ? openCalls[openCalls.length - 1] : null;
-  const thinking = !current && status?.promptAt != null
-    && status.promptAt > lastActivity
-    && now - status.promptAt < THINKING_WINDOW_MS;
 
-  // The NOW strip means "right now", so the trailing window is short: it only bridges the brief
-  // gap between two back-to-back tools (where Stop has not fired). It is not the generous
-  // 30-minute "open" window, or the strip and its Follow-live timer would tick on after a stop.
+  // The turn is still in flight whenever the prompt is newer than the last Stop. It stays lit for
+  // the whole turn, however long Claude works: the finished/cancelled/closed checks above are the
+  // real "off" signals, so the strip never goes dark mid-turn on a timer. This matches the
+  // snapshot's isRunning, so the strip and the page's "Working now" badge never disagree.
+  const inFlight = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
+  // Thinking is the sub-state where Claude is reasoning before the first tool of the turn: in
+  // flight, with the prompt newer than the last activity and nothing open yet.
+  const thinking = !current && inFlight && status?.promptAt != null && status.promptAt > lastActivity;
+
+  // A short trailing window bridges the brief gap between two back-to-back tools before any
+  // in-flight signal is stamped (a session with no prompt mark yet).
   const recent = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
-  // The turn is still in flight when the prompt is newer than the last Stop and we are inside the
-  // thinking window. This matches the snapshot's isRunning, so the strip stays lit through the
-  // longer gaps where Claude is reasoning between tools (no open call, last tool > RUNNING_WINDOW
-  // ago). Without it the strip and the page's "Working now" badge disagree mid-turn.
-  const turnInFlight = status?.promptAt != null
-    && status.promptAt > (status.doneAt ?? 0)
-    && now - status.promptAt < THINKING_WINDOW_MS;
-  const live = !!current || thinking || recent || turnInFlight;
+  const live = !!current || recent || inFlight;
 
   if (current) {
     const action = {

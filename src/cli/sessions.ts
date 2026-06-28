@@ -67,6 +67,27 @@ export const OPEN_WINDOW_MS = 10 * 60_000;
 // Bounding it keeps a terminal that was closed mid-turn, which never fired Stop, from
 // counting as running forever and inflating the live count.
 export const THINKING_WINDOW_MS = 3 * 60_000;
+// How long a turn may run before we assume the terminal crashed mid-response. Claude can work a
+// single prompt for many minutes (a long build, a deep edit pass), so this is deliberately
+// generous: it is only a backstop for a terminal that died without firing Stop or SessionEnd.
+// The real "turn over" signals (doneAt, a cancel marker, closedAt) end the live state at once and
+// are checked by every caller, so this never cuts a genuine turn short on a timer.
+export const TURN_BACKSTOP_MS = 30 * 60_000;
+
+// A turn is in flight when the latest prompt is newer than the last Stop (doneAt), so Claude has a
+// response underway. We do not end that on a short timer: a long turn whose tools keep firing stays
+// live because the backstop is measured from the latest activity, not the prompt. Only true silence
+// (no tools and no Stop) past the backstop self-heals a crashed terminal. Callers still check the
+// authoritative off-signals (doneAt past the last signal, a cancel marker, closedAt) separately.
+export function turnInFlight(
+  promptAt: number | null | undefined,
+  doneAt: number | null | undefined,
+  lastActivity: number,
+  now: number,
+): boolean {
+  if (promptAt == null || promptAt <= (doneAt ?? 0)) return false;
+  return now - Math.max(promptAt, lastActivity) < TURN_BACKSTOP_MS;
+}
 
 // Returns "Today", "Yesterday", or the locale date string for older sessions.
 // Based on calendar day boundaries, not a rolling 24h window.
@@ -109,9 +130,7 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
       // "thinking" covers the gap when Claude is working but hasn't emitted a tool call for
       // more than RUNNING_WINDOW_MS: a prompt newer than the last stop means it is still live.
       const status = readStatus(dir);
-      const thinking = evMtime != null && status?.promptAt != null
-        && status.promptAt > (status.doneAt ?? 0)
-        && now - status.promptAt < THINKING_WINDOW_MS;
+      const thinking = evMtime != null && turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
       const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
       // A SessionEnd stamp newer than the last activity means the terminal closed; drop it from
       // the live/open tiers at once instead of waiting out the window. A resume bumps activity
