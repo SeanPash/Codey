@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { explain, fillCachedExplanations, timelineDefaults, type ExplainDeps } from "./explain-service.js";
 import { armBudget, addSpend } from "../budget/budget.js";
+import { readSpend } from "../cost/spend-log.js";
 import type { SessionSnapshot, ReceiptLine, TimelineChunk, PromptGroup } from "../types.js";
 
 function rl(over: Partial<ReceiptLine> = {}): ReceiptLine {
@@ -26,7 +27,7 @@ function snapshot(): SessionSnapshot {
     lastActivityAt: 0, totalTokens: 0, workTotal: 0, contextTotal: 0, taskCount: 1,
     priciestTaskName: null, priciestTaskWork: 0, groups: [group("p0", [c0])], chunks: [c0], activeWarning: null,
     seedDepth: "deep", genAuto: true, budgetLeft: null,
-    codeyOverhead: { total: { calls: 0, tokens: 0, costUsd: 0 }, byKind: { narration: { calls: 0, tokens: 0, costUsd: 0 }, timeline: { calls: 0, tokens: 0, costUsd: 0 } }, byMode: {} },
+    codeyOverhead: { total: { calls: 0, tokens: 0, costUsd: 0 }, byKind: { narration: { calls: 0, tokens: 0, costUsd: 0 }, timeline: { calls: 0, tokens: 0, costUsd: 0 }, summary: { calls: 0, tokens: 0, costUsd: 0 } }, byMode: {} },
   };
 }
 
@@ -101,6 +102,35 @@ describe("explain", () => {
     await explain(snapshot(), { sessionId: "s1", scope: "task", id: "c0", depth: "deep" }, deps);
     const second = await explain(snapshot(), { sessionId: "s1", scope: "summary", id: "p0", depth: "deep" }, deps);
     expect(second.text).toBeTruthy();
+  });
+
+  it("logs a generation as summary spend in the overhead log", async () => {
+    mkdirSync(deps.sessionDir, { recursive: true });
+    await explain(snapshot(), { sessionId: "s1", scope: "task", id: "c0", depth: "deep" }, deps);
+    const entries = readSpend(deps.sessionDir);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].kind).toBe("summary");
+    // The mock reports only a token count, so usage falls back to that count with no breakdown.
+    expect(entries[0].usage.input + entries[0].usage.output
+      + entries[0].usage.cacheRead + entries[0].usage.cacheWrite).toBe(42);
+  });
+
+  it("carries real usage and cost into the summary spend entry when the narrator reports them", async () => {
+    mkdirSync(deps.sessionDir, { recursive: true });
+    narrate.mockResolvedValueOnce({
+      text: "Reread a.ts to line up the helper.", tokens: 100,
+      usage: { input: 10, output: 20, cacheRead: 70, cacheWrite: 0 }, costUsd: 0.012,
+    });
+    await explain(snapshot(), { sessionId: "s1", scope: "task", id: "c0", depth: "deep" }, deps);
+    const entry = readSpend(deps.sessionDir)[0];
+    expect(entry.usage).toEqual({ input: 10, output: 20, cacheRead: 70, cacheWrite: 0 });
+    expect(entry.costUsd).toBe(0.012);
+  });
+
+  it("does not log spend when nothing is generated", async () => {
+    mkdirSync(deps.sessionDir, { recursive: true });
+    await explain(snapshot(), { sessionId: "s1", scope: "task", id: "nope", depth: "deep" }, deps);
+    expect(readSpend(deps.sessionDir)).toHaveLength(0);
   });
 });
 

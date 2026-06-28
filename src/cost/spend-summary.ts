@@ -17,7 +17,7 @@ function zero(): SpendTotals {
 export function summarizeSpend(entries: SpendEntry[]): CodeyOverhead {
   const out: CodeyOverhead = {
     total: zero(),
-    byKind: { narration: zero(), timeline: zero() },
+    byKind: { narration: zero(), timeline: zero(), summary: zero() },
     byMode: {},
   };
   for (const e of entries) {

@@ -17,7 +17,17 @@ describe("summarizeSpend", () => {
     expect(s.total).toEqual({ calls: 0, tokens: 0, costUsd: 0 });
     expect(s.byKind.narration.calls).toBe(0);
     expect(s.byKind.timeline.calls).toBe(0);
+    expect(s.byKind.summary.calls).toBe(0);
     expect(s.byMode).toEqual({});
+  });
+
+  it("rolls summary calls into their own bucket and the total", () => {
+    const s = summarizeSpend([
+      e({ kind: "summary", mode: null, costUsd: 0.004 }),               // tokens 100
+      e({ kind: "summary", mode: null, costUsd: 0.001 }),               // tokens 100
+    ]);
+    expect(s.byKind.summary).toEqual({ calls: 2, tokens: 200, costUsd: 0.005 });
+    expect(s.total).toEqual({ calls: 2, tokens: 200, costUsd: 0.005 });
   });
 
   it("sums calls, tokens, and cost overall and per kind", () => {
