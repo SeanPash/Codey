@@ -778,7 +778,13 @@
     // It is null in the single view and reset to null after each pane, so nothing leaks across panes.
     let renderDepth = null;
     const activeDepth = () => renderDepth || curDepth();
-    const ekey = (scope, id) => scope + "|" + id + "|" + activeDepth();
+    // The session an id belongs to. Active Terminals panes embed it as "<sid>~<id>"; the single
+    // view uses bare positional ids (p1, c2), so they belong to whatever session is open now.
+    // Folding the session into every cache key is what stops one session's recap or explanation
+    // from showing under another session's prompt when their positional ids happen to line up.
+    const idSession = (id) => { const t = String(id).indexOf("~"); return t !== -1 ? String(id).slice(0, t) : (currentId || ""); };
+    const cacheKey = (scope, id, d) => idSession(id) + "|" + scope + "|" + id + "|" + d;
+    const ekey = (scope, id) => cacheKey(scope, id, activeDepth());
     const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
 
     async function generate(scope, id, rerender, gdepth) {
@@ -792,7 +798,7 @@
       // The depth comes from the button that was clicked (a pane carries its own), not the live
       // render context, which is null by the time this async click handler runs.
       const d = gdepth || curDepth();
-      const key = scope + "|" + id + "|" + d;
+      const key = cacheKey(scope, id, d);
       if (explCache.has(key) || explLoading.has(key)) return;
       explLoading.add(key);
       redraw();
@@ -814,10 +820,10 @@
     function seedEmbedded(snap) {
       const sd = snap.seedDepth || "deep";
       for (const c of snap.chunks || []) {
-        if (c.explanation) { const k = "task|" + c.id + "|" + sd; if (!explCache.has(k)) explCache.set(k, c.explanation); }
+        if (c.explanation) { const k = cacheKey("task", c.id, sd); if (!explCache.has(k)) explCache.set(k, c.explanation); }
       }
       for (const g of snap.groups || []) {
-        if (g.summary) { const k = "summary|" + g.id + "|" + sd; if (!explCache.has(k)) explCache.set(k, g.summary); }
+        if (g.summary) { const k = cacheKey("summary", g.id, sd); if (!explCache.has(k)) explCache.set(k, g.summary); }
       }
     }
 
