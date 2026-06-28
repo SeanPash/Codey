@@ -5,7 +5,8 @@ import { readMeta } from "../store/session-meta.js";
 import { readTranscriptTurns } from "../timeline/transcript.js";
 import { reconcileErrors } from "../warnings/reconcile.js";
 import { formatWarning } from "../warnings/format.js";
-import { createWatchState, activeWarning, type WatchState } from "./watch.js";
+import { createWatchState, type WatchState } from "./watch.js";
+import { activeWarning } from "../warnings/active.js";
 import { patchStatus } from "../statusline/state.js";
 import { appendWhy } from "../narration/history.js";
 import { runClaudeMetered, type MeteredResult } from "../narration/claude-metered.js";
@@ -17,7 +18,7 @@ import type { NarrateFn } from "../narration/engine.js";
 export async function narrateTick(dir: string, events: ToolEvent[], state: WatchState, now: number): Promise<void> {
   const w = activeWarning(events, now);
   patchStatus(dir, { warning: w ? formatWarning(w) : null });
-  const why = await state.engine.onEvents(events, now);
+  const why = await state.engine.onEvents(events, now, !!w);
   if (why) {
     patchStatus(dir, { why });
     appendWhy(dir, { ts: now, why });
@@ -25,7 +26,7 @@ export async function narrateTick(dir: string, events: ToolEvent[], state: Watch
 }
 
 // The narrate function the engine calls. It enforces the budget at the spend point and
-// meters real token cost, so neither the engine nor the throttle needs to know about budgets.
+// meters real token cost, so neither the engine nor the cadence needs to know about budgets.
 export function makeBudgetedNarrate(
   getBudget: () => Budget | null,
   metered: (prompt: string) => Promise<MeteredResult | null>,
@@ -63,7 +64,7 @@ export function runNarrate(sessionId: string, mode: Mode): void {
 
   // A narration pass can take seconds (it shells out to claude). Without this guard a burst of
   // file changes would fire overlapping ticks that each spawn their own claude before the
-  // throttle state is updated, multiplying processes and overshooting the budget.
+  // cadence state is updated, multiplying processes and overshooting the budget.
   let inFlight = false;
   const tick = async () => {
     if (inFlight) return;

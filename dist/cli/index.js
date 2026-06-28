@@ -3270,6 +3270,46 @@ function readTranscriptTurns(path) {
   }
 }
 
+// src/warnings/reconcile.ts
+import { randomUUID } from "node:crypto";
+function reconcileErrors(events, turns) {
+  const closed = /* @__PURE__ */ new Set();
+  const preById = /* @__PURE__ */ new Map();
+  for (const e of events) {
+    if (!e.toolUseId) continue;
+    if (e.phase === "post") closed.add(e.toolUseId);
+    else preById.set(e.toolUseId, e);
+  }
+  const synthetic = [];
+  for (const turn of turns) {
+    if (!turn.isError || !turn.toolUseId) continue;
+    if (closed.has(turn.toolUseId)) continue;
+    const pre = preById.get(turn.toolUseId);
+    if (!pre) continue;
+    synthetic.push({
+      id: randomUUID(),
+      phase: "post",
+      tool: pre.tool,
+      server: pre.server,
+      input: pre.input,
+      inputHash: pre.inputHash,
+      isError: true,
+      errorText: turn.errorText,
+      timestamp: pre.timestamp,
+      sessionId: pre.sessionId,
+      toolUseId: pre.toolUseId
+    });
+  }
+  if (synthetic.length === 0) return events;
+  const rank = (e) => e.phase === "post" ? 1 : 0;
+  return [...events, ...synthetic].sort((a, b) => a.timestamp - b.timestamp || rank(a) - rank(b));
+}
+
+// src/warnings/format.ts
+function formatWarning(w) {
+  return `\u26A0\uFE0F  ${w.message}`;
+}
+
 // src/warnings/open-calls.ts
 function computeOpenCalls(events) {
   const openByTool = /* @__PURE__ */ new Map();
@@ -3363,44 +3403,12 @@ function hangThreshold(tool) {
   return BY_TOOL[tool] ?? DEFAULT_MS;
 }
 
-// src/warnings/reconcile.ts
-import { randomUUID } from "node:crypto";
-function reconcileErrors(events, turns) {
-  const closed = /* @__PURE__ */ new Set();
-  const preById = /* @__PURE__ */ new Map();
-  for (const e of events) {
-    if (!e.toolUseId) continue;
-    if (e.phase === "post") closed.add(e.toolUseId);
-    else preById.set(e.toolUseId, e);
-  }
-  const synthetic = [];
-  for (const turn of turns) {
-    if (!turn.isError || !turn.toolUseId) continue;
-    if (closed.has(turn.toolUseId)) continue;
-    const pre = preById.get(turn.toolUseId);
-    if (!pre) continue;
-    synthetic.push({
-      id: randomUUID(),
-      phase: "post",
-      tool: pre.tool,
-      server: pre.server,
-      input: pre.input,
-      inputHash: pre.inputHash,
-      isError: true,
-      errorText: turn.errorText,
-      timestamp: pre.timestamp,
-      sessionId: pre.sessionId,
-      toolUseId: pre.toolUseId
-    });
-  }
-  if (synthetic.length === 0) return events;
-  const rank = (e) => e.phase === "post" ? 1 : 0;
-  return [...events, ...synthetic].sort((a, b) => a.timestamp - b.timestamp || rank(a) - rank(b));
-}
-
-// src/warnings/format.ts
-function formatWarning(w) {
-  return `\u26A0\uFE0F  ${w.message}`;
+// src/warnings/active.ts
+var LOOP_THRESHOLD = 5;
+var REPEAT_ERROR_THRESHOLD = 3;
+function activeWarning(events, now) {
+  const lastActivityTs = events.reduce((m, e) => Math.max(m, e.timestamp), 0) || void 0;
+  return detectLoop(events, LOOP_THRESHOLD) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ?? detectHang(computeOpenCalls(events), now, hangThreshold, lastActivityTs);
 }
 
 // src/narration/prompt.ts
@@ -3462,216 +3470,6 @@ ${lines}
 
 ${instruction2}
 Ground every claim in the actions above: name the actual files, functions, search terms, or commands involved. Never use vague filler like "several files", "the code", "the system", "various changes", "understand how it works", or "make sure everything is consistent". Be brief and specific, short enough to read at a glance. Write plain English with no markdown or backticks. Never use em dashes or hyphens to join clauses; use a period or a comma instead. Reply with only the explanation, no preamble.`;
-}
-
-// src/narration/throttle.ts
-var PACING = {
-  simple: { everyN: 1, minMs: 7e3 },
-  deep: { everyN: 2, minMs: 5e3 },
-  teach: { everyN: 3, minMs: 5e3 }
-};
-function shouldNarrate(mode, state) {
-  const p = PACING[mode];
-  return state.newEvents >= p.everyN && state.msSinceLast >= p.minMs;
-}
-
-// src/util/text.ts
-function stripDashes(s) {
-  return s.replace(/\s*[—–]\s*/g, ", ").replace(/ - /g, ", ").replace(/ ,/g, ",").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
-}
-function stripMarkdown(s) {
-  return s.replace(/`+/g, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)\*([^*]+)\*/g, "$1$2").replace(/\s{2,}/g, " ").trim();
-}
-
-// src/narration/engine.ts
-var WINDOW = 12;
-var NarrationEngine = class {
-  constructor(mode, narrate) {
-    this.mode = mode;
-    this.narrate = narrate;
-  }
-  lastCount = 0;
-  lastAtMs = 0;
-  // Called with the full event list so far. Returns narration text or null.
-  async onEvents(events, nowMs) {
-    const newEvents = events.length - this.lastCount;
-    const msSinceLast = this.lastAtMs === 0 ? Infinity : nowMs - this.lastAtMs;
-    if (!shouldNarrate(this.mode, { newEvents, msSinceLast })) return null;
-    const window = events.slice(-WINDOW);
-    const prompt = buildNarrationPrompt(window, this.mode);
-    const text = await this.narrate(prompt);
-    this.lastCount = events.length;
-    this.lastAtMs = nowMs;
-    return text ? stripMarkdown(stripDashes(text)) : text;
-  }
-};
-
-// src/narration/claude-headless.ts
-import { execFile as execFile2 } from "node:child_process";
-
-// src/narration/headless-flags.ts
-import { tmpdir } from "node:os";
-
-// src/narration/claude-spawn.ts
-function headlessEnv(base = process.env) {
-  return { ...base, CODEY_HEADLESS: "1", MAX_THINKING_TOKENS: "0" };
-}
-
-// src/narration/headless-flags.ts
-var DISALLOWED_TOOLS = [
-  "Bash",
-  "Edit",
-  "Read",
-  "Write",
-  "Glob",
-  "Grep",
-  "WebFetch",
-  "WebSearch",
-  "Task",
-  "NotebookEdit",
-  "TodoWrite",
-  "BashOutput",
-  "KillShell"
-];
-var NARRATOR_SYSTEM_PROMPT = "You narrate what an AI coding agent is doing for someone watching it work. Reply with only the narration in plain English: no preamble, no markdown, no tool names as nouns.";
-var SEGMENTER_SYSTEM_PROMPT = "You are a precise assistant. Follow the user's instructions and output format exactly, with no extra text.";
-function trimArgs(systemPrompt) {
-  return [
-    "--setting-sources",
-    "",
-    "--exclude-dynamic-system-prompt-sections",
-    "--system-prompt",
-    systemPrompt,
-    "--disallowed-tools",
-    DISALLOWED_TOOLS.join(" ")
-  ];
-}
-function headlessExecOptions(timeoutMs) {
-  return { timeout: timeoutMs, shell: false, windowsHide: true, cwd: tmpdir(), env: headlessEnv(), encoding: "utf8" };
-}
-
-// src/narration/claude-metered.ts
-import { execFile } from "node:child_process";
-
-// src/cost/pricing.ts
-var HAIKU_RATES = {
-  input: 1,
-  output: 5,
-  cacheRead: 0.1,
-  cacheWrite: 1.25
-};
-function costUsd(u) {
-  return (u.input * HAIKU_RATES.input + u.output * HAIKU_RATES.output + u.cacheRead * HAIKU_RATES.cacheRead + u.cacheWrite * HAIKU_RATES.cacheWrite) / 1e6;
-}
-
-// src/narration/narrator-log.ts
-import { appendFileSync as appendFileSync2 } from "node:fs";
-import { join as join3 } from "node:path";
-function logNarrator(dir, line) {
-  try {
-    appendFileSync2(join3(dir, "narrator.log"), `${(/* @__PURE__ */ new Date()).toISOString()} ${line}
-`);
-  } catch {
-  }
-}
-function describeExecError(err, stderr) {
-  if (!err) return "claude returned no usable result";
-  const parts = [];
-  if (err.killed || err.signal) parts.push("timed out");
-  if (err.code === "ENOENT") parts.push("claude not found on PATH");
-  else if (err.code != null) parts.push(`exit ${err.code}`);
-  if (parts.length === 0 && err.message) parts.push(err.message.split("\n")[0]);
-  const tail = (stderr ?? "").trim().split("\n")[0];
-  if (tail) parts.push(tail.length > 120 ? tail.slice(0, 119) + "\u2026" : tail);
-  return parts.join("; ") || "claude call failed";
-}
-
-// src/narration/claude-metered.ts
-var NO_USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-function buildMeteredArgs(prompt) {
-  return [
-    "-p",
-    prompt,
-    "--model",
-    "haiku",
-    "--output-format",
-    "json",
-    ...trimArgs(NARRATOR_SYSTEM_PROMPT)
-  ];
-}
-function estimateTokens(s) {
-  return Math.ceil(s.length / 4);
-}
-function parseMetered(stdout, prompt) {
-  const out = stdout.trim();
-  if (!out) return null;
-  try {
-    const o = JSON.parse(out);
-    const text = typeof o.result === "string" ? o.result.trim() : "";
-    if (!text) return null;
-    const u = o.usage ?? {};
-    const usage = {
-      input: u.input_tokens ?? 0,
-      output: u.output_tokens ?? 0,
-      cacheRead: u.cache_read_input_tokens ?? 0,
-      cacheWrite: u.cache_creation_input_tokens ?? 0
-    };
-    const tokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
-    const costUsd2 = typeof o.total_cost_usd === "number" ? o.total_cost_usd : costUsd(usage);
-    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text), usage, costUsd: costUsd2 };
-  } catch {
-    return { text: out, tokens: estimateTokens(prompt + out), usage: { ...NO_USAGE }, costUsd: 0 };
-  }
-}
-function runClaudeMetered(prompt, timeoutMs = 45e3, onError) {
-  return runMetered(buildMeteredArgs(prompt), prompt, timeoutMs, onError);
-}
-function runMetered(args, prompt, timeoutMs, onError) {
-  return new Promise((resolve) => {
-    const child = execFile("claude", args, headlessExecOptions(timeoutMs), (err, stdout, stderr) => {
-      if (err) {
-        onError?.(describeExecError(err, stderr));
-        return resolve(null);
-      }
-      const r = parseMetered(stdout, prompt);
-      if (!r) onError?.(describeExecError(null));
-      resolve(r);
-    });
-    child.stdin?.end();
-  });
-}
-
-// src/narration/claude-headless.ts
-function buildClaudeArgs(prompt) {
-  return ["-p", prompt, "--model", "haiku", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
-}
-function buildSegmenterMeteredArgs(prompt) {
-  return ["-p", prompt, "--model", "haiku", "--output-format", "json", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
-}
-function runSegmentationMetered(prompt, timeoutMs = 3e4) {
-  return runMetered(buildSegmenterMeteredArgs(prompt), prompt, timeoutMs);
-}
-function runClaude(prompt, timeoutMs = 15e3) {
-  return new Promise((resolve) => {
-    const child = execFile2("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
-      if (err) return resolve(null);
-      const out = stdout.trim();
-      resolve(out.length > 0 ? out : null);
-    });
-    child.stdin?.end();
-  });
-}
-
-// src/terminal/render.ts
-function renderNarration(text) {
-  return `  why: ${text}`;
-}
-function renderHeader(mode) {
-  return `Codey (mode: ${mode}) - watching what Claude is doing`;
-}
-function renderCaption(caption) {
-  return `\u25B8 ${caption.title}
-    ${caption.simple}`;
 }
 
 // src/caption/subject.ts
@@ -4474,6 +4272,292 @@ function mutating(stage) {
   return stage === "editing" || stage === "debugging";
 }
 
+// src/narration/cadence.ts
+var LONG_TOOL_MS = 8e3;
+var CADENCE = {
+  simple: { floorMs: 45e3, capMs: 75e3 },
+  deep: { floorMs: 25e3, capMs: 45e3 },
+  teach: { floorMs: 3e4, capMs: 5e4 }
+};
+function toolFamily(tool) {
+  if (tool === "Edit" || tool === "MultiEdit" || tool === "Write" || tool === "NotebookEdit") return "edit";
+  if (tool === "Read") return "read";
+  if (tool === "Grep" || tool === "Glob") return "search";
+  if (tool === "Bash" || tool === "PowerShell") return "run";
+  if (tool === "Task" || tool === "Agent") return "task";
+  return "other";
+}
+function lastPreBefore(events, cutoff) {
+  for (let i = Math.min(cutoff, events.length) - 1; i >= 0; i--) {
+    if (events[i].phase === "pre") return events[i];
+  }
+  return null;
+}
+function lastPre(events) {
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].phase === "pre") return events[i];
+  }
+  return null;
+}
+function naiveBoundaryCrossed(events, lastNarratedIndex) {
+  return chunkEvents(events).some((c) => c.startIndex > 0 && c.startIndex >= lastNarratedIndex);
+}
+function toolFamilyChanged(events, lastNarratedIndex) {
+  const now = lastPre(events);
+  const then = lastPreBefore(events, lastNarratedIndex);
+  if (!now || !then) return false;
+  return toolFamily(now.tool) !== toolFamily(then.tool);
+}
+function longToolFinished(events, lastNarratedIndex, thresholdMs = LONG_TOOL_MS) {
+  const openById = /* @__PURE__ */ new Map();
+  const openByTool = /* @__PURE__ */ new Map();
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    if (e.phase === "pre") {
+      if (e.toolUseId) openById.set(e.toolUseId, e);
+      const q = openByTool.get(e.tool) ?? [];
+      q.push(e);
+      openByTool.set(e.tool, q);
+      continue;
+    }
+    let openPre;
+    if (e.toolUseId && openById.has(e.toolUseId)) {
+      openPre = openById.get(e.toolUseId);
+      openById.delete(e.toolUseId);
+      const q = openByTool.get(e.tool);
+      if (q) {
+        const at = q.indexOf(openPre);
+        if (at >= 0) q.splice(at, 1);
+      }
+    } else {
+      openPre = openByTool.get(e.tool)?.shift();
+    }
+    if (!openPre) continue;
+    if (i >= lastNarratedIndex && e.timestamp - openPre.timestamp > thresholdMs) return true;
+  }
+  return false;
+}
+function shouldNarrate(mode, input) {
+  const { events, lastNarratedIndex, lastCallAt, now, warningActive } = input;
+  const { floorMs, capMs } = CADENCE[mode];
+  if (events.length <= lastNarratedIndex) return { fire: false, reason: null };
+  const sinceCall = lastCallAt === 0 ? Infinity : now - lastCallAt;
+  if (sinceCall < floorMs) return { fire: false, reason: null };
+  if (warningActive) return { fire: true, reason: "warning" };
+  if (longToolFinished(events, lastNarratedIndex)) return { fire: true, reason: "long-tool" };
+  if (naiveBoundaryCrossed(events, lastNarratedIndex)) return { fire: true, reason: "task" };
+  if (toolFamilyChanged(events, lastNarratedIndex)) return { fire: true, reason: "family" };
+  if (sinceCall >= capMs) return { fire: true, reason: "cap" };
+  return { fire: false, reason: null };
+}
+
+// src/util/text.ts
+function stripDashes(s) {
+  return s.replace(/\s*[—–]\s*/g, ", ").replace(/ - /g, ", ").replace(/ ,/g, ",").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
+}
+function stripMarkdown(s) {
+  return s.replace(/`+/g, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)\*([^*]+)\*/g, "$1$2").replace(/\s{2,}/g, " ").trim();
+}
+
+// src/narration/engine.ts
+var MAX_WINDOW = 40;
+var NarrationEngine = class {
+  constructor(mode, narrate) {
+    this.mode = mode;
+    this.narrate = narrate;
+  }
+  lastIndex = 0;
+  // events.length at the last narration
+  lastAtMs = 0;
+  // Called with the full event list so far. Returns narration text or null. warningActive lets a
+  // tripped free detector trigger a call between the floor and the cap.
+  async onEvents(events, nowMs, warningActive = false) {
+    const decision = shouldNarrate(this.mode, {
+      events,
+      lastNarratedIndex: this.lastIndex,
+      lastCallAt: this.lastAtMs,
+      now: nowMs,
+      warningActive
+    });
+    if (!decision.fire) return null;
+    const start = Math.max(this.lastIndex, events.length - MAX_WINDOW);
+    const window = events.slice(start);
+    const prompt = buildNarrationPrompt(window, this.mode);
+    const text = await this.narrate(prompt);
+    this.lastIndex = events.length;
+    this.lastAtMs = nowMs;
+    return text ? stripMarkdown(stripDashes(text)) : text;
+  }
+};
+
+// src/narration/claude-headless.ts
+import { execFile as execFile2 } from "node:child_process";
+
+// src/narration/headless-flags.ts
+import { tmpdir } from "node:os";
+
+// src/narration/claude-spawn.ts
+function headlessEnv(base = process.env) {
+  return { ...base, CODEY_HEADLESS: "1", MAX_THINKING_TOKENS: "0" };
+}
+
+// src/narration/headless-flags.ts
+var DISALLOWED_TOOLS = [
+  "Bash",
+  "Edit",
+  "Read",
+  "Write",
+  "Glob",
+  "Grep",
+  "WebFetch",
+  "WebSearch",
+  "Task",
+  "NotebookEdit",
+  "TodoWrite",
+  "BashOutput",
+  "KillShell"
+];
+var NARRATOR_SYSTEM_PROMPT = "You narrate what an AI coding agent is doing for someone watching it work. Reply with only the narration in plain English: no preamble, no markdown, no tool names as nouns.";
+var SEGMENTER_SYSTEM_PROMPT = "You are a precise assistant. Follow the user's instructions and output format exactly, with no extra text.";
+function trimArgs(systemPrompt) {
+  return [
+    "--setting-sources",
+    "",
+    "--exclude-dynamic-system-prompt-sections",
+    "--system-prompt",
+    systemPrompt,
+    "--disallowed-tools",
+    DISALLOWED_TOOLS.join(" ")
+  ];
+}
+function headlessExecOptions(timeoutMs) {
+  return { timeout: timeoutMs, shell: false, windowsHide: true, cwd: tmpdir(), env: headlessEnv(), encoding: "utf8" };
+}
+
+// src/narration/claude-metered.ts
+import { execFile } from "node:child_process";
+
+// src/cost/pricing.ts
+var HAIKU_RATES = {
+  input: 1,
+  output: 5,
+  cacheRead: 0.1,
+  cacheWrite: 1.25
+};
+function costUsd(u) {
+  return (u.input * HAIKU_RATES.input + u.output * HAIKU_RATES.output + u.cacheRead * HAIKU_RATES.cacheRead + u.cacheWrite * HAIKU_RATES.cacheWrite) / 1e6;
+}
+
+// src/narration/narrator-log.ts
+import { appendFileSync as appendFileSync2 } from "node:fs";
+import { join as join3 } from "node:path";
+function logNarrator(dir, line) {
+  try {
+    appendFileSync2(join3(dir, "narrator.log"), `${(/* @__PURE__ */ new Date()).toISOString()} ${line}
+`);
+  } catch {
+  }
+}
+function describeExecError(err, stderr) {
+  if (!err) return "claude returned no usable result";
+  const parts = [];
+  if (err.killed || err.signal) parts.push("timed out");
+  if (err.code === "ENOENT") parts.push("claude not found on PATH");
+  else if (err.code != null) parts.push(`exit ${err.code}`);
+  if (parts.length === 0 && err.message) parts.push(err.message.split("\n")[0]);
+  const tail = (stderr ?? "").trim().split("\n")[0];
+  if (tail) parts.push(tail.length > 120 ? tail.slice(0, 119) + "\u2026" : tail);
+  return parts.join("; ") || "claude call failed";
+}
+
+// src/narration/claude-metered.ts
+var NO_USAGE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+function buildMeteredArgs(prompt) {
+  return [
+    "-p",
+    prompt,
+    "--model",
+    "haiku",
+    "--output-format",
+    "json",
+    ...trimArgs(NARRATOR_SYSTEM_PROMPT)
+  ];
+}
+function estimateTokens(s) {
+  return Math.ceil(s.length / 4);
+}
+function parseMetered(stdout, prompt) {
+  const out = stdout.trim();
+  if (!out) return null;
+  try {
+    const o = JSON.parse(out);
+    const text = typeof o.result === "string" ? o.result.trim() : "";
+    if (!text) return null;
+    const u = o.usage ?? {};
+    const usage = {
+      input: u.input_tokens ?? 0,
+      output: u.output_tokens ?? 0,
+      cacheRead: u.cache_read_input_tokens ?? 0,
+      cacheWrite: u.cache_creation_input_tokens ?? 0
+    };
+    const tokens = usage.input + usage.output + usage.cacheRead + usage.cacheWrite;
+    const costUsd2 = typeof o.total_cost_usd === "number" ? o.total_cost_usd : costUsd(usage);
+    return { text, tokens: tokens > 0 ? tokens : estimateTokens(prompt + text), usage, costUsd: costUsd2 };
+  } catch {
+    return { text: out, tokens: estimateTokens(prompt + out), usage: { ...NO_USAGE }, costUsd: 0 };
+  }
+}
+function runClaudeMetered(prompt, timeoutMs = 45e3, onError) {
+  return runMetered(buildMeteredArgs(prompt), prompt, timeoutMs, onError);
+}
+function runMetered(args, prompt, timeoutMs, onError) {
+  return new Promise((resolve) => {
+    const child = execFile("claude", args, headlessExecOptions(timeoutMs), (err, stdout, stderr) => {
+      if (err) {
+        onError?.(describeExecError(err, stderr));
+        return resolve(null);
+      }
+      const r = parseMetered(stdout, prompt);
+      if (!r) onError?.(describeExecError(null));
+      resolve(r);
+    });
+    child.stdin?.end();
+  });
+}
+
+// src/narration/claude-headless.ts
+function buildClaudeArgs(prompt) {
+  return ["-p", prompt, "--model", "haiku", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
+}
+function buildSegmenterMeteredArgs(prompt) {
+  return ["-p", prompt, "--model", "haiku", "--output-format", "json", ...trimArgs(SEGMENTER_SYSTEM_PROMPT)];
+}
+function runSegmentationMetered(prompt, timeoutMs = 3e4) {
+  return runMetered(buildSegmenterMeteredArgs(prompt), prompt, timeoutMs);
+}
+function runClaude(prompt, timeoutMs = 15e3) {
+  return new Promise((resolve) => {
+    const child = execFile2("claude", buildClaudeArgs(prompt), headlessExecOptions(timeoutMs), (err, stdout) => {
+      if (err) return resolve(null);
+      const out = stdout.trim();
+      resolve(out.length > 0 ? out : null);
+    });
+    child.stdin?.end();
+  });
+}
+
+// src/terminal/render.ts
+function renderNarration(text) {
+  return `  why: ${text}`;
+}
+function renderHeader(mode) {
+  return `Codey (mode: ${mode}) - watching what Claude is doing`;
+}
+function renderCaption(caption) {
+  return `\u25B8 ${caption.title}
+    ${caption.simple}`;
+}
+
 // src/caption/caption.ts
 function subjectOf(chunk) {
   if (chunk.tool === "Grep" || chunk.tool === "Glob") return phrasePattern(chunk.raw ?? "");
@@ -4676,14 +4760,8 @@ function buildCaption(chunk, mode, why) {
 }
 
 // src/cli/watch.ts
-var LOOP_THRESHOLD = 5;
-var REPEAT_ERROR_THRESHOLD = 3;
 function createWatchState(mode, narrate) {
   return { engine: new NarrationEngine(mode, narrate), mode, lastWarningKey: null, lastActionKey: null };
-}
-function activeWarning(events, now) {
-  const lastActivityTs = events.reduce((m, e) => Math.max(m, e.timestamp), 0) || void 0;
-  return detectLoop(events, LOOP_THRESHOLD) ?? detectRepeatError(events, REPEAT_ERROR_THRESHOLD) ?? detectHang(computeOpenCalls(events), now, hangThreshold, lastActivityTs);
 }
 function warningKey(w) {
   return `${w.kind}|${w.tool}|${w.count}`;
@@ -4708,7 +4786,7 @@ async function processTick(events, state, now) {
       state.lastWarningKey = key2;
     }
   }
-  const narration = await state.engine.onEvents(events, now);
+  const narration = await state.engine.onEvents(events, now, !!w);
   if (narration) lines.push(renderNarration(narration));
   return { lines };
 }
@@ -4868,7 +4946,7 @@ function readSpend(dir) {
 async function narrateTick(dir, events, state, now) {
   const w = activeWarning(events, now);
   patchStatus(dir, { warning: w ? formatWarning(w) : null });
-  const why = await state.engine.onEvents(events, now);
+  const why = await state.engine.onEvents(events, now, !!w);
   if (why) {
     patchStatus(dir, { why });
     appendWhy(dir, { ts: now, why });
@@ -5609,14 +5687,26 @@ var RESET2 = "\x1B[0m";
 var BOLD2 = "\x1B[1m";
 var BRAND2 = "\x1B[38;5;75m";
 var DIM2 = "\x1B[38;5;244m";
+var AMBER = "\x1B[38;5;214m";
 function offHint() {
   return `${BOLD2}${BRAND2}Codey${RESET2} ${DIM2}off \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}${DIM2} for a live timeline \xB7 ${RESET2}${BRAND2}/codey:deep${RESET2}${DIM2} to narrate this session${RESET2}`;
+}
+function offWarningText(w) {
+  if (w.kind === "loop") return `Possible loop: ${w.tool} x${w.count}`;
+  if (w.kind === "repeat_error") return `Repeat error: ${w.tool} x${w.count}`;
+  return `Possible hang: ${w.tool} ${w.count}s`;
+}
+function renderOffWarning(w) {
+  return `${BOLD2}${AMBER}!${RESET2} ${AMBER}${offWarningText(w)}${RESET2}${DIM2} \xB7 ${RESET2}${BRAND2}/codey:timeline${RESET2}`;
 }
 function lineForSession(session, root, now) {
   if (!session) return "";
   const dir = join13(root, session);
   const mode = readSessionMode(dir);
-  if (!mode) return offHint();
+  if (!mode) {
+    const w = activeWarning(readEvents(dir), now);
+    return w ? renderOffWarning(w) : offHint();
+  }
   return statusLineFor(dir, now, mode);
 }
 function runStatusLine() {
