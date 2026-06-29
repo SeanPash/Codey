@@ -48,6 +48,13 @@ describe("buildTaskExplainPrompt", () => {
     for (const d of DEPTHS) expect(buildTaskExplainPrompt("X", [line()], d)).not.toContain("—");
   });
 
+  it("makes the teach concept define the idea and connect it to the work", () => {
+    const p = buildTaskExplainPrompt("X", [line()], "teach").toLowerCase();
+    expect(p).toContain("define the concept");
+    expect(p).toContain("never heard of it");
+    expect(p).toContain("applied to what claude did");
+  });
+
   it("surfaces a failure so the explanation can address it", () => {
     const p = buildTaskExplainPrompt("X", [line({ status: "fail", failSummary: "This command failed (exit code 1)." })], "deep");
     expect(p).toContain("This command failed (exit code 1).");
@@ -78,6 +85,13 @@ describe("buildActionExplainPrompt", () => {
       expect(p).not.toContain("—");
     }
     expect(buildActionExplainPrompt(line(), "teach").toLowerCase()).toContain("teach");
+  });
+
+  it("makes the teach concept define the idea before connecting it", () => {
+    const p = buildActionExplainPrompt(line(), "teach").toLowerCase();
+    expect(p).toContain("define the concept");
+    expect(p).toContain("never heard of it");
+    expect(p).toContain("connect that definition");
   });
 
   it("forbids asking the user for more context", () => {

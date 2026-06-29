@@ -6480,11 +6480,11 @@ function taskInstruction(depth) {
       return "In one plain English sentence for a non-technical person, say what Claude did in this task and why.";
     case "teach":
       return [
-        "Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences:",
+        "Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences, except the Concept, which gets the length noted there:",
         "What Claude did: name what the task actually accomplished.",
         "Why it mattered: the problem it solves or why it was worth doing.",
         "How it worked: the mechanism, in plain terms.",
-        "Concept: teach the key idea involved and define any technical term you use."
+        "Concept: pick the one idea worth learning from this task and actually teach it in two or three sentences. First define the concept in plain, general terms, as if the reader has never heard of it. Then show how it applied to what Claude did here. Define any technical term you use."
       ].join("\n");
     default:
       return [
@@ -6500,7 +6500,7 @@ function actionInstruction(depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this single step and why.";
     case "teach":
-      return "Explain this single step for someone learning to code, in three labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why Claude did it. Start the next line with 'How Claude did it:' then one or two sentences on how the step works. Start a final line with 'Concept:' then briefly teach the key concept involved and define any technical term you use.";
+      return "Explain this single step for someone learning to code, in three labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why Claude did it. Start the next line with 'How Claude did it:' then one or two sentences on how the step works. Start a final line with 'Concept:' then teach the key idea in two or three sentences: first define the concept in plain, general terms as if the reader has never heard of it, then connect that definition to what this step did. Define any technical term you use.";
     default:
       return "Explain this single step for a non-technical person, in two labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why this step matters. Start the next line with 'How Claude did it:' then one or two sentences on how the step works.";
   }
@@ -6596,7 +6596,7 @@ function instruction(depth, fileCount) {
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
-        "Concept: one or two sentences teaching the key idea involved, defining any technical term you use.",
+        "Concept: pick the one idea worth learning from this work and actually teach it in two or three sentences. First define the concept in plain, general terms, as if the reader has never heard of it. Then connect that definition to what Claude did here. Define any technical term you use.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
         "Write the report from the evidence above; do not just repeat Claude's closing chat message back."
       ].join("\n");
@@ -6694,6 +6694,9 @@ function timelineDefaults(mode) {
 function lineKey(l) {
   return [l.label, l.tool, l.status, l.why, l.raw, l.failSummary];
 }
+function actionId(chunkId, index) {
+  return `${chunkId}#${index}`;
+}
 function parseActionId(id) {
   const at = id.lastIndexOf("#");
   if (at < 0) return null;
@@ -6740,6 +6743,24 @@ async function explain(snap, req, deps) {
   if (isVacuousExplanation(text)) return { text: null, cached: false, paused: false };
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
   return { text, cached: false, paused: false };
+}
+var ALL_DEPTHS = ["simple", "deep", "teach"];
+function collectCachedExplanations(snap, root) {
+  const out = {};
+  const take = (scope, id) => {
+    for (const depth of ALL_DEPTHS) {
+      const loc = locate(snap, { sessionId: snap.sessionId, scope, id, depth });
+      if (!loc) continue;
+      const hit = readExplanation(snap.sessionId, scope, id, loc.hash, depth, root);
+      if (hit != null) out[`${scope}|${id}|${depth}`] = hit;
+    }
+  };
+  for (const c of snap.chunks) {
+    take("task", c.id);
+    c.receipt.workLines.forEach((_, i) => take("action", actionId(c.id, i)));
+  }
+  for (const g of snap.groups) take("summary", g.id);
+  return out;
 }
 function fillCachedExplanations(snap, depth, root) {
   const chunks = snap.chunks.map((c) => {
@@ -6934,7 +6955,8 @@ function loadSnapshot(sessionId, root = defaultRoot()) {
     activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null,
     budgetLeft: budgetLeftLabel(readBudget(store.dir))
   };
-  return fillCachedExplanations(withMeta, seedDepth, root);
+  const filled = fillCachedExplanations(withMeta, seedDepth, root);
+  return { ...filled, cachedExplanations: collectCachedExplanations(filled, root) };
 }
 function loadNow(sessionId, root = defaultRoot()) {
   const store = new SessionStore(sessionId, root);

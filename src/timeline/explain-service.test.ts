@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { explain, fillCachedExplanations, timelineDefaults, type ExplainDeps } from "./explain-service.js";
+import { explain, fillCachedExplanations, collectCachedExplanations, timelineDefaults, type ExplainDeps } from "./explain-service.js";
 import { armBudget, addSpend } from "../budget/budget.js";
 import { readSpend } from "../cost/spend-log.js";
 import type { SessionSnapshot, ReceiptLine, TimelineChunk, PromptGroup } from "../types.js";
@@ -161,5 +161,28 @@ describe("fillCachedExplanations", () => {
     const filled = fillCachedExplanations(snapshot(), "teach", root);
     expect(filled.chunks[0].explanation).toBeNull();
     expect(filled.groups[0].summary).toBeNull();
+  });
+});
+
+describe("collectCachedExplanations", () => {
+  it("gathers every cached entry across scopes and depths into one keyed map", async () => {
+    const snap = snapshot();
+    // Generate a mix the user would have clicked: a task at deep, an action at simple, a
+    // summary at teach. Each is on disk at its own depth.
+    await explain(snap, { sessionId: "s1", scope: "task", id: "c0", depth: "deep" }, deps);
+    await explain(snap, { sessionId: "s1", scope: "action", id: "c0#1", depth: "simple" }, deps);
+    await explain(snap, { sessionId: "s1", scope: "summary", id: "p0", depth: "teach" }, deps);
+
+    const map = collectCachedExplanations(snapshot(), root);
+    expect(map["task|c0|deep"]).toBe("Because it needed doing.");
+    expect(map["action|c0#1|simple"]).toBe("Because it needed doing.");
+    expect(map["summary|p0|teach"]).toBe("Because it needed doing.");
+    // Nothing was generated at these depths, so they are absent (not null).
+    expect(map["task|c0|simple"]).toBeUndefined();
+    expect(map["summary|p0|deep"]).toBeUndefined();
+  });
+
+  it("returns an empty map when nothing has been cached", () => {
+    expect(collectCachedExplanations(snapshot(), root)).toEqual({});
   });
 });

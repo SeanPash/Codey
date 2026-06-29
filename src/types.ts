@@ -112,6 +112,9 @@ export interface SessionSnapshot {
   genAuto: boolean;                // true when the session mode wants summaries to auto-generate
   budgetLeft: string | null;       // a "12k left" / "budget reached" cue, or null when uncapped
   codeyOverhead: CodeyOverhead;    // what Codey's own narration + timeline calls cost this session
+  // Every explanation/summary ever generated for this session, keyed "scope|id|depth". Read from
+  // disk on each load so a reopened timeline repaints all of it (all depths, all scopes) for free.
+  cachedExplanations?: Record<string, string>;
 }
 
 // --- Codey overhead: what Codey's own headless calls cost, kept separate from Claude's work ---
