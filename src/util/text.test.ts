@@ -28,6 +28,15 @@ describe("stripDashes", () => {
     expect(out).not.toMatch(/[—–]/);
     expect(out).toBe("first, second, third, fourth");
   });
+
+  it("keeps section breaks so a multi-part recap stays organized", () => {
+    const out = stripDashes("What changed: removed the line.\n\nFiles touched: index.html");
+    expect(out).toBe("What changed: removed the line.\n\nFiles touched: index.html");
+  });
+
+  it("collapses runs of spaces and tabs on a line but never the newlines", () => {
+    expect(stripDashes("a    b\nc\t\td")).toBe("a b\nc d");
+  });
 });
 
 describe("stripMarkdown", () => {
