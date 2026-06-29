@@ -815,8 +815,11 @@
       redraw();
     }
 
-    // Pre-load any explanations the snapshot already carries (cached at the seed depth), so a
-    // reopened timeline shows them without a round-trip. Never clobber a fresher client value.
+    // Pre-load any explanations the snapshot already carries, so a reopened timeline shows them
+    // without a round-trip. Two sources: the seed-depth fields embedded on chunks/groups, and the
+    // flat cachedExplanations map (every scope and depth the user ever generated, read from disk).
+    // The map is what makes clicked work survive a tab close or a fresh session: it was already
+    // paid for, so we just repaint it. Never clobber a fresher client value.
     function seedEmbedded(snap) {
       const sd = snap.seedDepth || "deep";
       for (const c of snap.chunks || []) {
@@ -824,6 +827,13 @@
       }
       for (const g of snap.groups || []) {
         if (g.summary) { const k = cacheKey("summary", g.id, sd); if (!explCache.has(k)) explCache.set(k, g.summary); }
+      }
+      // Map keys are "scope|id|depth" for this session; fold in the owning session id to match the
+      // explCache convention (idSession resolves bare ids to the open session) and avoid collisions.
+      const cached = snap.cachedExplanations || {};
+      for (const mk in cached) {
+        const k = snap.sessionId + "|" + mk;
+        if (!explCache.has(k)) explCache.set(k, cached[mk]);
       }
     }
 

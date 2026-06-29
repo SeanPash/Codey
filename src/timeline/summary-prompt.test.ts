@@ -76,6 +76,13 @@ describe("buildSummaryPrompt", () => {
     expect(p).toMatch(/do not (just )?(repeat|echo|copy)/);
   });
 
+  it("makes the teach concept define the idea and tie it to the work", () => {
+    const p = buildSummaryPrompt("p", tasks, "teach").toLowerCase();
+    expect(p).toContain("define the concept");
+    expect(p).toContain("never heard of it");
+    expect(p).toContain("connect that definition to what claude did");
+  });
+
   it("scales the What changed detail with how many files the prompt touched", () => {
     const small = buildSummaryPrompt("p", [{ name: "tweak", lines: [fileLine("src/a.ts")] }], "deep");
     expect(small).not.toMatch(/three to five/);

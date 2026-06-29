@@ -123,6 +123,31 @@ export async function explain(snap: SessionSnapshot, req: ExplainRequest, deps: 
   return { text, cached: false, paused: false };
 }
 
+const ALL_DEPTHS: ExplainDepth[] = ["simple", "deep", "teach"];
+
+// Gather every explanation the user has ever generated for this session, across all scopes
+// (task, action, summary) and all depths, into one flat map keyed "scope|id|depth". This is
+// what lets a reopened timeline (even in a brand new session) repaint everything that was
+// clicked without spending tokens again: the work is already on disk, so we just hand it back.
+// Only entries whose content still matches survive, since locate keys off the live content hash.
+export function collectCachedExplanations(snap: SessionSnapshot, root: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  const take = (scope: ExplainScope, id: string) => {
+    for (const depth of ALL_DEPTHS) {
+      const loc = locate(snap, { sessionId: snap.sessionId, scope, id, depth });
+      if (!loc) continue;
+      const hit = readExplanation(snap.sessionId, scope, id, loc.hash, depth, root);
+      if (hit != null) out[`${scope}|${id}|${depth}`] = hit;
+    }
+  };
+  for (const c of snap.chunks) {
+    take("task", c.id);
+    c.receipt.workLines.forEach((_, i) => take("action", actionId(c.id, i)));
+  }
+  for (const g of snap.groups) take("summary", g.id);
+  return out;
+}
+
 // Fill a freshly built snapshot with any explanations already cached at the given depth, so a
 // reopened timeline shows what the user generated before without another round-trip.
 export function fillCachedExplanations(snap: SessionSnapshot, depth: ExplainDepth, root: string): SessionSnapshot {

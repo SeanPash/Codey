@@ -16,7 +16,7 @@ import { listSessions, RUNNING_WINDOW_MS, turnInFlight } from "../cli/sessions.j
 import { selectActive } from "./active.js";
 import { readStatus } from "../statusline/state.js";
 import { readSessionMode } from "../statusline/active-mode.js";
-import { explain, fillCachedExplanations, timelineDefaults, type ExplainResult } from "../timeline/explain-service.js";
+import { explain, fillCachedExplanations, collectCachedExplanations, timelineDefaults, type ExplainResult } from "../timeline/explain-service.js";
 import type { ExplainScope } from "../timeline/explain-cache.js";
 import type { ExplainDepth } from "../timeline/explain-prompt.js";
 import { runClaudeMetered } from "../narration/claude-metered.js";
@@ -107,8 +107,11 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
     activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null,
     budgetLeft: budgetLeftLabel(readBudget(store.dir)),
   };
-  // Show any explanations already generated at the seed depth without another round-trip.
-  return fillCachedExplanations(withMeta, seedDepth, root);
+  // Show any explanations already generated at the seed depth without another round-trip. The
+  // flat cachedExplanations map carries the rest (other depths, action-level) so the browser can
+  // repaint everything the user ever clicked, even after a tab close or in a fresh session.
+  const filled = fillCachedExplanations(withMeta, seedDepth, root);
+  return { ...filled, cachedExplanations: collectCachedExplanations(filled, root) };
 }
 
 // Cheap live view for the NOW strip: events tail + statusline only, no transcript or

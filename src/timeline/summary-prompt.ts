@@ -92,7 +92,7 @@ function instruction(depth: ExplainDepth, fileCount: number): string {
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
-        "Concept: one or two sentences teaching the key idea involved, defining any technical term you use.",
+        "Concept: pick the one idea worth learning from this work and actually teach it in two or three sentences. First define the concept in plain, general terms, as if the reader has never heard of it. Then connect that definition to what Claude did here. Define any technical term you use.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
         "Write the report from the evidence above; do not just repeat Claude's closing chat message back.",
       ].join("\n");
