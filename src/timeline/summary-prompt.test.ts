@@ -11,6 +11,10 @@ function line(why: string): ReceiptLine {
   };
 }
 
+function fileLine(path: string): ReceiptLine {
+  return { ...line("editing"), raw: path };
+}
+
 function bashLine(command: string): ReceiptLine {
   return {
     label: "Running the tests", title: "Verifying the tests", subtitle: "Running the tests to check it passes.",
@@ -70,6 +74,18 @@ describe("buildSummaryPrompt", () => {
   it("tells deep and teach not to just echo Claude's closing chat message", () => {
     const p = buildSummaryPrompt("p", tasks, "deep").toLowerCase();
     expect(p).toMatch(/do not (just )?(repeat|echo|copy)/);
+  });
+
+  it("scales the What changed detail with how many files the prompt touched", () => {
+    const small = buildSummaryPrompt("p", [{ name: "tweak", lines: [fileLine("src/a.ts")] }], "deep");
+    expect(small).not.toMatch(/three to five/);
+
+    const manyFiles = Array.from({ length: 9 }, (_, i) => fileLine(`src/file${i}.ts`));
+    const big = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep");
+    expect(big).toMatch(/three to five/);
+    // teach scales the same way
+    const bigTeach = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "teach");
+    expect(bigTeach).toMatch(/three to five/);
   });
 
   it("only offers verification as grounding when a check actually ran", () => {
