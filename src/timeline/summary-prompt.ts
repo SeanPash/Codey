@@ -66,14 +66,28 @@ function evidenceBlock(tasks: SummaryTask[]): string {
   return lines.join("\n");
 }
 
-function instruction(depth: ExplainDepth): string {
+// The "What changed" section earns more room the more the prompt actually touched, so a small
+// tweak stays one tight sentence and a sprawling overhaul gets a real walkthrough. Other sections
+// stay short on purpose; length only helps where there is substance to explain.
+function whatChangedGuidance(fileCount: number): string {
+  if (fileCount >= 7) {
+    return "What changed: the actual behavior that changed, in concrete terms, in three to five plain sentences that group the related changes so a reader sees the main areas touched.";
+  }
+  if (fileCount >= 3) {
+    return "What changed: the actual behavior that changed, in concrete terms, in two or three plain sentences.";
+  }
+  return "What changed: the actual behavior that changed, in concrete terms, in one or two plain sentences (or, if nothing changed, what Claude inspected or found).";
+}
+
+function instruction(depth: ExplainDepth, fileCount: number): string {
+  const whatChanged = whatChangedGuidance(fileCount);
   switch (depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found.";
     case "teach":
       return [
-        "Recap what Claude accomplished, for someone learning to code, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep each section to one or two plain sentences, no bullet characters:",
-        "What changed: the actual behavior that changed, in concrete terms (or, if nothing changed, what Claude inspected or found).",
+        "Recap what Claude accomplished, for someone learning to code, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
+        whatChanged,
         "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
@@ -84,8 +98,8 @@ function instruction(depth: ExplainDepth): string {
       ].join("\n");
     default:
       return [
-        "Recap what Claude accomplished for a non-technical person, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep each section to one or two plain sentences, no bullet characters:",
-        "What changed: the actual behavior that changed, in concrete terms (or, if nothing changed, what Claude inspected or found).",
+        "Recap what Claude accomplished for a non-technical person, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
+        whatChanged,
         "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
@@ -100,6 +114,7 @@ function instruction(depth: ExplainDepth): string {
 // and the grounded evidence of what really changed, asking for an honest outcome.
 export function buildSummaryPrompt(promptText: string, tasks: SummaryTask[], depth: ExplainDepth): string {
   const body = tasks.map(taskBlock).join("\n");
+  const fileCount = changedFiles(tasks).length;
   return [
     `A user asked an AI coding agent: "${promptText}"`,
     "It worked through these tasks, with its own reasoning:",
@@ -107,6 +122,6 @@ export function buildSummaryPrompt(promptText: string, tasks: SummaryTask[], dep
     "",
     evidenceBlock(tasks),
     "",
-    `${instruction(depth)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`,
+    `${instruction(depth, fileCount)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`,
   ].join("\n");
 }
