@@ -18,9 +18,20 @@ function taskInstruction(depth: ExplainDepth): string {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this task and why.";
     case "teach":
-      return "In a few plain English sentences for someone learning to code, explain what Claude did in this task and why, then briefly teach the key concept involved (define any technical term you use).";
+      return [
+        "Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences:",
+        "What Claude did: name what the task actually accomplished.",
+        "Why it mattered: the problem it solves or why it was worth doing.",
+        "How it worked: the mechanism, in plain terms.",
+        "Concept: teach the key idea involved and define any technical term you use.",
+      ].join("\n");
     default:
-      return "In a few plain English sentences for a non-technical person, explain what Claude did in this task, why it matters, and how it actually addresses the problem.";
+      return [
+        "Explain this task for a non-technical person, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences:",
+        "What Claude did: name what the task actually accomplished.",
+        "Why it mattered: the problem it solves or why it was worth doing.",
+        "How it worked: the mechanism, in plain terms.",
+      ].join("\n");
   }
 }
 

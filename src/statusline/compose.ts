@@ -147,11 +147,15 @@ export function composeView(
   // line holds a meaningful caption instead of flickering once per tool call.
   const current = chunks[chunks.length - 1];
   // When the budget is spent we stop narrating and the caption falls back to its free
-  // deterministic wording. The why history is scoped to the current turn so a leftover
-  // explanation from the previous prompt never shows under this turn's stage: the
-  // explanation always matches the work on screen.
+  // deterministic wording. The narrator writes each why to the timestamped history and to snap.why
+  // together, so the turn-scoped history is authoritative: prefer a why from this turn so the
+  // explanation always matches the work on screen. Fall back to snap.why only when there is no
+  // history at all (a thin caller, or a session before any narration). When history exists but
+  // none of it belongs to this turn, snap.why is from a previous turn too, so we drop it rather
+  // than leak last turn's sentence in under this turn's stage.
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
-  const rawWhy = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
+  const scheduled = scheduleWhy(turnWhys, now);
+  const rawWhy = paused ? null : (scheduled ?? (whys.length === 0 ? snap.why : null));
   const rawClean = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
   // A generated why must clear the banned-filler guard before it touches any caption slot. The
   // narrator sometimes slips out an empty "thinking it through" despite the prompt; when it does we

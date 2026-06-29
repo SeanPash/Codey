@@ -5,11 +5,13 @@
 // cached or shown.
 export function stripDashes(s: string): string {
   return s
-    .replace(/\s*[—–]\s*/g, ", ") // em/en dash, with any surrounding spaces
+    .replace(/[ \t]*[—–][ \t]*/g, ", ")     // em/en dash, with any surrounding spaces
     .replace(/ - /g, ", ")                  // a spaced hyphen used as a clause break
     .replace(/ ,/g, ",")                    // no stray space before a comma we created
-    .replace(/,\s*,/g, ",")                 // collapse a doubled comma
-    .replace(/\s{2,}/g, " ")                // tidy any run of spaces
+    .replace(/,[ \t]*,/g, ",")              // collapse a doubled comma
+    .replace(/[^\S\n]{2,}/g, " ")           // tidy runs of spaces, but keep newlines so sections survive
+    .replace(/[ \t]*\n[ \t]*/g, "\n")       // trim spaces around line breaks
+    .replace(/\n{3,}/g, "\n\n")             // at most one blank line between sections
     .trim();
 }
 

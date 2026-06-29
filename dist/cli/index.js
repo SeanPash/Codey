@@ -4353,7 +4353,7 @@ function shouldNarrate(mode, input) {
 
 // src/util/text.ts
 function stripDashes(s) {
-  return s.replace(/\s*[—–]\s*/g, ", ").replace(/ - /g, ", ").replace(/ ,/g, ",").replace(/,\s*,/g, ",").replace(/\s{2,}/g, " ").trim();
+  return s.replace(/[ \t]*[—–][ \t]*/g, ", ").replace(/ - /g, ", ").replace(/ ,/g, ",").replace(/,[ \t]*,/g, ",").replace(/[^\S\n]{2,}/g, " ").replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 function stripMarkdown(s) {
   return s.replace(/`+/g, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)\*([^*]+)\*/g, "$1$2").replace(/\s{2,}/g, " ").trim();
@@ -5372,7 +5372,8 @@ function composeView(events, snap, now, whys = [], budget = null, overhead = sum
   }
   const current = chunks[chunks.length - 1];
   const turnWhys = whys.filter((w) => w.ts >= turnStart);
-  const rawWhy = paused ? null : scheduleWhy(turnWhys, now) ?? snap.why;
+  const scheduled = scheduleWhy(turnWhys, now);
+  const rawWhy = paused ? null : scheduled ?? (whys.length === 0 ? snap.why : null);
   const rawClean = rawWhy ? stripMarkdown(stripDashes(stripEllipsis(rawWhy))) : null;
   const cleanWhy = rawClean && !hasBannedPhrase(rawClean) ? rawClean : null;
   const richMode = snap.mode === "deep" || snap.mode === "teach";
@@ -6478,9 +6479,20 @@ function taskInstruction(depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this task and why.";
     case "teach":
-      return "In a few plain English sentences for someone learning to code, explain what Claude did in this task and why, then briefly teach the key concept involved (define any technical term you use).";
+      return [
+        "Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences:",
+        "What Claude did: name what the task actually accomplished.",
+        "Why it mattered: the problem it solves or why it was worth doing.",
+        "How it worked: the mechanism, in plain terms.",
+        "Concept: teach the key idea involved and define any technical term you use."
+      ].join("\n");
     default:
-      return "In a few plain English sentences for a non-technical person, explain what Claude did in this task, why it matters, and how it actually addresses the problem.";
+      return [
+        "Explain this task for a non-technical person, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences:",
+        "What Claude did: name what the task actually accomplished.",
+        "Why it mattered: the problem it solves or why it was worth doing.",
+        "How it worked: the mechanism, in plain terms."
+      ].join("\n");
   }
 }
 function actionInstruction(depth) {
@@ -6568,19 +6580,21 @@ function instruction(depth) {
       return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found.";
     case "teach":
       return [
-        "Recap what Claude accomplished, for someone learning to code, as a compact work report using these sections with a blank line between them:",
-        "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
+        "Recap what Claude accomplished, for someone learning to code, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep each section to one or two plain sentences, no bullet characters:",
+        "What changed: the actual behavior that changed, in concrete terms (or, if nothing changed, what Claude inspected or found).",
+        "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
-        "Then add one short plain-English note teaching the key concept involved (define any technical term you use).",
+        "Concept: one or two sentences teaching the key idea involved, defining any technical term you use.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
         "Write the report from the evidence above; do not just repeat Claude's closing chat message back."
       ].join("\n");
     default:
       return [
-        "Recap what Claude accomplished for a non-technical person, as a compact work report using these sections with a blank line between them:",
-        "What changed: a few short bullets on the actual behavior that changed (or, if nothing changed, what Claude inspected or found).",
+        "Recap what Claude accomplished for a non-technical person, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep each section to one or two plain sentences, no bullet characters:",
+        "What changed: the actual behavior that changed, in concrete terms (or, if nothing changed, what Claude inspected or found).",
+        "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
         "What's left: anything still open or unverified, or omit this section if the work is complete.",

@@ -373,7 +373,6 @@
     .ovrow.ovtot { border-top:1px solid var(--line); margin-top:3px; padding-top:11px; }
     .ovrow.ovtot .ovname { color:var(--ink); font-weight:700; }
     .ovrow.ovtot .ovcost { color:var(--body); }
-    .ovnote { font-size:10px; color:var(--muted); margin-top:12px; line-height:1.45; }
     /* priciest-task footer: its own labelled row below the breakdown, name on the left (truncated),
        spend on the right, so it reads as a separate receipt line and not part of the chart. */
     .tokfoot { margin-top:15px; padding-top:12px; border-top:1px solid var(--hair); }
@@ -424,7 +423,6 @@
     /* generated why/how panel inside an open task card */
     .expla { margin-top:13px; border:1px solid var(--line); background:var(--surf); border-radius:var(--r-card); padding:12px 14px; }
     .expla .et { font-size:8.5px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:7px; }
-    .expla .etext { font-size:13px; color:var(--ink2); line-height:1.62; white-space:pre-wrap; }
     .expla .edepth { color:var(--muted); font-weight:600; letter-spacing:.08em; }
     .genwrap { margin-top:13px; }
     .genbtn { font:inherit; font-size:12.5px; font-weight:600; color:var(--ink2); background:var(--surf-h); border:1px solid var(--line); border-radius:9px; padding:9px 14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
@@ -465,7 +463,6 @@
     .recap { margin-top:13px; background:var(--inset); border:1px solid var(--line); border-radius:var(--r-card); padding:11px 13px; }
     .recap .rt { font-size:9px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); font-weight:700; display:flex; align-items:center; gap:7px; margin-bottom:6px; }
     .recap .rt .ic { color:var(--ink2); }
-    .recap .rx { font-size:12.5px; color:var(--ink2); line-height:1.6; white-space:pre-wrap; }
     .recap .pend { font-size:12px; color:var(--muted); }
     .recap .pend.warn { color:var(--warn); }
 
@@ -786,6 +783,9 @@
     const cacheKey = (scope, id, d) => idSession(id) + "|" + scope + "|" + id + "|" + d;
     const ekey = (scope, id) => cacheKey(scope, id, activeDepth());
     const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
+    // The one-line skim echo for a finished prompt. A sectioned recap leads with "What changed:",
+    // so drop that label and take the first line and sentence, keeping the echo a clean phrase.
+    const echoText = (s) => firstSentence(String(s).replace(/^\s*what changed\s*:\s*/i, "").split(/\n/)[0]);
 
     async function generate(scope, id, rerender, gdepth) {
       // Active Terminals namespaces ids as "<sessionId>~<chunkId>" so a button knows its own
@@ -855,7 +855,7 @@
     function explainBlock(scope, id) {
       const key = ekey(scope, id);
       const cached = explCache.get(key);
-      if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(activeDepth())}</span></div><div class="etext">${esc(cached)}</div></div>`;
+      if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(activeDepth())}</span></div><div class="expls">${sectionCards(cached, TASK_LABELS, null)}</div></div>`;
       if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(activeDepth())} depth…</span></div>`;
       if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining.</div>`;
       return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#9670;</span> Explain this task</button>`
@@ -866,7 +866,7 @@
     function summaryBlock(g) {
       const key = ekey("summary", g.id);
       const cached = explCache.get(key);
-      if (cached) return `<div class="recap"><div class="rt"><span class="ic">&#9670;</span> What Claude got done</div><div class="rx">${esc(cached)}</div></div>`;
+      if (cached) return `<div class="recap"><div class="rt"><span class="ic">&#9670;</span> What Claude got done</div><div class="expls">${sectionCards(cached, SUMMARY_LABELS, null)}</div></div>`;
       if (explLoading.has(key)) return `<div class="recap"><span class="gening"><span class="spin"></span>Summarizing this prompt…</span></div>`;
       if (g.live) return `<div class="recap"><span class="pend">A recap appears here once Claude finishes this prompt.</span></div>`;
       if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached, so Codey paused explaining.</span></div>`;
@@ -1019,24 +1019,39 @@
       return bits.join(" · ");
     }
 
-    // Split a generated step explanation into its labeled parts (Why this mattered / How Claude
-    // did it / Concept). The model is asked for those labels; if they are missing we show the
-    // whole text under one heading, so the panel always reads cleanly.
-    function explainSections(text) {
+    // Split a generated explanation into labeled section cards. The model is asked to start each
+    // part with a known label and a colon; each becomes its own titled block so a longer, multi
+    // part explanation stays organized and skimmable instead of a wall of text. Any text before
+    // the first label shows as an unlabeled lead. With no labels at all, the whole thing shows as
+    // one block, under the fallback heading when one is given, or plain when it is null.
+    function sectionCards(text, labels, fallbackHead) {
       const t = String(text).trim();
-      const re = /(why this mattered|how claude did it|concept)\s*:/ig;
+      const alt = labels.map((d) => d[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+      const re = new RegExp("(" + alt + ")\\s*:", "ig");
+      const headOf = new Map(labels.map((d) => [d[0], d[1]]));
       const hits = [];
       let m;
-      while ((m = re.exec(t))) hits.push({ label: m[1].toLowerCase(), at: m.index, end: re.lastIndex });
-      const heading = { "why this mattered": "Why this mattered", "how claude did it": "How Claude did it", "concept": "Concept used" };
-      if (!hits.length) return `<div class="exs"><div class="exh">Why this mattered</div><div class="ext">${esc(t)}</div></div>`;
+      while ((m = re.exec(t))) hits.push({ key: m[1].toLowerCase(), at: m.index, end: re.lastIndex });
+      const block = (head, body) =>
+        `<div class="exs">${head ? `<div class="exh">${esc(head)}</div>` : ""}<div class="ext">${esc(body)}</div></div>`;
+      if (!hits.length) return block(fallbackHead, t);
       let html = "";
+      const lead = t.slice(0, hits[0].at).trim();
+      if (lead) html += block(null, lead);
       for (let i = 0; i < hits.length; i++) {
         const seg = t.slice(hits[i].end, i + 1 < hits.length ? hits[i + 1].at : undefined).trim();
-        if (seg) html += `<div class="exs"><div class="exh">${esc(heading[hits[i].label])}</div><div class="ext">${esc(seg)}</div></div>`;
+        if (seg) html += block(headOf.get(hits[i].key) || hits[i].key, seg);
       }
       return html;
     }
+
+    // The label sets each explanation scope is asked to produce, mapped to display headings.
+    const STEP_LABELS = [["why this mattered", "Why this mattered"], ["how claude did it", "How Claude did it"], ["concept", "Concept used"]];
+    const TASK_LABELS = [["what claude did", "What Claude did"], ["why it mattered", "Why it mattered"], ["how it worked", "How it worked"], ["concept", "Concept used"]];
+    const SUMMARY_LABELS = [["what changed", "What changed"], ["why it mattered", "Why it mattered"], ["files touched", "Files touched"], ["verification", "Verification"], ["what's left", "What's left"], ["whats left", "What's left"], ["concept", "Concept used"]];
+
+    // A step keeps its old fallback heading, so a label-less reply still reads as a reason.
+    function explainSections(text) { return sectionCards(text, STEP_LABELS, "Why this mattered"); }
 
     // The "Explain this step" button, shown until an explanation is generated or loading. A
     // thinking row with no concrete decision (explainable === false) gets no button: there is
@@ -1287,7 +1302,7 @@
       const sum = explCache.get(sumKey);
       const follow = opts ? opts.follow : followLive;
       const showEcho = opts ? opts.showEcho : (view === "single");
-      const echo = (!g.live && sum && showEcho) ? `<div class="gecho">${esc(firstSentence(sum))}</div>` : "";
+      const echo = (!g.live && sum && showEcho) ? `<div class="gecho">${esc(echoText(sum))}</div>` : "";
       const following = g.live && follow ? " following" : "";
       // When the user pressed Esc mid-turn, note it after the cards.
       const cancelNote = g.cancelled ? `<div class="grpcancel">&#9209; User cancelled Claude mid-prompt</div>` : "";
@@ -1436,8 +1451,7 @@
           + ovRow("Timeline", ov.byKind.timeline)
           + ovRow("Summaries", ov.byKind.summary || zeroTot)
           + ovRow("Total", ov.total, " ovtot")
-          + `</div>`
-          + `<div class="ovnote">Cost as reported by Claude, billed to your plan. Tokens are exact.</div></div>`;
+          + `</div></div>`;
 
       document.getElementById("summary").innerHTML =
         `<div class="sidehd"><span class="t">Session stats</span>`

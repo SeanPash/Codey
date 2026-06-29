@@ -133,6 +133,19 @@ describe("composeView live phase", () => {
     expect(view.sentence).toContain("Claude is reading");
   });
 
+  it("does not leak the still-set snap.why from the previous prompt into a new turn", () => {
+    // Reproduces the live bug: the header tracked the new prompt instantly, but snap.why still
+    // held the last prompt's narrated sentence and leaked in under the new turn's stage. The
+    // narrator records every why in the history too, so the stale sentence is present there with
+    // its original (pre-turn) timestamp, exactly as it is in a real session.
+    const events = [pre("b", "Read", { file_path: "explain-prompt.ts" }, 200)];
+    const stale = "Claude is copying the built index.html and verifying it contains the cost text.";
+    const whys = [{ ts: 10, why: stale }];
+    const view = composeView(events, snap({ promptAt: 150, why: stale }), 5000, whys);
+    expect(view.sentence).not.toBe(stale);
+    expect(view.sentence).toContain("Claude is reading");
+  });
+
   it("drops to a complete deterministic sentence when the live why is too long to show whole", () => {
     const events = [pre("a", "Read", { file_path: "a.ts" }, 0)];
     const runOn = "Claude is investigating how the Codey narration system currently captures and tracks what you ask for so that later captions can refer to the real prompt instead of a generic file activity line and stay grounded in the work";
