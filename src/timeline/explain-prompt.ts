@@ -23,7 +23,7 @@ function taskInstruction(depth: ExplainDepth): string {
         "What Claude did: name what the task actually accomplished.",
         "Why it mattered: the problem it solves or why it was worth doing.",
         "How it worked: the mechanism, in plain terms.",
-        "Concept: pick the one idea worth learning from this task and actually teach it in two or three sentences. First define the concept in plain, general terms, as if the reader has never heard of it. Then show how it applied to what Claude did here. Define any technical term you use.",
+        "Concept: teach the one technique, tool, or skill worth learning from this task. Choose something concrete that Claude actually used (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then connect it to what Claude did here. Two or three sentences, and define any term you introduce.",
       ].join("\n");
     default:
       return [
@@ -40,7 +40,7 @@ function actionInstruction(depth: ExplainDepth): string {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this single step and why.";
     case "teach":
-      return "Explain this single step for someone learning to code, in three labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why Claude did it. Start the next line with 'How Claude did it:' then one or two sentences on how the step works. Start a final line with 'Concept:' then teach the key idea in two or three sentences: first define the concept in plain, general terms as if the reader has never heard of it, then connect that definition to what this step did. Define any technical term you use.";
+      return "Explain this single step for someone learning to code, in three labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why Claude did it. Start the next line with 'How Claude did it:' then one or two sentences on how the step works. Start a final line with 'Concept:' then teach the one technique, tool, or skill worth learning from this step. Choose something concrete that Claude actually used (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then tie it to what this step did. Two or three sentences, and define any term you introduce.";
     default:
       return "Explain this single step for a non-technical person, in two labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why this step matters. Start the next line with 'How Claude did it:' then one or two sentences on how the step works.";
   }

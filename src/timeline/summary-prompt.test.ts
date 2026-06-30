@@ -76,11 +76,11 @@ describe("buildSummaryPrompt", () => {
     expect(p).toMatch(/do not (just )?(repeat|echo|copy)/);
   });
 
-  it("makes the teach concept define the idea and tie it to the work", () => {
+  it("makes the teach concept teach a real technique with an analogy, not a trivial term", () => {
     const p = buildSummaryPrompt("p", tasks, "teach").toLowerCase();
-    expect(p).toContain("define the concept");
-    expect(p).toContain("never heard of it");
-    expect(p).toContain("connect that definition to what claude did");
+    expect(p).toContain("technique, tool, or skill");
+    expect(p).toContain("everyday analogy");
+    expect(p).toContain("not a basic term the reader already knows");
   });
 
   it("scales the What changed detail with how many files the prompt touched", () => {
