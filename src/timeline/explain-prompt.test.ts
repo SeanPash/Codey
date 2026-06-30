@@ -48,11 +48,11 @@ describe("buildTaskExplainPrompt", () => {
     for (const d of DEPTHS) expect(buildTaskExplainPrompt("X", [line()], d)).not.toContain("—");
   });
 
-  it("makes the teach concept define the idea and connect it to the work", () => {
+  it("makes the teach concept teach a real technique with an analogy, not a trivial term", () => {
     const p = buildTaskExplainPrompt("X", [line()], "teach").toLowerCase();
-    expect(p).toContain("define the concept");
-    expect(p).toContain("never heard of it");
-    expect(p).toContain("applied to what claude did");
+    expect(p).toContain("technique, tool, or skill");
+    expect(p).toContain("everyday analogy");
+    expect(p).toContain("not a basic term the reader already knows");
   });
 
   it("surfaces a failure so the explanation can address it", () => {
@@ -87,11 +87,11 @@ describe("buildActionExplainPrompt", () => {
     expect(buildActionExplainPrompt(line(), "teach").toLowerCase()).toContain("teach");
   });
 
-  it("makes the teach concept define the idea before connecting it", () => {
+  it("makes the teach concept teach a real technique with an analogy, not a trivial term", () => {
     const p = buildActionExplainPrompt(line(), "teach").toLowerCase();
-    expect(p).toContain("define the concept");
-    expect(p).toContain("never heard of it");
-    expect(p).toContain("connect that definition");
+    expect(p).toContain("technique, tool, or skill");
+    expect(p).toContain("everyday analogy");
+    expect(p).toContain("not a basic term the reader already knows");
   });
 
   it("forbids asking the user for more context", () => {
