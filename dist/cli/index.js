@@ -5295,9 +5295,12 @@ var VACUOUS_EXPLANATION = [
   /\bno (specific|concrete|clear|particular) (reason|detail|information|context)\b/i,
   /\bnothing (specific|concrete|particular) (to (say|add|explain)|here)\b/i
 ];
+function isHedgeFiller(text) {
+  return VACUOUS_EXPLANATION.some((re) => re.test(text));
+}
 function isVacuousExplanation(text) {
   if (hasBannedPhrase(text)) return true;
-  return VACUOUS_EXPLANATION.some((re) => re.test(text));
+  return isHedgeFiller(text);
 }
 
 // src/statusline/compose.ts
@@ -6740,7 +6743,7 @@ async function explain(snap, req, deps) {
   const usage = res.usage ?? { input: res.tokens, output: 0, cacheRead: 0, cacheWrite: 0 };
   appendSpend(deps.sessionDir, { ts: Date.now(), kind: "summary", mode: null, usage, costUsd: res.costUsd ?? 0 });
   const text = stripDashes(res.text.trim());
-  if (isVacuousExplanation(text)) return { text: null, cached: false, paused: false };
+  if (isHedgeFiller(text)) return { text: null, cached: false, paused: false };
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
   return { text, cached: false, paused: false };
 }

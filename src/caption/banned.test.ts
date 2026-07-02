@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hasBannedPhrase, firstBannedPhrase, isVacuousExplanation } from "./banned.js";
+import { hasBannedPhrase, firstBannedPhrase, isVacuousExplanation, isHedgeFiller } from "./banned.js";
 
 describe("hasBannedPhrase", () => {
   it("flags the generic filler phrases Codey must never show", () => {
@@ -90,5 +90,30 @@ describe("isVacuousExplanation", () => {
   it("keeps a real, grounded explanation", () => {
     const good = "Claude reread render.ts so the new clipStage helper would line up with the existing status bar layout.";
     expect(isVacuousExplanation(good)).toBe(false);
+  });
+});
+
+describe("isHedgeFiller", () => {
+  it("suppresses the same pausing/reflecting hedges as isVacuousExplanation", () => {
+    const vacuous = [
+      "The agent paused and reflected before continuing.",
+      "Claude paused to think about what to do next.",
+      "There is no specific reason given for this step.",
+    ];
+    for (const t of vacuous) expect(isHedgeFiller(t)).toBe(true);
+  });
+
+  it("keeps a prose recap that happens to describe searching and reading files", () => {
+    // A search-heavy prompt's recap legitimately uses caption-banned language ("several files",
+    // "searching the project") inside real sentences. It is not empty filler, so a prompt summary
+    // must not be thrown away for it, even though a short status-line caption would be.
+    const recaps = [
+      "Claude searched the project for the addTask function, reading several files to trace where tasks are created before making changes to the store.",
+      "To locate the store, Claude searched the project for the code and read a few files, confirming where the priority field should live.",
+    ];
+    for (const r of recaps) {
+      expect(hasBannedPhrase(r)).toBe(true); // the caption guard would (wrongly) reject these
+      expect(isHedgeFiller(r)).toBe(false);  // but the prose guard keeps them
+    }
   });
 });

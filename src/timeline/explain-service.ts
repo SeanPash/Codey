@@ -7,7 +7,7 @@ import { hashContent } from "../util/hash.js";
 import { readBudget, addSpend, budgetAllows } from "../budget/budget.js";
 import { appendSpend } from "../cost/spend-log.js";
 import { stripDashes } from "../util/text.js";
-import { isVacuousExplanation } from "../caption/banned.js";
+import { isHedgeFiller } from "../caption/banned.js";
 
 export interface ExplainRequest {
   sessionId: string;
@@ -118,7 +118,10 @@ export async function explain(snap: SessionSnapshot, req: ExplainRequest, deps: 
   const text = stripDashes(res.text.trim());
   // A generation that came back as empty filler ("the agent paused and reflected") says nothing,
   // so we show no panel rather than print it. It is left uncached so a later retry can do better.
-  if (isVacuousExplanation(text)) return { text: null, cached: false, paused: false };
+  // Judge it as prose (hedge patterns only): a real recap of a search-heavy prompt legitimately
+  // says "searched the project" or "read several files", and the short-caption ban list would
+  // wrongly reject those, spending tokens but showing nothing.
+  if (isHedgeFiller(text)) return { text: null, cached: false, paused: false };
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
   return { text, cached: false, paused: false };
 }
