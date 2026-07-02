@@ -6,7 +6,7 @@ import { readExplanation, writeExplanation, type ExplainScope } from "./explain-
 import { hashContent } from "../util/hash.js";
 import { readBudget, addSpend, budgetAllows } from "../budget/budget.js";
 import { appendSpend } from "../cost/spend-log.js";
-import { stripDashes } from "../util/text.js";
+import { stripDashes, stripEmphasis } from "../util/text.js";
 import { isHedgeFiller } from "../caption/banned.js";
 
 export interface ExplainRequest {
@@ -115,7 +115,7 @@ export async function explain(snap: SessionSnapshot, req: ExplainRequest, deps: 
   addSpend(deps.sessionDir, res.tokens);
   const usage: Usage = res.usage ?? { input: res.tokens, output: 0, cacheRead: 0, cacheWrite: 0 };
   appendSpend(deps.sessionDir, { ts: Date.now(), kind: "summary", mode: null, usage, costUsd: res.costUsd ?? 0 });
-  const text = stripDashes(res.text.trim());
+  const text = stripEmphasis(stripDashes(res.text.trim()));
   // A generation that came back as empty filler ("the agent paused and reflected") says nothing,
   // so we show no panel rather than print it. It is left uncached so a later retry can do better.
   // Judge it as prose (hedge patterns only): a real recap of a search-heavy prompt legitimately

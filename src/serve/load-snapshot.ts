@@ -42,7 +42,7 @@ export function isRunning(dir: string, now: number, cancelledAt = 0): boolean {
   const status = readStatus(dir);
   // A SessionEnd stamp newer than any activity means the terminal closed; it is not live.
   if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
-  const isThinking = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
+  const isThinking = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now, evMtime);
   // The Stop hook stamps doneAt when Claude finishes a turn. If that stamp is newer than every
   // other signal (last tool event and last prompt), the turn is over: drop live at once rather
   // than waiting out the recent-activity window, so a finished session stops pulsing right away.
@@ -199,6 +199,9 @@ export function loadLive(root: string = defaultRoot()): LiveSnapshot {
       cancelled,
       groupId,
       seedDepth: snap.seedDepth,
+      // The live "stuck" warning, so an Active Terminals pane can offer the same intervention bar
+      // the single view does. Only while the terminal is running: a parked turn shows no warning.
+      activeWarning: running ? snap.activeWarning : null,
     };
   });
   // liveCount is genuinely-running terminals; the badge/jump-to-live key off this, not "open".
