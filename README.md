@@ -123,15 +123,24 @@ It's the difference between juggling several silent terminals and watching all o
 
 ## Token costs
 
-<img src="assets/token-breakdown.png" alt="The token-breakdown panel: session totals, then where the tokens went split across writing, reading, searching, commands, and thinking, with the priciest task called out" width="260" align="right">
-
 Codey is built to stay cheap, and most of it costs nothing at all.
+
+<table>
+<tr>
+<td valign="top">
 
 - **The timeline is free.** It reads a local log of what already happened, so scrolling the full story of any session, including past ones, costs zero tokens. The stuck detectors are free too, since they are plain checks with no model behind them.
 - **Narration runs on the cheapest model**, in short bursts throttled by mode. `simple` is near-zero, while `deep` and `teach` spend a little more to explain the why.
 - **Explanations are on demand.** Clicking to explain a step, or recapping a whole task, is the only time the timeline spends anything, and only on the step you picked.
 
 It all runs on the Claude plan you already have, so there is no separate bill to worry about.
+
+</td>
+<td valign="top" width="300">
+<img src="assets/token-breakdown.png" alt="The token-breakdown panel showing where a session's tokens went, split across writing, reading, searching, commands, and thinking, with a share next to each" width="280">
+</td>
+</tr>
+</table>
 
 ## Your machine, and only your machine
 
