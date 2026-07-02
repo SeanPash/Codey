@@ -75,18 +75,28 @@ export const THINKING_WINDOW_MS = 3 * 60_000;
 export const TURN_BACKSTOP_MS = 30 * 60_000;
 
 // A turn is in flight when the latest prompt is newer than the last Stop (doneAt), so Claude has a
-// response underway. We do not end that on a short timer: a long turn whose tools keep firing stays
-// live because the backstop is measured from the latest activity, not the prompt. Only true silence
-// (no tools and no Stop) past the backstop self-heals a crashed terminal. Callers still check the
-// authoritative off-signals (doneAt past the last signal, a cancel marker, closedAt) separately.
+// response underway. Once a tool has fired we do not end that on a short timer: a long turn whose
+// tools keep firing stays live because the backstop is measured from the latest activity, not the
+// prompt. But a prompt that never reached its first tool (a pure thinking gap) is bounded tighter,
+// so a turn cancelled or crashed before any tool ran self-heals in minutes, not half an hour. That
+// is the common "I pressed Esc and it still shows live" case: no Stop hook fires and often no cancel
+// marker is written, so this shorter bound is what drops it. Callers still check the authoritative
+// off-signals (doneAt past the last signal, a cancel marker, closedAt) separately, and those clear
+// it at once when present. toolActivity is the last tool-event time (defaults to lastActivity for
+// callers that already fold it in); it is what tells a pure thinking gap from real work.
 export function turnInFlight(
   promptAt: number | null | undefined,
   doneAt: number | null | undefined,
   lastActivity: number,
   now: number,
+  toolActivity: number = lastActivity,
 ): boolean {
   if (promptAt == null || promptAt <= (doneAt ?? 0)) return false;
-  return now - Math.max(promptAt, lastActivity) < TURN_BACKSTOP_MS;
+  // A tool fired on or after this prompt: real work is underway, so keep it live for the generous
+  // backstop measured from the latest activity.
+  if (toolActivity >= promptAt) return now - Math.max(promptAt, lastActivity) < TURN_BACKSTOP_MS;
+  // No tool since the prompt: this is a pure thinking gap, bounded short so a dead turn drops soon.
+  return now - promptAt < THINKING_WINDOW_MS;
 }
 
 // Returns "Today", "Yesterday", or the locale date string for older sessions.
@@ -130,7 +140,7 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
       // "thinking" covers the gap when Claude is working but hasn't emitted a tool call for
       // more than RUNNING_WINDOW_MS: a prompt newer than the last stop means it is still live.
       const status = readStatus(dir);
-      const thinking = evMtime != null && turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
+      const thinking = evMtime != null && turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now, evMtime ?? 0);
       const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
       // A SessionEnd stamp newer than the last activity means the terminal closed; drop it from
       // the live/open tiers at once instead of waiting out the window. A resume bumps activity

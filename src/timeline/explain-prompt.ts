@@ -50,7 +50,7 @@ function actionInstruction(depth: ExplainDepth): string {
 // context, sometimes just a thinking step. These rules keep it from breaking on thin input by
 // asking the user a question (it has no one to ask) or by stalling for "more context".
 const SELF_CONTAINED = "Explain only the steps shown above. The steps are all the context that exists, so never ask the user for more information, never say you lack context, and never ask them to describe what happened. If the detail is sparse, give your best plain high-level explanation from what is shown.";
-const TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation, no preamble.";
+const TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Write the labels and body as plain text, with no markdown formatting: no asterisks, backticks, or bold. Reply with only the explanation, no preamble.";
 
 // Explain a whole task: feed the model the reasoning behind each action so it can give a real
 // why and how. The task name is Codey's own automatic guess, so we say so plainly: the model

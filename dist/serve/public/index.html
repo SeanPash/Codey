@@ -1034,8 +1034,19 @@
     // part explanation stays organized and skimmable instead of a wall of text. Any text before
     // the first label shows as an unlabeled lead. With no labels at all, the whole thing shows as
     // one block, under the fallback heading when one is given, or plain when it is null.
+    // Strip markdown emphasis a model slipped into an explanation (bold **, __, inline `code`, and
+    // leading heading hashes). The backend strips this now, but explanations cached on disk before
+    // that fix still carry the markers, so we clean them here too. Newlines are kept so the section
+    // parser still sees each label on its own line.
+    function stripExplMarkup(s) {
+      return String(s)
+        .replace(/\*\*/g, "").replace(/__/g, "").replace(/`+/g, "")
+        .replace(/(^|\n)[ \t]*#{1,6}[ \t]*/g, "$1")
+        .replace(/[^\S\n]{2,}/g, " ").replace(/[ \t]+\n/g, "\n").trim();
+    }
+
     function sectionCards(text, labels, fallbackHead) {
-      const t = String(text).trim();
+      const t = stripExplMarkup(text);
       const alt = labels.map((d) => d[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
       const re = new RegExp("(" + alt + ")\\s*:", "ig");
       const headOf = new Map(labels.map((d) => [d[0], d[1]]));
@@ -1727,18 +1738,23 @@
     function wireIntervention(scope) {
       scope.querySelectorAll(".intervene").forEach((barEl) => {
         const tool = barEl.dataset.tool;
+        // The intervention has to reach the terminal that is stuck. In the single view that is the
+        // open session; in an Active Terminals pane the chunk id is namespaced "sessionId~chunkId",
+        // so its leading segment is the session to send to.
+        const chunk = barEl.dataset.chunk || "";
+        const sid = chunk.includes("~") ? chunk.split("~")[0] : currentId;
         barEl.querySelectorAll(".ibtn").forEach((btn) => {
           btn.addEventListener("click", async (e) => {
             e.stopPropagation();
             const action = btn.dataset.action;
             barEl.querySelectorAll(".ibtn").forEach((b) => (b.disabled = true));
             try {
-              await fetch("/api/session/" + encodeURIComponent(currentId) + "/intervene", {
+              await fetch("/api/session/" + encodeURIComponent(sid) + "/intervene", {
                 method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }),
               });
             } catch { /* the Esc path is the real stop */ }
             confirmed.set(barEl.dataset.chunk, action);
-            tickSingle();
+            tick();
           });
         });
         const copyBtn = barEl.querySelector(".copybtn");
@@ -1817,9 +1833,13 @@
     let lastLive = null; // keep the last payload so pager clicks re-render without a refetch
     // Each pane runs its own Follow live, independent of the others and of the single view: one
     // terminal can follow its live work while another stays parked where the user is reading.
-    const paneFollow = {};       // sessionId -> bool (absent = following by default)
-    const paneLiveGroupId = {};  // sessionId -> last live group id, to re-engage follow on a new prompt
-    const paneFollowOn = (sid) => paneFollow[sid] !== false;
+    // Follow live is exclusive across panes: at most one terminal follows at a time. A pane only
+    // follows when it explicitly holds the slot (absent = not following), and reconcileAutoFollow
+    // hands that slot to the most recently prompted running terminal, so two live terminals never
+    // both auto-scroll at once.
+    const paneFollow = {};       // sessionId -> bool (true = holds the single follow slot)
+    const paneLiveGroupId = {};  // sessionId -> last live group id, to detect a fresh prompt
+    const paneFollowOn = (sid) => paneFollow[sid] === true;
     // Each pane carries its own explanation depth so one terminal can read Simple while another
     // reads Deep, with no swapping. Absent -> fall back to that session's seed depth, then "deep".
     const paneDepth = {};        // sessionId -> "simple" | "deep" | "teach"
@@ -1859,15 +1879,9 @@
         ...g, id: sid + "~" + g.id,
         chunks: g.chunks.map((c) => ({ ...c, id: sid + "~" + c.id })),
       }));
-      // A new prompt re-engages this pane's Follow live, exactly like the single view: when the live
-      // group id changes, snap back to following even if the user had scrolled up to read earlier.
+      // Which follow slot this pane holds was decided centrally in reconcileAutoFollow before this
+      // render, so a fresh prompt in the most recent terminal wins it and parks the rest.
       const liveGroup = groups.find((g) => g.live);
-      if (liveGroup && paneLiveGroupId[sid] !== liveGroup.id) {
-        paneLiveGroupId[sid] = liveGroup.id;
-        paneFollow[sid] = true;
-      } else if (!liveGroup) {
-        paneLiveGroupId[sid] = null;
-      }
       // The pane's one live task (last task of its live group), so cardHtml lights the right row.
       const liveChunks = liveGroup ? liveGroup.chunks : [];
       const liveChunkId = s.running && liveChunks.length ? liveChunks[liveChunks.length - 1].id : null;
@@ -1876,7 +1890,9 @@
       // Pseudo-snapshot for the shared card/group renderers: this pane's own live flag and live row.
       const lastFinite = groups.reduce((m, g) => Math.max(m, g.endTs < 1e15 ? g.endTs : g.startTs), 0) || Date.now();
       const pseudo = { live: s.running, lastActivityAt: lastFinite, liveChunkId };
-      const barNone = () => null; // panes carry no intervention warnings
+      // A stuck terminal offers the same "step in" bar as the single view, on its current live task.
+      const paneWarn = s.running ? s.activeWarning : null;
+      const paneBar = (c) => (paneWarn && c.id === liveChunkId ? paneWarn : null);
 
       // Build this pane's body under its own depth so every Explain/Summarize block keys and labels
       // at the pane's depth. Reset to null right after, so the next pane (or the single view) is clean.
@@ -1884,7 +1900,7 @@
       let body;
       if (groups.length) {
         body = `<div class="feed">`
-          + groups.map((g) => groupHtml(g, pseudo, barNone, { follow, showEcho: true })).join("")
+          + groups.map((g) => groupHtml(g, pseudo, paneBar, { follow, showEcho: true })).join("")
           + `</div>`;
       } else if (s.thinking) {
         body = `<div class="pthink"><span class="pip"></span>Thinking about your request…</div>`;
@@ -1998,9 +2014,31 @@
       });
     }
 
+    // Hand the single Follow-live slot to the most recently prompted terminal that just started a
+    // new turn, and park every other pane. Runs once per tick before rendering, so when two
+    // terminals are live only one auto-scrolls, and a fresh prompt in a newer terminal takes the
+    // slot from an older one. A pane the user manually parked or followed keeps that choice until
+    // the next new prompt lands somewhere. Operates on the full session list, not just the visible
+    // page, so a live terminal on another page is still tracked.
+    function reconcileAutoFollow(sessions) {
+      const newTurns = [];
+      for (const s of sessions) {
+        const sid = s.sessionId;
+        const lg = (s.groups || []).find((g) => g.live);
+        const gid = lg ? lg.id : null;
+        if (gid && paneLiveGroupId[sid] !== gid) newTurns.push(s);
+        paneLiveGroupId[sid] = gid;
+      }
+      if (!newTurns.length) return;
+      newTurns.sort((a, b) => b.lastPromptTs - a.lastPromptTs);
+      const winner = newTurns[0].sessionId;
+      for (const s of sessions) paneFollow[s.sessionId] = s.sessionId === winner;
+    }
+
     function renderSplit(live) {
       const savedScroll = capturePaneScroll();
       const sessions = live.sessions;
+      reconcileAutoFollow(sessions);
       liveNow = live.liveCount > 0;
       updateLiveBadge(live.liveCount);
       document.getElementById("sname").textContent = "Active terminals";
@@ -2038,6 +2076,7 @@
       wireSplitControls(main);
       wireCards(main, () => renderSplit(lastLive));
       wireGenerate(main, () => renderSplit(lastLive));
+      wireIntervention(main);
       wirePanes(main);
       applyPaneScroll(savedScroll);
     }

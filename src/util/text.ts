@@ -15,6 +15,23 @@ export function stripDashes(s: string): string {
     .trim();
 }
 
+// Timeline explanations are split into labeled section cards, so their newlines matter and the
+// terminal-only stripMarkdown (which collapses all whitespace) would flatten them. This is the
+// section-safe version: it removes bold/italic/inline-code markers and any leading heading hashes
+// a model slips in, while leaving line breaks intact so the section parser still sees each label
+// on its own line. Run generated explanations through here so labels like "**Why this mattered:**"
+// never reach the reader as literal asterisks.
+export function stripEmphasis(s: string): string {
+  return s
+    .replace(/\*\*/g, "")               // bold markers
+    .replace(/__/g, "")                 // underscore bold markers
+    .replace(/`+/g, "")                 // inline code fences
+    .replace(/(^|\n)[ \t]*#{1,6}[ \t]*/g, "$1") // leading markdown heading hashes
+    .replace(/[^\S\n]{2,}/g, " ")       // tidy runs of spaces, keep newlines
+    .replace(/[ \t]+\n/g, "\n")         // no trailing spaces left by a removed marker
+    .trim();
+}
+
 // The status line and ticker are plain text, but the model often wraps code in markdown
 // (`loss()`, **bold**). Those characters render literally in a terminal, so strip the markup
 // while keeping the word itself. Run generated narration through here before it is shown.

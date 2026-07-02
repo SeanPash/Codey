@@ -75,16 +75,28 @@ describe("isRunning", () => {
     expect(isRunning(DIR, NOW)).toBe(true);
   });
 
-  it("stays live for a long in-flight turn, well past the old short window", () => {
-    // A prompt with no Stop, ten minutes on: Claude can work one prompt this long, so it is still
-    // live. The turn ends on a real finish/cancel/close signal, not a short timer.
+  it("stays live for a long working turn, well past the old short window", () => {
+    // A prompt with no Stop, ten minutes on, and tools still firing: Claude can work one prompt this
+    // long, so it is still live. The turn ends on a real finish/cancel/close signal, not a timer.
+    mockStatSync.mockReturnValue({ mtimeMs: NOW - 30_000 });
     mockReadStatus.mockReturnValue({ promptAt: NOW - 10 * 60_000, doneAt: null, updatedAt: NOW });
     expect(isRunning(DIR, NOW)).toBe(true);
   });
 
+  it("bounds a long pure-thinking gap (no tool ever fired) by the shorter thinking window", () => {
+    // Prompt submitted, no Stop, and no tool has ever fired this turn (no events file). This is the
+    // cancelled-mid-thought case that used to linger the full backstop: now it self-heals in minutes
+    // so the live count drops back to zero instead of showing a stuck "1 live".
+    mockReadStatus.mockReturnValue({ promptAt: NOW - 5 * 60_000, doneAt: null, updatedAt: NOW });
+    expect(isRunning(DIR, NOW)).toBe(false);
+  });
+
   it("self-heals a crashed terminal only after the long backstop", () => {
-    // No activity and no Stop for over the backstop: assume the terminal died mid-turn, drop live.
-    mockReadStatus.mockReturnValue({ promptAt: NOW - TURN_BACKSTOP_MS - 1, doneAt: null, updatedAt: NOW });
+    // A tool fired, then total silence and no Stop for over the backstop: assume the terminal died
+    // mid-turn and drop live. The tool activity is what keeps this on the long backstop, not the
+    // shorter thinking bound.
+    mockStatSync.mockReturnValue({ mtimeMs: NOW - TURN_BACKSTOP_MS - 1 });
+    mockReadStatus.mockReturnValue({ promptAt: NOW - TURN_BACKSTOP_MS - 2, doneAt: null, updatedAt: NOW });
     expect(isRunning(DIR, NOW)).toBe(false);
   });
 
