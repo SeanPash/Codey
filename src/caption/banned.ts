@@ -66,8 +66,18 @@ const VACUOUS_EXPLANATION: RegExp[] = [
   /\bnothing (specific|concrete|particular) (to (say|add|explain)|here)\b/i,
 ];
 
-// True when a generated explanation is empty filler and should not be shown.
+// True when text is only the "model hedged and said nothing" filler, ignoring the short-caption
+// ban list. This is the right guard for multi-sentence prose (a prompt recap or a task/action
+// explanation): such prose legitimately says "searched the project" or "read several files"
+// inside real sentences, so judging it by the caption ban list would throw away good summaries.
+export function isHedgeFiller(text: string): boolean {
+  return VACUOUS_EXPLANATION.some((re) => re.test(text));
+}
+
+// True when a short caption is empty filler and should not be shown. Combines the caption ban
+// list with the hedge patterns, so it is strict enough for a status line or a card title. Prose
+// summaries and explanations use isHedgeFiller instead, which does not apply the ban list.
 export function isVacuousExplanation(text: string): boolean {
   if (hasBannedPhrase(text)) return true;
-  return VACUOUS_EXPLANATION.some((re) => re.test(text));
+  return isHedgeFiller(text);
 }
