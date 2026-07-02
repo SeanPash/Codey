@@ -51,7 +51,18 @@ Codey closes that gap. It reads the tool-call stream Claude Code already produce
 
 `/codey:timeline` opens a local browser page that lays out the whole session as a visual storyboard. The run unfolds as a sequence of readable steps grouped by the prompt that started them, with failures and warnings flagged right where they happened. A live strip at the top shows what Claude is doing this very moment, and Follow Live keeps the page pinned to the latest step, so the browser stays in sync with your terminal in real time.
 
-Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you curious, there's an **Explain this step** button right on it, and a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
+<table>
+<tr>
+<td valign="top">
+
+Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you want to know more, there's an **Explain this step** button right on it, plus a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
+
+</td>
+<td valign="top" width="300">
+<img src="assets/token-breakdown.png" alt="The token-breakdown panel showing where a session's tokens went, split across writing, reading, searching, commands, and thinking, with a share next to each" width="280">
+</td>
+</tr>
+</table>
 
 <p align="center">
   <img src="assets/timeline-live.png" alt="The live strip at the top of the timeline shows what Claude is doing this moment, with Follow Live pinning the page to the latest step as the storyboard fills in below" width="900">
@@ -123,15 +134,30 @@ It's the difference between juggling several silent terminals and watching all o
 
 ## Token costs
 
-<img src="assets/token-breakdown.png" alt="The token-breakdown panel: session totals, then where the tokens went split across writing, reading, searching, commands, and thinking, with the priciest task called out" width="260" align="right">
+Codey is honest about what it costs. Part of it is genuinely free. The rest is cheap, throttled to the mode you picked, and always added up in plain sight so it is never a surprise.
 
-Codey is built to stay cheap, and most of it costs nothing at all.
+<table>
+<tr>
+<td valign="top">
 
-- **The timeline is free.** It reads a local log of what already happened, so scrolling the full story of any session, including past ones, costs zero tokens. The stuck detectors are free too, since they are plain checks with no model behind them.
-- **Narration runs on the cheapest model**, in short bursts throttled by mode. `simple` is near-zero, while `deep` and `teach` spend a little more to explain the why.
-- **Explanations are on demand.** Clicking to explain a step, or recapping a whole task, is the only time the timeline spends anything, and only on the step you picked.
+**Free:**
 
-It all runs on the Claude plan you already have, so there is no separate bill to worry about.
+- **Reading the timeline.** The page reads a local log of what already happened, so scrolling the full story of any session, past or live, makes no model calls.
+- **Stuck detection.** The loop, repeat-error, and hang checks are plain code, with no model behind them.
+
+**What you pay for, while you follow along:**
+
+- **Live narration**, whenever a mode is on. It runs on the cheapest model in short throttled bursts. `simple` is near-zero, while `deep` and `teach` spend a little more to explain the why. This is the real ongoing cost, not the timeline.
+- **On-demand explanations.** Clicking Explain this step, or recapping a whole prompt, spends only on the step you chose.
+
+Codey keeps its own tab, split across narration, timeline, and summaries, so you always see exactly what it added on top of your session. It all runs on the Claude plan you already have.
+
+</td>
+<td valign="top" width="240">
+<img src="assets/codey-overhead.png" alt="The Codey Overhead panel: what Codey itself cost this session, split across live narration, timeline, and summaries, with a token count and dollar estimate for each" width="220">
+</td>
+</tr>
+</table>
 
 ## Your machine, and only your machine
 

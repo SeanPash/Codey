@@ -10,7 +10,8 @@ Screenshots used by the top-level [README](../README.md) and the [screenshot gal
 - `explain-step.png` - a step expanded with Explain this step, showing the raw command and a recap.
 - `sessions.png` - the sessions sidebar, recent sessions grouped by day.
 - `active-terminals.png` - the Active Terminals view with two live session timelines side by side.
-- `token-breakdown.png` - the token-breakdown panel with a label next to each color.
+- `token-breakdown.png` - the token-breakdown panel with a label next to each color (where the session's own tokens went).
+- `codey-overhead.png` - the Codey Overhead panel: what Codey itself spent, split across narration, timeline, and summaries.
 - `mode-simple.png` / `mode-deep.png` / `mode-teach.png` - the same session recapped at each summary depth.
 
 ## Still needed
