@@ -84,8 +84,9 @@ Some of the most useful work Codey does is free. Pure, AI-free detectors watch t
 
 When something fires, the stuck task gets an amber bar with three choices: nudge it to move on, push it toward a different approach, or stop and hand control back to you. One click feeds Claude a short, plain reason it reads and acts on. Codey only ever observes and suggests. It never acts without your click.
 
-<!-- SCREENSHOT NEEDED: the amber intervention bar on a stuck task with the three buttons (nudge / try a different approach / stop and ask me). Not yet captured, so this embed stays commented out until a shot exists. -->
-<!-- ![Stuck-task intervention](assets/intervention.png) -->
+<p align="center">
+  <img src="assets/intervention.png" alt="A stuck task flagged with an amber bar reading Claude has tried the same step 6 times, offering three choices: nudge it to move on, try a different approach, or stop and ask me" width="900">
+</p>
 
 ### Explain any step, only when you want
 

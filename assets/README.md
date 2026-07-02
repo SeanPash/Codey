@@ -13,10 +13,7 @@ Screenshots used by the top-level [README](../README.md) and the [screenshot gal
 - `token-breakdown.png` - the token-breakdown panel with a label next to each color (where the session's own tokens went).
 - `codey-overhead.png` - the Codey Overhead panel: what Codey itself spent, split across narration, timeline, and summaries.
 - `mode-simple.png` / `mode-deep.png` / `mode-teach.png` - the same session recapped at each summary depth.
-
-## Still needed
-
-- `intervention.png` - the amber intervention bar on a stuck task, with the three buttons (nudge / try a different approach / stop and ask me). Its embed in the README stays commented out until a shot exists.
+- `intervention.png` - the amber intervention bar on a stuck task, with the three buttons (nudge / try a different approach / stop and ask me).
 
 ## Gallery
 
