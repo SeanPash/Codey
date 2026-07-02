@@ -51,7 +51,7 @@ Codey closes that gap. It reads the tool-call stream Claude Code already produce
 
 `/codey:timeline` opens a local browser page that lays out the whole session as a visual storyboard. The run unfolds as a sequence of readable steps grouped by the prompt that started them, with failures and warnings flagged right where they happened. A live strip at the top shows what Claude is doing this very moment, and Follow Live keeps the page pinned to the latest step, so the browser stays in sync with your terminal in real time.
 
-Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you curious, there's an **Explain this step** button right on it, and a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
+Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you want to know more, there's an **Explain this step** button right on it, plus a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
 
 <p align="center">
   <img src="assets/timeline-live.png" alt="The live strip at the top of the timeline shows what Claude is doing this moment, with Follow Live pinning the page to the latest step as the storyboard fills in below" width="900">
