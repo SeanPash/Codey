@@ -148,10 +148,22 @@
     .sessrename { width:100%; display:flex; gap:5px; align-items:center; padding:5px 6px; }
     .sessrename input { flex:1; min-width:0; background:var(--inset); border:1px solid var(--line); color:var(--ink);
       border-radius:6px; padding:5px 7px; font:inherit; font-size:12px; }
-    /* active session: raised surface + a single cyan left edge marks the selection (the one place
-       the focus accent is used), name brightens to ink. */
-    .sess.active { background:var(--surf-h); border-color:var(--line); box-shadow:inset 2px 0 0 var(--sel); }
+    /* selected session: an ambient cyan wash + soft glow marks the selection - no painted edge,
+       matching the live-task card. Cyan (never green) stays reserved for "which session you're viewing". */
+    .sess.active { border-color:var(--sel-dim);
+      background:linear-gradient(180deg,rgba(95,168,224,.07),transparent 60%),var(--surf-h);
+      box-shadow:0 0 12px -6px rgba(95,168,224,.38); }
     .sess.active .sname { color:var(--ink); }
+    /* running session: a quiet green wash + glow so the live row reads as "lit" in the list, like the
+       live task. The green dot carries any motion; the row stays still to keep a busy list calm. */
+    .sess.live { border-color:var(--live-dim);
+      background:linear-gradient(180deg,rgba(52,211,153,.055),transparent 60%),transparent;
+      box-shadow:0 0 12px -7px rgba(52,211,153,.34); }
+    /* selected AND running: the cyan selection layers on top of the live green - both cues stack. */
+    .sess.active.live { border-color:var(--sel-dim);
+      background:linear-gradient(180deg,rgba(95,168,224,.07),transparent 60%),
+                 linear-gradient(180deg,rgba(52,211,153,.05),transparent 60%),var(--surf-h);
+      box-shadow:0 0 12px -6px rgba(95,168,224,.38), 0 0 13px -7px rgba(52,211,153,.30); }
     .sess .sname { font-weight:600; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:8px; }
     .sess .smeta { color:var(--muted); font-size:9.5px; margin-top:4px; padding-left:15px; }
     .sess .rproj { color:var(--body); }
@@ -542,9 +554,15 @@
     .tbody { width:100%; }
     /* narration lead line at the top of the expanded body */
     .tlead { font-size:12px; color:var(--body); margin:6px 0 2px; line-height:1.45; }
-    /* live task accent: dim inset on the left */
-    .task.live { background:var(--surf-h); box-shadow:inset 2px 0 0 var(--live-deep); }
-    .task.live:hover { box-shadow:inset 2px 0 0 var(--live-dim), 0 4px 14px rgba(0,0,0,.26); }
+    /* live task accent: an ambient green wash + soft breathing glow marks the live card -
+       no hard painted edge. The whole card reads as "lit," pulsing gently in time with the
+       spine node instead of a stripe stuck on the left. */
+    .task.live { border-color:var(--live-dim);
+      background:linear-gradient(180deg,rgba(52,211,153,.06),transparent 55%),var(--surf-h);
+      box-shadow:0 0 16px -6px rgba(52,211,153,.30);
+      animation:liveglow 2.8s ease-in-out infinite; }
+    .task.live:hover { border-color:var(--live-dim); transform:translateY(-1px); animation:none;
+      box-shadow:0 0 22px -4px rgba(52,211,153,.42), 0 6px 16px rgba(0,0,0,.28); }
     /* live spine node - scoped to .feed */
     .feed .task.live::before { border-color:var(--live); box-shadow:0 0 0 3px var(--bg), 0 0 5px rgba(52,211,153,.3); animation:softpulse 2.8s ease-in-out infinite; }
     .task.live .nm { color:var(--ink); font-weight:600; }
@@ -554,6 +572,8 @@
     /* green running timer for live tasks - weight 400 (override the global .running 600) */
     .rmeta.running { color:var(--live); font-weight:400; }
     @keyframes softpulse { 0%,100% { box-shadow:0 0 0 3px var(--bg), 0 0 0 0 rgba(52,211,153,0) } 50% { box-shadow:0 0 0 3px var(--bg), 0 0 6px rgba(52,211,153,.32) } }
+    /* live-card ambient glow: a slow breath of the outer bloom, no hard edge */
+    @keyframes liveglow { 0%,100% { box-shadow:0 0 13px -7px rgba(52,211,153,.24); } 50% { box-shadow:0 0 20px -5px rgba(52,211,153,.40); } }
 
     /* Active Terminals: two full-size terminals side by side, paged. Each pane keeps the full
        height of the row and scrolls its own breakdowns, so a busy terminal never squishes its
@@ -1520,12 +1540,13 @@
 
     function sessRowHtml(s) {
       const active = s.id === currentId ? " active" : "";
+      const live = s.running ? " live" : "";
       const proj = s.project ? ` &middot; ${esc(s.project)}` : "";
       if (s.id === renamingId) {
         return `<div class="sessrename" data-id="${esc(s.id)}">`
           + `<input class="rename-in" type="text" value="${esc(s.name)}" aria-label="New name" /></div>`;
       }
-      return `<button class="sess${active}" data-id="${esc(s.id)}" type="button">`
+      return `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
         + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span>`
         + `</button>`;
