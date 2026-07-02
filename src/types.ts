@@ -170,6 +170,7 @@ export interface LiveSession {
   groupId: string | null;      // current turn's group id, so a pane can summarize the prompt
   groups: PromptGroup[];       // full prompt history, so a pane is a real single-terminal timeline
   seedDepth: "simple" | "deep" | "teach"; // this session's mode, the pane's default depth
+  activeWarning: Warning | null;   // the live "stuck" warning for this terminal, drives the pane's intervention bar
 }
 
 // A terminal the user hid from the grid, kept so it can be listed and restored.

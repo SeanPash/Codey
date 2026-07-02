@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { latestSessionId, listSessions, dayBucket, turnInFlight, TURN_BACKSTOP_MS } from "./sessions.js";
+import { latestSessionId, listSessions, dayBucket, turnInFlight, TURN_BACKSTOP_MS, THINKING_WINDOW_MS } from "./sessions.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -35,6 +35,23 @@ describe("turnInFlight", () => {
   it("self-heals only after the backstop of total silence", () => {
     const silentSince = NOW - TURN_BACKSTOP_MS - 1;
     expect(turnInFlight(silentSince, null, silentSince, NOW)).toBe(false);
+  });
+
+  it("bounds a pure thinking gap (no tool since the prompt) by the shorter thinking window", () => {
+    // Prompt submitted, no tool has fired since (toolActivity predates the prompt): this is the
+    // cancelled-mid-thought case. It stays live briefly, then self-heals well before the backstop.
+    const promptAt = NOW - THINKING_WINDOW_MS + 5_000;
+    const oldTool = promptAt - 10_000;
+    expect(turnInFlight(promptAt, null, promptAt, NOW, oldTool)).toBe(true);
+    const stalePrompt = NOW - THINKING_WINDOW_MS - 1;
+    expect(turnInFlight(stalePrompt, null, stalePrompt, NOW, stalePrompt - 10_000)).toBe(false);
+  });
+
+  it("keeps a long turn live once its first tool has fired, even past the thinking window", () => {
+    // A tool fired on or after the prompt, so the generous backstop applies, not the thinking window.
+    const promptAt = NOW - THINKING_WINDOW_MS - 60_000;
+    const recentTool = NOW - 2_000;
+    expect(turnInFlight(promptAt, null, recentTool, NOW, recentTool)).toBe(true);
   });
 });
 

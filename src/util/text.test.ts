@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripDashes, stripMarkdown } from "./text.js";
+import { stripDashes, stripMarkdown, stripEmphasis } from "./text.js";
 
 describe("stripDashes", () => {
   it("turns an em dash into a comma", () => {
@@ -52,5 +52,27 @@ describe("stripMarkdown", () => {
     expect(stripMarkdown("Claude is editing helper.ts so the loss function runs.")).toBe(
       "Claude is editing helper.ts so the loss function runs.",
     );
+  });
+});
+
+describe("stripEmphasis", () => {
+  it("removes bold markers around a section label but keeps the newlines", () => {
+    const out = stripEmphasis("**Why this mattered:** the tests must pass.\n**How Claude did it:** it ran them.");
+    expect(out).toBe("Why this mattered: the tests must pass.\nHow Claude did it: it ran them.");
+  });
+
+  it("drops inline code fences and leading heading hashes", () => {
+    expect(stripEmphasis("## Concept: the `node --test` runner finds tests.")).toBe(
+      "Concept: the node --test runner finds tests.",
+    );
+  });
+
+  it("tidies the extra space a removed marker leaves without touching real content", () => {
+    expect(stripEmphasis("Concept: __caching__ stores a result.")).toBe("Concept: caching stores a result.");
+  });
+
+  it("leaves clean, unformatted prose alone", () => {
+    const clean = "Why this mattered: the change keeps the count honest.\nHow Claude did it: it read the store.";
+    expect(stripEmphasis(clean)).toBe(clean);
   });
 });

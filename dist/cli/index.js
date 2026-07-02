@@ -4355,6 +4355,9 @@ function shouldNarrate(mode, input) {
 function stripDashes(s) {
   return s.replace(/[ \t]*[—–][ \t]*/g, ", ").replace(/ - /g, ", ").replace(/ ,/g, ",").replace(/,[ \t]*,/g, ",").replace(/[^\S\n]{2,}/g, " ").replace(/[ \t]*\n[ \t]*/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
+function stripEmphasis(s) {
+  return s.replace(/\*\*/g, "").replace(/__/g, "").replace(/`+/g, "").replace(/(^|\n)[ \t]*#{1,6}[ \t]*/g, "$1").replace(/[^\S\n]{2,}/g, " ").replace(/[ \t]+\n/g, "\n").trim();
+}
 function stripMarkdown(s) {
   return s.replace(/`+/g, "").replace(/\*\*([^*]+)\*\*/g, "$1").replace(/(^|\s)\*([^*]+)\*/g, "$1$2").replace(/\s{2,}/g, " ").trim();
 }
@@ -5721,9 +5724,10 @@ var RUNNING_WINDOW_MS = 15e3;
 var OPEN_WINDOW_MS = 10 * 6e4;
 var THINKING_WINDOW_MS = 3 * 6e4;
 var TURN_BACKSTOP_MS = 30 * 6e4;
-function turnInFlight(promptAt, doneAt, lastActivity, now) {
+function turnInFlight(promptAt, doneAt, lastActivity, now, toolActivity = lastActivity) {
   if (promptAt == null || promptAt <= (doneAt ?? 0)) return false;
-  return now - Math.max(promptAt, lastActivity) < TURN_BACKSTOP_MS;
+  if (toolActivity >= promptAt) return now - Math.max(promptAt, lastActivity) < TURN_BACKSTOP_MS;
+  return now - promptAt < THINKING_WINDOW_MS;
 }
 function dayBucket(mtime, now) {
   const d = new Date(mtime);
@@ -5755,7 +5759,7 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
       customName: readCustomName(dir)
     });
     const status = readStatus(dir);
-    const thinking = evMtime != null && turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
+    const thinking = evMtime != null && turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now, evMtime ?? 0);
     const recentActivity = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
     const closed = status?.closedAt != null && status.closedAt >= lastActivity;
     const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
@@ -6509,7 +6513,7 @@ function actionInstruction(depth) {
   }
 }
 var SELF_CONTAINED = "Explain only the steps shown above. The steps are all the context that exists, so never ask the user for more information, never say you lack context, and never ask them to describe what happened. If the detail is sparse, give your best plain high-level explanation from what is shown.";
-var TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the explanation, no preamble.";
+var TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Write the labels and body as plain text, with no markdown formatting: no asterisks, backticks, or bold. Reply with only the explanation, no preamble.";
 function buildTaskExplainPrompt(taskName, lines, depth) {
   const body = lines.map(actionContext).join("\n");
   return [
@@ -6742,7 +6746,7 @@ async function explain(snap, req, deps) {
   addSpend(deps.sessionDir, res.tokens);
   const usage = res.usage ?? { input: res.tokens, output: 0, cacheRead: 0, cacheWrite: 0 };
   appendSpend(deps.sessionDir, { ts: Date.now(), kind: "summary", mode: null, usage, costUsd: res.costUsd ?? 0 });
-  const text = stripDashes(res.text.trim());
+  const text = stripEmphasis(stripDashes(res.text.trim()));
   if (isHedgeFiller(text)) return { text: null, cached: false, paused: false };
   writeExplanation(req.sessionId, req.scope, req.id, loc.hash, req.depth, text, deps.root);
   return { text, cached: false, paused: false };
@@ -6900,7 +6904,7 @@ function isRunning(dir, now, cancelledAt = 0) {
   const withinWindow = lastActivity > 0 && now - lastActivity < RUNNING_WINDOW_MS;
   const status = readStatus(dir);
   if (status?.closedAt != null && status.closedAt >= lastActivity) return false;
-  const isThinking = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now);
+  const isThinking = turnInFlight(status?.promptAt, status?.doneAt, lastActivity, now, evMtime);
   const lastSignal = Math.max(lastActivity, status?.promptAt ?? 0);
   const finished = status?.doneAt != null && status.doneAt >= lastSignal;
   if (finished) return false;
@@ -7025,7 +7029,10 @@ function loadLive(root = defaultRoot()) {
       prompt,
       cancelled,
       groupId,
-      seedDepth: snap.seedDepth
+      seedDepth: snap.seedDepth,
+      // The live "stuck" warning, so an Active Terminals pane can offer the same intervention bar
+      // the single view does. Only while the terminal is running: a parked turn shows no warning.
+      activeWarning: running ? snap.activeWarning : null
     };
   });
   return { sessions, liveCount: sessions.filter((s) => s.running).length, hidden };
