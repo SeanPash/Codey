@@ -8,8 +8,11 @@ Codey is a plugin for Claude Code that displays Claude's actions in a story-like
 
 </div>
 
-<!-- SCREENSHOT NEEDED: hero shot of the browser timeline showing the live now-strip at the top, the per-task storyboard down the page, and the token-breakdown chart -->
-<!-- ![Codey timeline](assets/timeline.png) -->
+<p align="center">
+  <img src="assets/timeline.png" alt="The Codey timeline: a full session laid out as a storyboard, each step showing what Claude did and why, with per-step token costs and a live breakdown of where the tokens went" width="900">
+</p>
+
+<p align="center"><a href="SCREENSHOTS.md"><b>See more screenshots</b></a></p>
 
 ## Install
 
@@ -50,8 +53,9 @@ Codey closes that gap. It reads the tool-call stream Claude Code already produce
 
 Session stats give you the shape of the run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step or a whole task makes you curious, there's an **Explain this step** button right on it, and a way to recap an entire prompt. You spend a few tokens only on the things you choose to dig into.
 
-<!-- SCREENSHOT NEEDED: the browser timeline with the live now-strip, Follow Live, per-task storyboard, and stats -->
-<!-- ![Codey timeline](assets/timeline.png) -->
+<p align="center">
+  <img src="assets/timeline-live.png" alt="The live strip at the top of the timeline shows what Claude is doing this moment, with Follow Live pinning the page to the latest step as the storyboard fills in below" width="900">
+</p>
 
 ### Narration right in your terminal
 
@@ -59,8 +63,9 @@ While Codey is on, the bottom of your terminal becomes a two-line readout: the c
 
 At the lightest setting it costs almost nothing. You choose how much it says.
 
-<!-- SCREENSHOT NEEDED: the terminal status line, action on top, reason underneath -->
-<!-- ![Codey status line](assets/status-line.png) -->
+<p align="center">
+  <img src="assets/status-line.png" alt="The Codey status line at the bottom of the terminal: the current action on top, the plain-English reason for it underneath" width="900">
+</p>
 
 ### Knows when Claude is stuck
 
@@ -68,21 +73,24 @@ Some of the most useful work Codey does is free. Pure, AI-free detectors watch t
 
 When something fires, the stuck task gets an amber bar with three choices: nudge it to move on, push it toward a different approach, or stop and hand control back to you. One click feeds Claude a short, plain reason it reads and acts on. Codey only ever observes and suggests. It never acts without your click.
 
-<!-- SCREENSHOT NEEDED: the amber intervention bar on a stuck task with the three buttons -->
+<!-- SCREENSHOT NEEDED: the amber intervention bar on a stuck task with the three buttons (nudge / try a different approach / stop and ask me). Not yet captured, so this embed stays commented out until a shot exists. -->
 <!-- ![Stuck-task intervention](assets/intervention.png) -->
 
 ### Explain any step, only when you want
 
 The timeline is readable for free. When a step makes you curious, click **Explain this step** for a deeper, on-demand explanation of what happened and why. You spend a few tokens only on the steps you choose, so you stay cheap by default and dig in exactly where it matters. The same works for a whole prompt: ask for a recap of everything Claude got done that turn.
 
-<!-- SCREENSHOT NEEDED: the token-breakdown chart with a label next to each color -->
-<!-- ![Token breakdown chart](assets/token-breakdown.png) -->
+<p align="center">
+  <img src="assets/explain-step.png" alt="A step expanded with Explain this step, showing what Claude did and the exact command behind it, next to a full recap of what the task got done" width="900">
+</p>
 
 ### Replay any session
 
 The timeline isn't just for the run happening right now. A sessions sidebar lets you flip between every recent session and replay any of them step by step, so you can go back and understand a run long after it finished.
 
-<!-- SCREENSHOT NEEDED: the sessions sidebar with multiple recent sessions, one selected for replay -->
+<p align="center">
+  <img src="assets/sessions.png" alt="The sessions sidebar listing recent sessions grouped by day, any of which can be reopened and replayed step by step" width="270">
+</p>
 
 ### Every terminal in one place
 
@@ -90,8 +98,9 @@ Running Claude Code in two or three terminals at once, it's easy to lose track o
 
 It's the difference between juggling several silent terminals and watching all of them tell their story on one screen.
 
-<!-- SCREENSHOT NEEDED: the Active Terminals view with two or three live session timelines side by side, each following its own run -->
-<!-- ![Active terminals](assets/active-terminals.png) -->
+<p align="center">
+  <img src="assets/active-terminals.png" alt="The Active Terminals view: two live session timelines side by side, each following its own run in real time" width="900">
+</p>
 
 ## Without Codey vs with Codey
 
@@ -113,6 +122,8 @@ It's the difference between juggling several silent terminals and watching all o
 - Following autonomous coding sessions
 
 ## Token costs
+
+<img src="assets/token-breakdown.png" alt="The token-breakdown panel: session totals, then where the tokens went split across writing, reading, searching, commands, and thinking, with the priciest task called out" width="260" align="right">
 
 Codey is built to stay cheap, and most of it costs nothing at all.
 
@@ -141,6 +152,34 @@ Type `/codey` in Claude Code and the picker lists everything.
 | `/codey:off` | Stops narrating and restores your plain status line. |
 
 The three narration modes are really one knob: how many tokens you spend to understand more. `simple` is brief and nearly free, `deep` explains why each step matters, and `teach` explains the work and the ideas behind it. Narration runs on the cheapest model and draws on the same Claude plan as your normal work, so the deeper modes cost a little more of your quota. The timeline stays free either way, and only spends when you click for an explanation.
+
+## The same run, summarized three ways
+
+That one knob shows up on the timeline too. Flip the depth toggle and every recap rewrites itself to match, from a single honest line to a full teardown with the idea behind it. Here is the same session recapped at each depth.
+
+### Simple
+
+One honest line per prompt: what Claude got done, and nothing you have to wade through.
+
+<p align="center">
+  <img src="assets/mode-simple.png" alt="The timeline in Simple depth, where each recap is a single plain sentence summarizing what Claude got done" width="900">
+</p>
+
+### Deep
+
+The same recap, opened up: what changed, why it mattered, how it was verified, and what is still left.
+
+<p align="center">
+  <img src="assets/mode-deep.png" alt="The timeline in Deep depth, where each recap breaks out what changed, why it mattered, verification, and what is left" width="900">
+</p>
+
+### Teach
+
+Everything Deep shows, plus the files it touched and the concept behind the work, explained with a quick analogy so you learn as you read.
+
+<p align="center">
+  <img src="assets/mode-teach.png" alt="The timeline in Teach depth, adding the files touched and a plain-language explanation of the concept behind the work" width="900">
+</p>
 
 ## What's next
 
