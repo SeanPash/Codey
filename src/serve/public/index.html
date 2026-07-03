@@ -953,11 +953,11 @@
       const groups = {
         appearance: () =>
           `<div class="sgrp"><h3>Appearance</h3><p class="gdesc">How the timeline looks on this machine.</p>`
-          + segRow("Theme", "Dark is Codey's default. Light is easier in a bright room.", "theme",
+          + segRow("Theme", "Choose the interface color scheme.", "theme",
               [["dark","Dark"],["light","Light"]])
           + segRow("Reduce motion", "Turns off the live pulse and ambient glow.", "motion",
               [["full","Off"],["reduced","On"]])
-          + segRow("Density", "Compact tightens row spacing.", "density",
+          + segRow("Density", "How tightly the timeline rows are packed.", "density",
               [["comfortable","Relaxed"],["compact","Compact"]])
           + segRow("Text size", "Scales the whole page.", "textsize",
               [["s","S"],["m","M"],["l","L"]])
@@ -1012,18 +1012,20 @@
     function applyPreset(preset) {
       setSetting("live", preset);
       if (preset === "saver") {
+        // Token saver forces summaries to Manual and defers the AI timeline (see the saver flag
+        // on the snapshot fetch). Follow live only governs scrolling, so it leaves summaries alone.
         setSetting("autoopen", "0"); setSetting("follow", "0");
         followLive = false; genMode = "saver"; localStorage.setItem("codey-gen", "saver");
       } else {
         setSetting("autoopen", "1"); setSetting("follow", "1");
-        followLive = true; genMode = "auto"; localStorage.setItem("codey-gen", "auto");
+        followLive = true;
       }
       if (lastSnap) renderSingle(lastSnap);
     }
     function renderNarrationGroup() {
       // Reads the live depth/genMode (not a settings key) so it always matches the title-row control.
       return `<div class="sgrp"><h3>Narration</h3>`
-        + `<p class="gdesc">Also on the title-row controls. Changing it here changes it there too.</p>`
+        + `<p class="gdesc">How much Codey explains as Claude works, and whether it recaps each prompt.</p>`
         + segRow("Default depth", "Simple is one line. Deep explains why. Teach teaches the concept.", "depth",
             [["simple","Simple"],["deep","Deep"],["teach","Teach"]], curDepth())
         + segRow("Summaries", "Auto generates a recap per prompt. Manual waits for a click.", "gen",
@@ -1045,10 +1047,8 @@
       return arr;
     }
     function renderAboutGroup() {
-      // knownBuild is the /health build id; in dev it is a path, so show its last segment.
-      const b = knownBuild ? String(knownBuild).split(/[\\/]/).pop() : "";
       return `<div class="sgrp"><h3>About</h3>`
-        + `<p class="gdesc">Codey timeline${b ? " &middot; build " + esc(b) : ""}.</p>`
+        + `<p class="gdesc">Codey narrates a live Claude Code session in plain English and flags when it looks stuck.</p>`
         + `<div class="srow"><div class="srmeta"><div class="rt">Reset all settings</div>`
         + `<div class="rd">Restores every setting on this page to its default. Does not touch your bookmarks.</div></div>`
         + `<button class="sresetbtn" id="reset-settings" type="button">Reset</button></div>`
@@ -2017,7 +2017,8 @@
       lastSnap = snap;
       liveNow = !!snap.live;
       if (depth === null) { depth = snap.seedDepth || "deep"; applyMode(); }
-      if (genMode === null) genMode = snap.genAuto ? "auto" : "saver";
+      // Summaries default to Manual so Codey never auto-spends on recaps until the user opts in.
+      if (genMode === null) genMode = "saver";
       seedEmbedded(snap);
       renderHeader(snap);
       renderControls(snap);
