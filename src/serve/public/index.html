@@ -897,8 +897,69 @@
       document.querySelectorAll("#spnav a").forEach((n) => n.classList.toggle("on", n === a));
       renderSettings();
     });
-    // renderSettings is replaced with the real dispatcher in the next step. Stub for now:
-    function renderSettings() { document.getElementById("spcontent").textContent = settingsGroup; }
+    // Small builders for a settings row. segRow renders a segmented control; swRow a toggle.
+    function segRow(title, desc, key, opts, cur) {
+      const val = cur !== undefined ? cur : settings[key];
+      const btns = opts.map(([v, label]) =>
+        `<button data-set="${key}" data-val="${v}" class="${val === v ? "on" : ""}">${label}</button>`).join("");
+      return `<div class="srow"><div class="srmeta"><div class="rt">${title}</div><div class="rd">${desc}</div></div>`
+        + `<div class="sseg">${btns}</div></div>`;
+    }
+    function swRow(title, desc, key) {
+      return `<div class="srow"><div class="srmeta"><div class="rt">${title}</div><div class="rd">${desc}</div></div>`
+        + `<div class="sw ${settings[key] === "1" ? "on" : ""}" data-toggle="${key}"></div></div>`;
+    }
+    function renderSettings() {
+      const el = document.getElementById("spcontent");
+      const groups = {
+        appearance: () =>
+          `<div class="sgrp"><h3>Appearance</h3><p class="gdesc">How the timeline looks on this machine.</p>`
+          + segRow("Theme", "System follows your OS light/dark setting.", "theme",
+              [["system","System"],["dark","Dark"],["light","Light"]])
+          + segRow("Reduce motion", "Turns off the live pulse and ambient glow.", "motion",
+              [["full","Off"],["reduced","On"]])
+          + segRow("Density", "Compact tightens row spacing.", "density",
+              [["comfortable","Comfortable"],["compact","Compact"]])
+          + segRow("Text size", "Scales the whole page.", "textsize",
+              [["s","S"],["m","M"],["l","L"]])
+          + `</div>`,
+        live: () => renderLiveGroup(),
+        narration: () => renderNarrationGroup(),
+        sessions: () => renderSessionsGroup(),
+        about: () => renderAboutGroup(),
+      };
+      el.innerHTML = (groups[settingsGroup] || groups.appearance)();
+      wireSettingsControls();
+    }
+    // One delegated wiring pass for every seg/toggle the current group rendered.
+    function wireSettingsControls() {
+      const el = document.getElementById("spcontent");
+      el.querySelectorAll("button[data-set]").forEach((b) => b.addEventListener("click", () => {
+        applySettingChange(b.dataset.set, b.dataset.val);
+        renderSettings();
+      }));
+      el.querySelectorAll(".sw[data-toggle]").forEach((s) => s.addEventListener("click", () => {
+        applySettingChange(s.dataset.toggle, settings[s.dataset.toggle] === "1" ? "0" : "1");
+        renderSettings();
+      }));
+      wireLiveControls(el);
+      wireAboutControls(el);
+    }
+    // Central place to react to a changed setting beyond persisting it. Extended per group below.
+    function applySettingChange(key, val) {
+      setSetting(key, val);
+      if (key === "depth") { depth = val; localStorage.setItem("codey-depth", val); autoFired.clear(); applyMode(); if (lastSnap) renderSingle(lastSnap); }
+      if (key === "gen") { genMode = val; localStorage.setItem("codey-gen", val); if (lastSnap) renderSingle(lastSnap); }
+      if (key === "sort" || key === "showdismissed") refreshRail();
+    }
+    // Group renderers and extra wiring are defined in later tasks. Stubs keep the panel running.
+    function renderLiveGroup() { return "<div class='sgrp'><h3>Live &amp; tokens</h3></div>"; }
+    function renderNarrationGroup() { return "<div class='sgrp'><h3>Narration</h3></div>"; }
+    function renderSessionsGroup() { return "<div class='sgrp'><h3>Sessions</h3></div>"; }
+    function renderAboutGroup() { return "<div class='sgrp'><h3>About</h3></div>"; }
+    function wireLiveControls(_el) { /* filled in Task 9 */ }
+    function wireAboutControls(_el) { /* filled in Task 13 */ }
+    function refreshRail() { /* filled in Task 11 */ }
 
     // ---- Explanations: generated why/how and per-prompt summaries ----
     const explCache = new Map();   // "scope|id|depth" -> generated text (survives the live refresh)
