@@ -425,6 +425,10 @@
     .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
       background:var(--now-bg); border:1px solid var(--live-dim); border-radius:12px;
       padding:11px 14px; box-shadow:var(--now-shadow); }
+    /* token-saver quiet banner: neutral, no live-green, no glow */
+    .nowstrip.quiet { background:var(--surf-h); border-color:var(--line); box-shadow:none; }
+    .nowstrip.quiet .neye { background:var(--muted); color:var(--surf); }
+    .nowstrip.quiet .ndot { background:var(--surf); animation:none; }
     .nowstrip .nowtop { display:flex; align-items:center; gap:10px; }
     .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#0b1410;
       font-weight:800; display:inline-flex; align-items:center; gap:6px; flex:none;
@@ -1233,7 +1237,17 @@
       // turn), so trusting only /now made the strip vanish while the page still said "Working
       // now". Falling back to the snapshot keeps the strip and the page in agreement mid-turn.
       const live = (n && n.live) || (lastSnap && lastSnap.live);
-      if (!live || view !== "single") { strip.hidden = true; return; }
+      if (!live || view !== "single") { strip.hidden = true; strip.classList.remove("quiet"); return; }
+      // Token saver stays quiet: no live activity feed, just a calm free banner. The full timeline
+      // is revealed by the single AI pass once this prompt finishes.
+      if (settings.live === "saver") {
+        strip.hidden = false;
+        strip.classList.add("quiet");
+        strip.innerHTML = `<div class="nowtop"><span class="neye"><span class="ndot"></span>Working</span>`
+          + `<span class="nact think">Token saver is on. The full timeline appears when this prompt finishes.</span></div>`;
+        return;
+      }
+      strip.classList.remove("quiet");
       strip.hidden = false;
       n = n || {};
       // Name the exact step: the tool tag plus its literal target (the real command/file), so
@@ -2172,7 +2186,9 @@
       document.getElementById("jumplive").hidden = !(pinned && anyRunning);
       if (!currentId) { document.getElementById("main").innerHTML = '<div class="empty">No sessions found.</div>'; return; }
       try {
-        const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId))).json();
+        // Token saver appends ?saver=1 so the server defers live AI segmentation off the hot path.
+        const saverQ = settings.live === "saver" ? "?saver=1" : "";
+        const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId) + saverQ)).json();
         if (view !== "single") return;
         renderSingle(snap);
       } catch { /* keep last view on a transient error */ }
