@@ -128,6 +128,16 @@ function secondaryLen(rich: boolean): string {
   return rich ? "one to three plain sentences" : "one or two plain sentences";
 }
 
+// The teach-mode Concept section. Budget teaches the single most important technique; rich is the
+// "teach me everything" setting, so it teaches every notable technique the work used, each as its
+// own point. Both keep the same guardrails: a concrete technique, an everyday analogy, no trivia.
+function conceptGuidance(rich: boolean): string {
+  if (rich) {
+    return "Concept: teach every notable technique, tool, or skill this work used, each as its own labeled point (Concept 1, Concept 2, and so on). For each, choose something concrete that Claude actually used here (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then say how Claude used it in this work. Cover all the main topics, two or three sentences each, and define any term you introduce.";
+  }
+  return "Concept: teach the one technique, tool, or skill worth learning from this work. Choose something concrete that Claude actually used here (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then say how Claude used it in this work. Two or three sentences, and define any term you introduce.";
+}
+
 // In rich mode, push the recap to name the concrete things the evidence hands it (the real
 // identifiers, values, and root cause) instead of paraphrasing. Empty in budget mode.
 function specificityRule(rich: boolean): string {
@@ -151,7 +161,7 @@ function instruction(depth: ExplainDepth, fileCount: number, rich: boolean): str
         "Files touched: the files from the evidence, comma separated.",
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
-        "Concept: teach the one technique, tool, or skill worth learning from this work. Choose something concrete that Claude actually used here (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then say how Claude used it in this work. Two or three sentences, and define any term you introduce.",
+        conceptGuidance(rich),
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
         "Write the report from the evidence above; do not just repeat Claude's closing chat message back." + specifics,
       ].join("\n");

@@ -128,6 +128,22 @@ describe("buildSummaryPrompt", () => {
     expect(p).toMatch(/name the (actual|real|specific)/);
   });
 
+  it("teaches every concept in rich teach mode, but only the main one in budget teach", () => {
+    const richTeach = buildSummaryPrompt("p", tasks, "teach", true).toLowerCase();
+    const budgetTeach = buildSummaryPrompt("p", tasks, "teach", false).toLowerCase();
+    expect(budgetTeach).toContain("the one technique");
+    expect(richTeach).not.toContain("the one technique");
+    expect(richTeach).toMatch(/every (notable )?technique/);
+  });
+
+  it("keeps rich and budget distinct in simple mode too", () => {
+    const editLine: ReceiptLine = { ...line("x"), evidence: 'replaced ".sw {" with ".stgl {"' };
+    const rich = buildSummaryPrompt("p", [{ name: "t", lines: [editLine] }], "simple", true);
+    const budget = buildSummaryPrompt("p", [{ name: "t", lines: [editLine] }], "simple", false);
+    expect(rich).toContain(".stgl");
+    expect(budget).not.toContain(".stgl");
+  });
+
   it("only offers verification as grounding when a check actually ran", () => {
     const verified: SummaryTask[] = [
       { name: "Fix the recap", lines: [line("the change"), bashLine("npx vitest run")] },

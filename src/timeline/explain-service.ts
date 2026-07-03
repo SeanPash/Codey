@@ -76,7 +76,7 @@ interface Located { prompt: string; hash: string; }
 // Bump this whenever the prompt wording changes in a way that should invalidate old cached
 // explanations. The cache keys on content, not prompt text, so without this a reader who already
 // generated a recap would keep seeing the old, shallower wording forever. v2 = richer walkthroughs.
-const PROMPT_VERSION = "v2";
+const PROMPT_VERSION = "v3";
 
 // Find what a request points at and build both its prompt and its content hash. Returns null
 // when the id does not resolve, so a stale browser id degrades to "nothing to show".

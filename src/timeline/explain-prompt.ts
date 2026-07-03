@@ -30,6 +30,17 @@ function partLen(rich: boolean): string {
   return rich ? "two to four plain sentences" : "one or two plain sentences";
 }
 
+// The teach-mode Concept section. Budget teaches the single most important technique; rich teaches
+// every notable technique the work used, each as its own point. `tie` phrases the closing link to
+// the scope (a whole task, or one step). Both keep the same guardrails: a concrete technique, an
+// everyday analogy, no trivia.
+function conceptGuidance(rich: boolean, tie: string): string {
+  if (rich) {
+    return `Concept: teach every notable technique, tool, or skill worth learning here, each as its own labeled point (Concept 1, Concept 2, and so on). For each, choose something concrete that Claude actually used (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then ${tie}. Cover all the main topics, two or three sentences each, and define any term you introduce.`;
+  }
+  return `Concept: teach the one technique, tool, or skill worth learning here. Choose something concrete that Claude actually used (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then ${tie}. Two or three sentences, and define any term you introduce.`;
+}
+
 function taskInstruction(depth: ExplainDepth, rich: boolean): string {
   const parts = partLen(rich);
   switch (depth) {
@@ -41,7 +52,7 @@ function taskInstruction(depth: ExplainDepth, rich: boolean): string {
         "What Claude did: name what the task actually accomplished.",
         "Why it mattered: the problem it solves or why it was worth doing.",
         "How it worked: the mechanism, in plain terms.",
-        "Concept: teach the one technique, tool, or skill worth learning from this task. Choose something concrete that Claude actually used (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then connect it to what Claude did here. Two or three sentences, and define any term you introduce.",
+        conceptGuidance(rich, "connect it to what Claude did here"),
       ].join("\n");
     default:
       return [
@@ -53,14 +64,15 @@ function taskInstruction(depth: ExplainDepth, rich: boolean): string {
   }
 }
 
-function actionInstruction(depth: ExplainDepth): string {
+function actionInstruction(depth: ExplainDepth, rich: boolean): string {
+  const parts = rich ? "two or three sentences" : "one or two sentences";
   switch (depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this single step and why.";
     case "teach":
-      return "Explain this single step for someone learning to code, in three labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why Claude did it. Start the next line with 'How Claude did it:' then one or two sentences on how the step works. Start a final line with 'Concept:' then teach the one technique, tool, or skill worth learning from this step. Choose something concrete that Claude actually used (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then tie it to what this step did. Two or three sentences, and define any term you introduce.";
+      return `Explain this single step for someone learning to code, in labeled parts. Start a line with 'Why this mattered:' then ${parts} on why Claude did it. Start the next line with 'How Claude did it:' then ${parts} on how the step works. Then ${conceptGuidance(rich, "tie it to what this step did")}`;
     default:
-      return "Explain this single step for a non-technical person, in two labeled parts. Start a line with 'Why this mattered:' then one or two sentences on why this step matters. Start the next line with 'How Claude did it:' then one or two sentences on how the step works.";
+      return `Explain this single step for a non-technical person, in two labeled parts. Start a line with 'Why this mattered:' then ${parts} on why this step matters. Start the next line with 'How Claude did it:' then ${parts} on how the step works.`;
   }
 }
 
@@ -99,6 +111,6 @@ export function buildActionExplainPrompt(line: ReceiptLine, depth: ExplainDepth,
     intro,
     actionContext(line, rich),
     "",
-    `${actionInstruction(depth)}${decisionRule} ${SELF_CONTAINED} ${TAIL}`,
+    `${actionInstruction(depth, rich)}${decisionRule} ${SELF_CONTAINED} ${TAIL}`,
   ].join("\n");
 }

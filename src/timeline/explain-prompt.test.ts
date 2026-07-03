@@ -90,6 +90,14 @@ describe("buildTaskExplainPrompt", () => {
     expect(budget).toContain("one or two plain sentences");
     expect(rich).toContain("two to four plain sentences");
   });
+
+  it("teaches every concept in rich teach mode for a task, but the main one in budget", () => {
+    const rich = buildTaskExplainPrompt("X", [line()], "teach", true).toLowerCase();
+    const budget = buildTaskExplainPrompt("X", [line()], "teach", false).toLowerCase();
+    expect(budget).toContain("the one technique");
+    expect(rich).not.toContain("the one technique");
+    expect(rich).toMatch(/every (notable )?technique/);
+  });
 });
 
 describe("buildActionExplainPrompt", () => {
