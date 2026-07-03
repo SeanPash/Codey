@@ -83,16 +83,32 @@ describe("buildSummaryPrompt", () => {
     expect(p).toContain("not a basic term the reader already knows");
   });
 
-  it("scales the What changed detail with how many files the prompt touched", () => {
-    const small = buildSummaryPrompt("p", [{ name: "tweak", lines: [fileLine("src/a.ts")] }], "deep");
+  it("scales the What changed detail with how many files the prompt touched, in budget mode", () => {
+    const small = buildSummaryPrompt("p", [{ name: "tweak", lines: [fileLine("src/a.ts")] }], "deep", false);
     expect(small).not.toMatch(/three to five/);
 
     const manyFiles = Array.from({ length: 9 }, (_, i) => fileLine(`src/file${i}.ts`));
-    const big = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep");
+    const big = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep", false);
     expect(big).toMatch(/three to five/);
     // teach scales the same way
-    const bigTeach = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "teach");
+    const bigTeach = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "teach", false);
     expect(bigTeach).toMatch(/three to five/);
+  });
+
+  it("asks for a markedly longer What changed walkthrough in rich mode than budget", () => {
+    const manyFiles = Array.from({ length: 9 }, (_, i) => fileLine(`src/file${i}.ts`));
+    const budget = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep", false);
+    const rich = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep", true);
+    expect(budget).toMatch(/three to five/);
+    expect(rich).toMatch(/six to ten/);
+    expect(rich.toLowerCase()).toContain("walk through");
+  });
+
+  it("gives the secondary sections more room in rich mode than budget", () => {
+    const budget = buildSummaryPrompt("p", tasks, "deep", false);
+    const rich = buildSummaryPrompt("p", tasks, "deep", true);
+    expect(budget).toContain("one or two plain sentences");
+    expect(rich).toContain("one to three plain sentences");
   });
 
   it("in rich mode, feeds the concrete change substance so the recap names the real change", () => {

@@ -6616,13 +6616,17 @@ function actionContext(l, rich) {
 function specificityRule(rich) {
   return rich ? " Name the actual files, identifiers, values, and root cause from the changes and reasoning above; be as specific as the evidence allows." : "";
 }
-function taskInstruction(depth) {
+function partLen(rich) {
+  return rich ? "two to four plain sentences" : "one or two plain sentences";
+}
+function taskInstruction(depth, rich) {
+  const parts = partLen(rich);
   switch (depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this task and why.";
     case "teach":
       return [
-        "Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences, except the Concept, which gets the length noted there:",
+        `Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to ${parts}, except the Concept, which gets the length noted there:`,
         "What Claude did: name what the task actually accomplished.",
         "Why it mattered: the problem it solves or why it was worth doing.",
         "How it worked: the mechanism, in plain terms.",
@@ -6630,7 +6634,7 @@ function taskInstruction(depth) {
       ].join("\n");
     default:
       return [
-        "Explain this task for a non-technical person, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences:",
+        `Explain this task for a non-technical person, in labeled parts, each on its own line starting with the label and a colon. Keep each part to ${parts}:`,
         "What Claude did: name what the task actually accomplished.",
         "Why it mattered: the problem it solves or why it was worth doing.",
         "How it worked: the mechanism, in plain terms."
@@ -6655,7 +6659,7 @@ function buildTaskExplainPrompt(taskName, lines, depth, rich = true) {
     `Codey automatically grouped these steps from an AI coding agent and labeled the group "${taskName}". That label is a rough guess, not the agent's stated goal, so explain what the steps below actually accomplish and do not claim the agent did the wrong thing just because the steps differ from the label. These are the steps, with the agent's own reasoning:`,
     body,
     "",
-    `${taskInstruction(depth)}${specificityRule(rich)} ${SELF_CONTAINED} ${TAIL}`
+    `${taskInstruction(depth, rich)}${specificityRule(rich)} ${SELF_CONTAINED} ${TAIL}`
   ].join("\n");
 }
 function buildActionExplainPrompt(line, depth, rich = true) {
@@ -6740,7 +6744,16 @@ function evidenceBlock(tasks, rich) {
   }
   return lines.join("\n");
 }
-function whatChangedGuidance(fileCount) {
+function whatChangedGuidance(fileCount, rich) {
+  if (rich) {
+    if (fileCount >= 7) {
+      return "What changed: walk through what actually changed, grouped by area, in six to ten plain sentences, so a reader sees each main change and not a vague summary. Name the specific files, identifiers, and behaviors from the concrete changes above.";
+    }
+    if (fileCount >= 3) {
+      return "What changed: walk through what actually changed in four to six plain sentences, naming the specific files, identifiers, and behaviors from the concrete changes above.";
+    }
+    return "What changed: describe what actually changed in two to four plain sentences, naming the specific identifiers, values, or behaviors from the concrete changes above (or, if nothing changed, what Claude inspected or found).";
+  }
   if (fileCount >= 7) {
     return "What changed: the actual behavior that changed, in concrete terms, in three to five plain sentences that group the related changes so a reader sees the main areas touched.";
   }
@@ -6749,18 +6762,22 @@ function whatChangedGuidance(fileCount) {
   }
   return "What changed: the actual behavior that changed, in concrete terms, in one or two plain sentences (or, if nothing changed, what Claude inspected or found).";
 }
+function secondaryLen(rich) {
+  return rich ? "one to three plain sentences" : "one or two plain sentences";
+}
 function specificityRule2(rich) {
   return rich ? " Name the specific identifiers, values, files, and root cause from the concrete changes above; be as precise as the evidence allows instead of paraphrasing." : "";
 }
 function instruction(depth, fileCount, rich) {
-  const whatChanged = whatChangedGuidance(fileCount);
+  const whatChanged = whatChangedGuidance(fileCount, rich);
+  const secondary = secondaryLen(rich);
   const specifics = specificityRule2(rich);
   switch (depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found." + specifics;
     case "teach":
       return [
-        "Recap what Claude accomplished, for someone learning to code, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
+        `Recap what Claude accomplished, for someone learning to code, as an organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to ${secondary}, give the lengths noted below, no bullet characters:`,
         whatChanged,
         "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",
@@ -6772,7 +6789,7 @@ function instruction(depth, fileCount, rich) {
       ].join("\n");
     default:
       return [
-        "Recap what Claude accomplished for a non-technical person, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
+        `Recap what Claude accomplished for a non-technical person, as an organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to ${secondary}, give the lengths noted below, no bullet characters:`,
         whatChanged,
         "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",
@@ -6877,13 +6894,14 @@ function parseActionId(id) {
 function summaryTasks(chunks) {
   return chunks.map((c) => ({ name: c.name, lines: c.receipt.workLines }));
 }
+var PROMPT_VERSION = "v2";
 function locate(snap, req) {
   const rich = req.rich !== false;
   if (req.scope === "task") {
     const c = snap.chunks.find((x) => x.id === req.id);
     if (!c) return null;
     const lines = c.receipt.workLines;
-    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth, rich), hash: hashContent([lines.map(lineKey), rich]) };
+    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth, rich), hash: hashContent([lines.map(lineKey), rich, PROMPT_VERSION]) };
   }
   if (req.scope === "action") {
     const parsed = parseActionId(req.id);
@@ -6891,12 +6909,12 @@ function locate(snap, req) {
     const c = snap.chunks.find((x) => x.id === parsed.chunkId);
     const line = c?.receipt.workLines[parsed.index];
     if (!line) return null;
-    return { prompt: buildActionExplainPrompt(line, req.depth, rich), hash: hashContent([lineKey(line), rich]) };
+    return { prompt: buildActionExplainPrompt(line, req.depth, rich), hash: hashContent([lineKey(line), rich, PROMPT_VERSION]) };
   }
   const g = snap.groups.find((x) => x.id === req.id);
   if (!g) return null;
   const tasks = summaryTasks(g.chunks);
-  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)]), rich]);
+  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)]), rich, PROMPT_VERSION]);
   return { prompt: buildSummaryPrompt(g.prompt, tasks, req.depth, rich), hash };
 }
 async function explain(snap, req, deps) {

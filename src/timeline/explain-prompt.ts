@@ -24,13 +24,20 @@ function specificityRule(rich: boolean): string {
     : "";
 }
 
-function taskInstruction(depth: ExplainDepth): string {
+// Rich is the "explain it deeply" setting, so each labeled part earns more room; budget stays
+// tight. The Concept part keeps its own length either way.
+function partLen(rich: boolean): string {
+  return rich ? "two to four plain sentences" : "one or two plain sentences";
+}
+
+function taskInstruction(depth: ExplainDepth, rich: boolean): string {
+  const parts = partLen(rich);
   switch (depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, say what Claude did in this task and why.";
     case "teach":
       return [
-        "Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences, except the Concept, which gets the length noted there:",
+        `Explain this task for someone learning to code, in labeled parts, each on its own line starting with the label and a colon. Keep each part to ${parts}, except the Concept, which gets the length noted there:`,
         "What Claude did: name what the task actually accomplished.",
         "Why it mattered: the problem it solves or why it was worth doing.",
         "How it worked: the mechanism, in plain terms.",
@@ -38,7 +45,7 @@ function taskInstruction(depth: ExplainDepth): string {
       ].join("\n");
     default:
       return [
-        "Explain this task for a non-technical person, in labeled parts, each on its own line starting with the label and a colon. Keep each part to one or two plain sentences:",
+        `Explain this task for a non-technical person, in labeled parts, each on its own line starting with the label and a colon. Keep each part to ${parts}:`,
         "What Claude did: name what the task actually accomplished.",
         "Why it mattered: the problem it solves or why it was worth doing.",
         "How it worked: the mechanism, in plain terms.",
@@ -73,7 +80,7 @@ export function buildTaskExplainPrompt(taskName: string, lines: ReceiptLine[], d
     `Codey automatically grouped these steps from an AI coding agent and labeled the group "${taskName}". That label is a rough guess, not the agent's stated goal, so explain what the steps below actually accomplish and do not claim the agent did the wrong thing just because the steps differ from the label. These are the steps, with the agent's own reasoning:`,
     body,
     "",
-    `${taskInstruction(depth)}${specificityRule(rich)} ${SELF_CONTAINED} ${TAIL}`,
+    `${taskInstruction(depth, rich)}${specificityRule(rich)} ${SELF_CONTAINED} ${TAIL}`,
   ].join("\n");
 }
 

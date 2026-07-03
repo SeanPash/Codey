@@ -73,17 +73,23 @@ function summaryTasks(chunks: SessionSnapshot["chunks"]): SummaryTask[] {
 
 interface Located { prompt: string; hash: string; }
 
+// Bump this whenever the prompt wording changes in a way that should invalidate old cached
+// explanations. The cache keys on content, not prompt text, so without this a reader who already
+// generated a recap would keep seeing the old, shallower wording forever. v2 = richer walkthroughs.
+const PROMPT_VERSION = "v2";
+
 // Find what a request points at and build both its prompt and its content hash. Returns null
 // when the id does not resolve, so a stale browser id degrades to "nothing to show".
 function locate(snap: SessionSnapshot, req: ExplainRequest): Located | null {
-  // Rich is the default; only an explicit false selects the lean budget prompt. Richness is folded
-  // into every cache hash so a rich and a budget explanation never resolve to the same entry.
+  // Rich is the default; only an explicit false selects the lean budget prompt. Richness and the
+  // prompt version are folded into every cache hash so rich and budget never resolve to the same
+  // entry, and a prompt change invalidates stale cached text.
   const rich = req.rich !== false;
   if (req.scope === "task") {
     const c = snap.chunks.find((x) => x.id === req.id);
     if (!c) return null;
     const lines = c.receipt.workLines;
-    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth, rich), hash: hashContent([lines.map(lineKey), rich]) };
+    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth, rich), hash: hashContent([lines.map(lineKey), rich, PROMPT_VERSION]) };
   }
   if (req.scope === "action") {
     const parsed = parseActionId(req.id);
@@ -91,13 +97,13 @@ function locate(snap: SessionSnapshot, req: ExplainRequest): Located | null {
     const c = snap.chunks.find((x) => x.id === parsed.chunkId);
     const line = c?.receipt.workLines[parsed.index];
     if (!line) return null;
-    return { prompt: buildActionExplainPrompt(line, req.depth, rich), hash: hashContent([lineKey(line), rich]) };
+    return { prompt: buildActionExplainPrompt(line, req.depth, rich), hash: hashContent([lineKey(line), rich, PROMPT_VERSION]) };
   }
   // summary
   const g = snap.groups.find((x) => x.id === req.id);
   if (!g) return null;
   const tasks = summaryTasks(g.chunks);
-  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)]), rich]);
+  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)]), rich, PROMPT_VERSION]);
   return { prompt: buildSummaryPrompt(g.prompt, tasks, req.depth, rich), hash };
 }
 

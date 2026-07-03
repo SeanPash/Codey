@@ -100,9 +100,19 @@ function evidenceBlock(tasks: SummaryTask[], rich: boolean): string {
 }
 
 // The "What changed" section earns more room the more the prompt actually touched, so a small
-// tweak stays one tight sentence and a sprawling overhaul gets a real walkthrough. Other sections
-// stay short on purpose; length only helps where there is substance to explain.
-function whatChangedGuidance(fileCount: number): string {
+// tweak stays one tight sentence and a sprawling overhaul gets a real walkthrough. Rich mode is
+// the "explain it deeply" setting, so it asks for a markedly fuller walkthrough than budget at
+// every size; budget stays tight to keep the recap cheap. Other sections scale via secondaryLen.
+function whatChangedGuidance(fileCount: number, rich: boolean): string {
+  if (rich) {
+    if (fileCount >= 7) {
+      return "What changed: walk through what actually changed, grouped by area, in six to ten plain sentences, so a reader sees each main change and not a vague summary. Name the specific files, identifiers, and behaviors from the concrete changes above.";
+    }
+    if (fileCount >= 3) {
+      return "What changed: walk through what actually changed in four to six plain sentences, naming the specific files, identifiers, and behaviors from the concrete changes above.";
+    }
+    return "What changed: describe what actually changed in two to four plain sentences, naming the specific identifiers, values, or behaviors from the concrete changes above (or, if nothing changed, what Claude inspected or found).";
+  }
   if (fileCount >= 7) {
     return "What changed: the actual behavior that changed, in concrete terms, in three to five plain sentences that group the related changes so a reader sees the main areas touched.";
   }
@@ -110,6 +120,12 @@ function whatChangedGuidance(fileCount: number): string {
     return "What changed: the actual behavior that changed, in concrete terms, in two or three plain sentences.";
   }
   return "What changed: the actual behavior that changed, in concrete terms, in one or two plain sentences (or, if nothing changed, what Claude inspected or found).";
+}
+
+// How much room the secondary sections (Why it mattered, What's left) get. Rich is the deeper
+// setting, so it allows an extra sentence where there is substance; budget stays tight.
+function secondaryLen(rich: boolean): string {
+  return rich ? "one to three plain sentences" : "one or two plain sentences";
 }
 
 // In rich mode, push the recap to name the concrete things the evidence hands it (the real
@@ -121,14 +137,15 @@ function specificityRule(rich: boolean): string {
 }
 
 function instruction(depth: ExplainDepth, fileCount: number, rich: boolean): string {
-  const whatChanged = whatChangedGuidance(fileCount);
+  const whatChanged = whatChangedGuidance(fileCount, rich);
+  const secondary = secondaryLen(rich);
   const specifics = specificityRule(rich);
   switch (depth) {
     case "simple":
       return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found." + specifics;
     case "teach":
       return [
-        "Recap what Claude accomplished, for someone learning to code, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
+        `Recap what Claude accomplished, for someone learning to code, as an organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to ${secondary}, give the lengths noted below, no bullet characters:`,
         whatChanged,
         "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",
@@ -140,7 +157,7 @@ function instruction(depth: ExplainDepth, fileCount: number, rich: boolean): str
       ].join("\n");
     default:
       return [
-        "Recap what Claude accomplished for a non-technical person, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
+        `Recap what Claude accomplished for a non-technical person, as an organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to ${secondary}, give the lengths noted below, no bullet characters:`,
         whatChanged,
         "Why it mattered: what problem this solved or why it was worth doing.",
         "Files touched: the files from the evidence, comma separated.",

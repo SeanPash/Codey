@@ -83,6 +83,13 @@ describe("buildTaskExplainPrompt", () => {
     const p = buildTaskExplainPrompt("Rename the class", [l], "deep", false);
     expect(p).not.toContain(".stgl");
   });
+
+  it("asks for deeper parts in rich mode than budget", () => {
+    const rich = buildTaskExplainPrompt("X", [line()], "deep", true);
+    const budget = buildTaskExplainPrompt("X", [line()], "deep", false);
+    expect(budget).toContain("one or two plain sentences");
+    expect(rich).toContain("two to four plain sentences");
+  });
 });
 
 describe("buildActionExplainPrompt", () => {
