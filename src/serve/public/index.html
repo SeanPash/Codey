@@ -871,9 +871,8 @@
       autoopen: "1",          // auto-open the running task
       overhead: "1",          // show Codey's own token cost
       follow: "1",            // follow-live (persisted; was in-memory only)
-      sort: "recent",         // recent | tokens | saved
+      sort: "recent",         // recent | tasks | saved
       confirmdelete: "1",     // ask before deleting a terminal
-      showdismissed: "0",     // keep dismissed panes in the list
     };
     const settings = {};
     for (const k in SETTINGS_DEFAULTS) settings[k] = localStorage.getItem("codey-" + k) ?? SETTINGS_DEFAULTS[k];
@@ -965,7 +964,7 @@
       setSetting(key, val);
       if (key === "depth") { depth = val; localStorage.setItem("codey-depth", val); autoFired.clear(); applyMode(); if (lastSnap) renderSingle(lastSnap); }
       if (key === "gen") { genMode = val; localStorage.setItem("codey-gen", val); if (lastSnap) renderSingle(lastSnap); }
-      if (key === "sort" || key === "showdismissed") refreshRail();
+      if (key === "sort") refreshRail();
       if (key === "autoopen" || key === "overhead") { if (lastSnap) renderSingle(lastSnap); }
     }
     // Group renderers and extra wiring are defined in later tasks. Stubs keep the panel running.
@@ -1006,7 +1005,20 @@
             [["auto","Auto"],["saver","Manual"]], genMode || "auto")
         + `</div>`;
     }
-    function renderSessionsGroup() { return "<div class='sgrp'><h3>Sessions</h3></div>"; }
+    function renderSessionsGroup() {
+      return `<div class="sgrp"><h3>Sessions</h3><p class="gdesc">How the sidebar lists your terminals.</p>`
+        + segRow("Default sort", "Order of the sessions list, within each day.", "sort",
+            [["recent","Recent"],["tasks","Most tasks"],["saved","Saved first"]])
+        + swRow("Confirm before delete", "Ask first when deleting a terminal.", "confirmdelete")
+        + `</div>`;
+    }
+    // Sort a session list per the chosen order. "recent" keeps the server's mtime-desc order.
+    function sortSessions(list) {
+      const arr = list.slice();
+      if (settings.sort === "tasks") return arr.sort((a, b) => (b.taskCount || 0) - (a.taskCount || 0));
+      if (settings.sort === "saved") return arr.sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
+      return arr;
+    }
     function renderAboutGroup() { return "<div class='sgrp'><h3>About</h3></div>"; }
     function wireLiveControls(el) {
       el.querySelectorAll(".spreset[data-preset]").forEach((p) => p.addEventListener("click", () => {
@@ -1015,7 +1027,7 @@
       }));
     }
     function wireAboutControls(_el) { /* filled in Task 13 */ }
-    function refreshRail() { /* filled in Task 11 */ }
+    function refreshRail() { if (lastSessions && lastSessions.length) renderRailList(lastSessions); }
 
     // ---- Explanations: generated why/how and per-prompt summaries ----
     const explCache = new Map();   // "scope|id|depth" -> generated text (survives the live refresh)
@@ -1867,7 +1879,7 @@
         byDay.get(d).push(s);
       }
       const groups = days.map((d) => {
-        const rows = byDay.get(d);
+        const rows = sortSessions(byDay.get(d));
         return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
           + rows.map(sessRowHtml).join("");
       }).join("");
@@ -1909,7 +1921,8 @@
 
     async function deleteSession(id) {
       const s = lastSessions.find((x) => x.id === id);
-      if (!confirm("Delete " + (s ? s.name : "this terminal") + " from the timeline? This cannot be undone.")) return;
+      if (settings.confirmdelete === "1"
+          && !confirm("Delete " + (s ? s.name : "this terminal") + " from the timeline? This cannot be undone.")) return;
       try { await fetch("/api/session/" + encodeURIComponent(id), { method: "DELETE" }); } catch { /* refetch handles it */ }
       if (currentId === id) { currentId = null; pinned = false; }
       tickSingle();
