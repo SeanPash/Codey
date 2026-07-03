@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, utimesSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { latestSessionId, listSessions, dayBucket, turnInFlight, TURN_BACKSTOP_MS, THINKING_WINDOW_MS } from "./sessions.js";
+import { writeSaved } from "../store/session-saved-store.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -153,6 +154,20 @@ describe("listSessions", () => {
     const items = listSessions(dir, now);
     expect(items.find((s) => s.id === "real")?.acted).toBe(true);
     expect(items.find((s) => s.id === "prompted")?.acted).toBe(false);
+  });
+
+  it("includes the saved flag from the store", () => {
+    const now = Date.now();
+    const saved = join(dir, "saved-one");
+    mkdirSync(saved);
+    writeFileSync(join(saved, "events.jsonl"), '{"phase":"pre"}\n');
+    writeSaved(saved, true);
+    const plain = join(dir, "plain-one");
+    mkdirSync(plain);
+    writeFileSync(join(plain, "events.jsonl"), '{"phase":"pre"}\n');
+    const items = listSessions(dir, now);
+    expect(items.find((s) => s.id === "saved-one")?.saved).toBe(true);
+    expect(items.find((s) => s.id === "plain-one")?.saved).toBe(false);
   });
 
   // A terminal where the user only sent a prompt (e.g. just said "hi") shows up dimmed so it
