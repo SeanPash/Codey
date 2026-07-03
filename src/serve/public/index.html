@@ -776,6 +776,39 @@
     let renamingId = null;         // session id being renamed inline (pauses rail refresh)
     let statsCollapsed = localStorage.getItem("codey-stats-collapsed") === "1"; // sidebar collapse state
 
+    // ---- Settings: one place that reads, applies, and persists every preference ----
+    // Narration depth/summaries are NOT here: they keep their own null-until-seeded variables
+    // (depth, genMode) so a session still inherits its running mode. The panel reads those live.
+    const SETTINGS_DEFAULTS = {
+      theme: "system",        // system | dark | light
+      motion: "full",         // full | reduced
+      density: "comfortable", // comfortable | compact
+      textsize: "m",          // s | m | l
+      live: "follow",         // follow | saver  (the headline preset)
+      autoopen: "1",          // auto-open the running task
+      overhead: "1",          // show Codey's own token cost
+      follow: "1",            // follow-live (persisted; was in-memory only)
+      sort: "recent",         // recent | tokens | saved
+      confirmdelete: "1",     // ask before deleting a terminal
+      showdismissed: "0",     // keep dismissed panes in the list
+    };
+    const settings = {};
+    for (const k in SETTINGS_DEFAULTS) settings[k] = localStorage.getItem("codey-" + k) ?? SETTINGS_DEFAULTS[k];
+    function setSetting(key, val) {
+      settings[key] = val;
+      localStorage.setItem("codey-" + key, val);
+      applySettings();
+    }
+    // Pure-CSS switches: theme, motion, density and text size are attributes on <html>.
+    function applySettings() {
+      const r = document.documentElement;
+      r.dataset.theme = settings.theme;       // "system" leaves it to the media query
+      r.dataset.motion = settings.motion;
+      r.dataset.density = settings.density;
+      r.dataset.textsize = settings.textsize;
+    }
+    applySettings();
+
     // ---- Explanations: generated why/how and per-prompt summaries ----
     const explCache = new Map();   // "scope|id|depth" -> generated text (survives the live refresh)
     const explLoading = new Set(); // keys currently generating
