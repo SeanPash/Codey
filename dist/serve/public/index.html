@@ -712,6 +712,12 @@
     .dots { display:flex; gap:6px; } .dot { width:7px;height:7px;border-radius:50%;background:var(--surf-h);border:1px solid var(--line); }
     .dot.on { background:var(--ink2); border-color:var(--ink2); box-shadow:none; }
     .prange { font-size:11.5px; color:var(--ink2); font-weight:500; }
+    /* Active Terminals top bar: the pager (centered when present) plus a page-wide Detail control.
+       Detail is one switch for every pane here, since Rich/Budget is a global explanation setting.
+       The single view keeps its own copy in the hidden title row. */
+    .splitbar { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; flex:none; padding:2px 2px 0; }
+    .splitbar .pager { grid-column:2; }
+    .splitbar .sbdetail { grid-column:3; justify-self:end; }
 
     @keyframes beam { to { background-position:-200% 0; } }
 
@@ -1137,6 +1143,8 @@
     let genMode = localStorage.getItem("codey-gen");   // "auto" | "saver", null until seeded
     let lastSnap = null;           // last single-view snapshot, for re-render after a generation
     let liveNow = false;           // a session is actively running, so poll faster
+    let lastLiveCount = 0;         // running-terminal count last seen, to catch a second going live
+    let liveCountSeen = false;     // seed the baseline on the first read so a load never auto-switches
     const curDepth = () => depth || "deep";
     // Re-tint the whole page to the active narration mode by swapping <body data-mode>. Simple,
     // Deep and Teach each drive a different --accent, so the chrome reads as the mode you are in.
@@ -2263,7 +2271,9 @@
       lastSessions = sessions;
       if (!pinned && sessions[0]) currentId = sessions[0].id;
       const anyRunning = sessions.some((s) => s.running);
-      updateLiveBadge(sessions.filter((s) => s.running).length);
+      const liveCount = sessions.filter((s) => s.running).length;
+      updateLiveBadge(liveCount);
+      if (trackLiveCount(liveCount)) return; // a second terminal went live; now showing Active Terminals
       // Don't redraw the rail mid-rename or the input loses focus and the typed text.
       if (!renamingId) renderRail(sessions);
       // Only offer "Jump to live" when there is something live to jump to.
@@ -2313,6 +2323,19 @@
       tick();
     }
 
+    // Nudge a single-view user over to Active Terminals the first time a second terminal goes live,
+    // so both running terminals are in front of them. Edge-triggered on the rise into 2+ live: it
+    // fires once and then leaves the user wherever they navigate, so switching back to Single sticks
+    // (never frozen on the split). The first observed count only seeds the baseline, so opening the
+    // page with two already-live terminals does not yank the view. Returns true if it switched.
+    function trackLiveCount(n) {
+      const rose = liveCountSeen && view === "single" && lastLiveCount < 2 && n >= 2;
+      lastLiveCount = n;
+      liveCountSeen = true;
+      if (rose) { setView("split"); return true; }
+      return false;
+    }
+
     function updateLiveBadge(n) {
       document.getElementById("livecount").textContent = n;
       const wrap = document.getElementById("livewrap");
@@ -2334,7 +2357,9 @@
     // both auto-scroll at once.
     const paneFollow = {};       // sessionId -> bool (true = holds the single follow slot)
     const paneLiveGroupId = {};  // sessionId -> last live group id, to detect a fresh prompt
-    const paneFollowOn = (sid) => paneFollow[sid] === true;
+    // Token saver has no Follow live here, exactly like the single view's quiet now-strip: every
+    // follow read collapses to false, so no pane auto-scrolls and the toggle never lights up.
+    const paneFollowOn = (sid) => settings.live !== "saver" && paneFollow[sid] === true;
     // Each pane carries its own explanation depth so one terminal can read Simple while another
     // reads Deep, with no swapping. Absent -> fall back to that session's seed depth, then "deep".
     const paneDepth = {};        // sessionId -> "simple" | "deep" | "teach"
@@ -2407,10 +2432,13 @@
       renderDepth = null;
       // Per-pane Follow live toggle, shown only while the terminal is live. Off keeps the user's
       // scroll put; the "Jump to live" affordance below surfaces when new work lands out of view.
-      const followBtn = s.running
+      // Token saver drops both, matching the single view: no live-follow chrome, the timeline just
+      // fills in as work lands and the AI grouping is revealed once the prompt finishes.
+      const saver = settings.live === "saver";
+      const followBtn = s.running && !saver
         ? `<button class="pfollow${follow ? " on" : ""}" type="button" data-follow="${esc(sid)}">`
           + `<span class="fd"></span>${follow ? "Following" : "Follow live"}</button>` : "";
-      const jump = s.running
+      const jump = s.running && !saver
         ? `<button class="pjump" type="button" data-jump="${esc(sid)}" hidden>New live activity &#8595;</button>` : "";
       // This pane's own depth control: Simple/Deep/Teach, scoped to this terminal only.
       const dseg = (val, lab) => `<button class="${val === pd ? "on" : ""}" type="button" data-pdepth="${esc(sid)}" data-pd-val="${val}">${lab}</button>`;
@@ -2516,6 +2544,7 @@
     // the next new prompt lands somewhere. Operates on the full session list, not just the visible
     // page, so a live terminal on another page is still tracked.
     function reconcileAutoFollow(sessions) {
+      if (settings.live === "saver") return; // token saver: no auto-follow, matches the single view
       const newTurns = [];
       for (const s of sessions) {
         const sid = s.sessionId;
@@ -2559,15 +2588,26 @@
           + `<button class="nav" id="pg-next" type="button"${splitPage === pages ? " disabled" : ""}>&#8250;</button>`
           + `<span class="prange">Page ${splitPage} of ${pages}</span></div>`
         : "";
-      // Controls (pager + hidden tray) pinned above; the two panes fill the row below. A lone
-      // pane on the last page spans the full width instead of leaving an empty column.
+      // Page-wide Rich/Budget detail control. Explanation detail is a global setting, so one switch
+      // covers every pane here (the single view's copy lives in the title row, hidden on this page).
+      const isBudget = settings.explainmode === "budget";
+      const detailCtl = `<span class="pdepth sbdetail" title="How much real evidence feeds each explanation and recap, for every terminal here">`
+        + `<span class="pdl">Detail</span><span class="pseg">`
+        + `<button class="${!isBudget ? "on" : ""}" type="button" data-sdetail="rich">Rich</button>`
+        + `<button class="${isBudget ? "on" : ""}" type="button" data-sdetail="budget">Budget</button>`
+        + `</span></span>`;
+      // Controls (top bar: pager + Detail, then the hidden tray) pinned above; the two panes fill
+      // the row below. A lone pane on the last page spans the full width instead of leaving a gap.
       const solo = pageItems.length === 1 ? " solo" : "";
-      main.innerHTML = `<div class="splitwrap">${pager}${tray}<div class="tstack${solo}">${stack}</div></div>`;
+      main.innerHTML = `<div class="splitwrap"><div class="splitbar">${pager}${detailCtl}</div>${tray}<div class="tstack${solo}">${stack}</div></div>`;
 
       const prev = document.getElementById("pg-prev");
       const next = document.getElementById("pg-next");
       if (prev) prev.addEventListener("click", () => { splitPinned = true; splitPage--; renderSplit(lastLive); });
       if (next) next.addEventListener("click", () => { splitPinned = true; splitPage++; renderSplit(lastLive); });
+      // Rich/Budget switch: setDetail persists the choice and re-ticks, which re-renders these panes.
+      main.querySelectorAll("[data-sdetail]").forEach((b) =>
+        b.addEventListener("click", () => setDetail(b.dataset.sdetail)));
       wireSplitControls(main);
       wireCards(main, () => renderSplit(lastLive));
       wireGenerate(main, () => renderSplit(lastLive));
@@ -2591,6 +2631,7 @@
         const live = await (await fetch("/api/live" + (settings.live === "saver" ? "?saver=1" : ""))).json();
         if (view !== "split") return; // a view switch landed while this fetch was in flight
         lastLive = live;
+        trackLiveCount(live.liveCount); // keep the baseline fresh so a later 1->2 rise still fires
         renderSplit(lastLive);
       } catch { /* keep the last view on a transient error */ }
     }
