@@ -476,6 +476,13 @@
     .genbtn:hover { background:var(--inset); border-color:var(--muted); }
     .genbtn .ic { font-size:12px; }
     .genhint { font-size:10.5px; color:var(--muted); margin-top:8px; }
+    .genhint b { color:var(--ink2); font-weight:600; }
+    /* the rich/budget switch tucked under a generate button, so the detail tradeoff is discoverable
+       right where tokens get spent, not only buried in Settings */
+    .dswitchline { display:flex; align-items:center; gap:6px; margin-top:6px; font-size:10.5px; color:var(--muted); }
+    .dswitchline .ic { color:var(--muted); font-size:10px; }
+    .dswitch { font:inherit; font-size:10.5px; font-weight:600; color:var(--ink2); background:transparent; border:none; border-bottom:1px dashed var(--muted); padding:0 0 1px; cursor:pointer; }
+    .dswitch:hover { color:var(--ink); border-bottom-color:var(--ink); }
     .gening { font-size:12.5px; color:var(--body); display:inline-flex; align-items:center; gap:9px; }
     .expla .gening, .genwrap .gening, .recap .gening { margin-top:0; }
     /* generation spinner: neutral, not green - this is a generation wait, not a live step */
@@ -1205,6 +1212,31 @@
       }
     }
 
+    // Flip Rich/Budget detail from the header control or an inline hint, then refetch. Mirrors the
+    // Settings panel's explainmode branch: switching changes what every explanation says, so drop
+    // the auto-fired guard and re-tick so the snapshot returns the new detail level's cached text.
+    function setDetail(val) {
+      if (settings.explainmode === val) return;
+      setSetting("explainmode", val);
+      autoFired.clear();
+      tick();
+    }
+
+    // The hint under a generate button: what it makes and at which detail, plus a one-click switch
+    // between Rich and Budget. Putting it here makes the tradeoff discoverable at the moment a user
+    // spends tokens, instead of only in Settings. noun is "explanation" or "recap".
+    function genHint(noun) {
+      const rich = settings.explainmode !== "budget";
+      const cur = rich ? "Rich" : "Budget";
+      const other = rich ? "budget" : "rich";
+      const otherLabel = rich ? "Budget" : "Rich";
+      const pitch = rich
+        ? `for a leaner, cheaper ${noun}`
+        : `for ${noun}s grounded in the real edits and searches`;
+      return `<div class="genhint">Generates a ${esc(activeDepth())} ${noun} at <b>${cur}</b> detail. Uses your Codey tokens.`
+        + `<span class="dswitchline"><span class="ic">&#10022;</span> <button class="dswitch" type="button" data-detail="${other}">Switch to ${otherLabel}</button> ${pitch}.</span></div>`;
+    }
+
     function renderControls(snap) {
       const el = document.getElementById("tlctl");
       if (!el) return;
@@ -1216,6 +1248,8 @@
         + seg("simple", curDepth(), "Simple") + seg("deep", curDepth(), "Deep") + seg("teach", curDepth(), "Teach") + `</div></div>`
         + `<div class="ctlgrp"><span class="cl">Summaries</span><div class="seg" id="seg-gen">`
         + seg("auto", genMode, "Auto") + seg("saver", genMode, "Manual") + `</div></div>`
+        + `<div class="ctlgrp"><span class="cl">Detail</span><div class="seg" id="seg-detail">`
+        + seg("rich", settings.explainmode, "Rich") + seg("budget", settings.explainmode, "Budget") + `</div></div>`
         + cue;
       el.querySelectorAll("#seg-depth button").forEach((b) => b.addEventListener("click", () => {
         depth = b.dataset.val; localStorage.setItem("codey-depth", depth); autoFired.clear();
@@ -1226,6 +1260,7 @@
         genMode = b.dataset.val; localStorage.setItem("codey-gen", genMode);
         if (lastSnap) renderSingle(lastSnap);
       }));
+      el.querySelectorAll("#seg-detail button").forEach((b) => b.addEventListener("click", () => setDetail(b.dataset.val)));
     }
 
     // The generated why/how panel for an open task. Works in both the single view and the
@@ -1237,7 +1272,7 @@
       if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(activeDepth())} depth…</span></div>`;
       if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining.</div>`;
       return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#9670;</span> Explain this task</button>`
-        + `<div class="genhint">Generates a ${esc(activeDepth())} explanation. Uses your Codey tokens.</div></div>`;
+        + genHint("explanation") + `</div>`;
     }
 
     // The closing recap card for a prompt group.
@@ -1249,7 +1284,7 @@
       if (g.live) return `<div class="recap"><span class="pend">A recap appears here once Claude finishes this prompt.</span></div>`;
       if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached, so Codey paused explaining.</span></div>`;
       return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
-        + `<div class="genhint">Generates a ${esc(activeDepth())} recap. Uses your Codey tokens.</div></div>`;
+        + genHint("recap") + `</div>`;
     }
 
     // ---- Live NOW strip + Follow Live ----
@@ -2018,12 +2053,19 @@
       const shown = sessions.filter((s) =>
         (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q))
         && inDateRange(s) && (!savedFilter || s.saved));
-      let listHtml;
+      // The terminal you are viewing always pins to the very top, whatever the sort, so it never
+      // scrolls out of reach under Most tokens or Most tasks. It is pulled out of the grouped and
+      // ranked lists below so it is never listed twice. A current session hidden by the search,
+      // date, or Saved filter is simply not pinned, so filters still mean what they say.
+      const cur = currentId ? shown.find((s) => s.id === currentId) : null;
+      const rest = cur ? shown.filter((s) => s.id !== currentId) : shown;
+      const pinnedHtml = cur ? `<div class="dayhd">Current terminal</div>` + sessRowHtml(cur) : "";
+      let listHtml = "";
       if (settings.sort === "recent") {
         // Group by day, preserving the most-recent-first order the server already sorted by.
         const days = [];
         const byDay = new Map();
-        for (const s of shown) {
+        for (const s of rest) {
           const d = s.day || "Earlier";
           if (!byDay.has(d)) { byDay.set(d, []); days.push(d); }
           byDay.get(d).push(s);
@@ -2033,12 +2075,13 @@
           return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
             + rows.map(sessRowHtml).join("");
         }).join("");
-      } else {
+      } else if (rest.length) {
         // Any other sort applies across every terminal, not just within a day: one flat ranked list.
-        const rows = sortSessions(shown);
+        const rows = sortSessions(rest);
         listHtml = `<div class="dayhd">${esc(SORT_LABELS[settings.sort] || "Sorted")}<span class="dcount">${rows.length}</span></div>`
           + rows.map(sessRowHtml).join("");
       }
+      listHtml = pinnedHtml + listHtml;
       const emptyHtml = savedFilter
         ? `<div class="railempty"><span class="bmbig">${bmSvg()}</span><div class="et">No saved sessions yet</div>`
           + `<div class="eh">Click the bookmark on a session to save it here.</div></div>`
@@ -2139,6 +2182,10 @@
       scope.querySelectorAll("[data-gen-scope]").forEach((b) => b.addEventListener("click", (e) => {
         e.stopPropagation();
         generate(b.dataset.genScope, b.dataset.genId, rerender, b.dataset.genDepth);
+      }));
+      scope.querySelectorAll("[data-detail]").forEach((b) => b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setDetail(b.dataset.detail);
       }));
     }
 
