@@ -57,6 +57,14 @@ Session stats give you the shape of a run at a glance, and a token-breakdown cha
   <img src="assets/explain-step.png" alt="A step expanded with Explain this step, showing what Claude did and the exact command behind it, next to a full recap of what the task got done" width="900">
 </p>
 
+## Saved sessions
+
+The timeline isn't just for the run happening right now. A sessions sidebar lists every recent session grouped by day, so you can flip back to any of them and replay it step by step long after it finished. Search across them by name, filter by date, and star the ones worth keeping so a tap on **Saved** brings back just those.
+
+<p align="center">
+  <img src="assets/sessions-saved.png" alt="The sessions sidebar: a search box, a filter-by-date control, All and Saved tabs, and recent sessions grouped by day with a star to bookmark each one" width="300">
+</p>
+
 ## Three modes: simple, deep, teach
 
 Codey comes with three modes, and they're really one knob: how much you want to understand versus how many tokens you want to spend. Each one gives you a different depth of breakdown on the exact step Claude is doing, both in the terminal narration and on the timeline recaps.
@@ -81,6 +89,10 @@ Flip the depth toggle on the timeline and every recap rewrites itself to match, 
   <img src="assets/mode-teach.png" alt="The timeline in Teach depth, adding the files touched and a plain-language explanation of the concept behind the work" width="900">
   <br><em>Teach</em>
 </p>
+
+## Rich or Budget detail
+
+There's a second knob that sits next to every explanation and summary: **Detail**, set to either **Rich** or **Budget**. Where the mode decides how a recap is shaped, Detail decides how much goes into it. **Rich** grounds each explanation in the actual edits and searches Claude ran, so it names the real change instead of talking in general terms, and it spends a bit more to do that. **Budget** keeps things leaner and cheaper. Rich is the default, and you can flip it from the header or right where you click to generate, so the tradeoff is in front of you at the moment you're about to spend. Token Saver quietly drops to Budget for you.
 
 ## Live narration in your terminal
 
@@ -107,6 +119,24 @@ When something fires, the stuck task gets an amber bar with three choices: nudge
 <p align="center">
   <img src="assets/intervention.png" alt="A stuck task flagged with an amber bar reading Claude has tried the same step 6 times, offering three choices: nudge it to move on, try a different approach, or stop and ask me" width="900">
 </p>
+
+## Settings and Token Saver
+
+There's a settings panel behind the gear in the top corner for tuning how the timeline looks and behaves, all saved on your machine.
+
+**Appearance** covers the basics: dark or light theme, reduce motion to kill the live pulse and glow, relaxed or compact density, and a text-size scale for the whole page.
+
+<p align="center">
+  <img src="assets/settings-appearance.png" alt="The Settings Appearance panel: theme, reduce motion, density, and text size controls" width="760">
+</p>
+
+**Live and tokens** is where **Token Saver** lives, and it's worth calling out. Follow Live auto-scrolls to the newest step and refreshes fast, which is great to watch but does a bit more work. Token Saver flips that around: it stays quiet, holds off on auto-summaries, and reveals the whole prompt and its steps once the turn finishes. So you still get the full breakdown, just for fewer tokens, read after the fact instead of live.
+
+<p align="center">
+  <img src="assets/settings-live-tokens.png" alt="The Settings Live and tokens panel: Follow live versus Token saver, and an auto-open the live task toggle" width="760">
+</p>
+
+There are more panels for narration, sessions, and stats too, so you can dial in exactly how much Codey shows and spends.
 
 ## What it costs
 

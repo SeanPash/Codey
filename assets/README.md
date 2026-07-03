@@ -9,6 +9,9 @@ Screenshots used by the top-level [README](../README.md) and the [screenshot gal
 - `status-line.png` - the terminal status line while Codey is on (action on top, reason underneath).
 - `explain-step.png` - a step expanded with Explain this step, showing the raw command and a recap.
 - `sessions.png` - the sessions sidebar, recent sessions grouped by day.
+- `sessions-saved.png` - the sessions sidebar with search, filter-by-date, and the All/Saved (starred) tabs.
+- `settings-appearance.png` - the Settings Appearance panel (theme, reduce motion, density, text size).
+- `settings-live-tokens.png` - the Settings Live & tokens panel (Follow live vs Token saver, auto-open live task).
 - `active-terminals.png` - the Active Terminals view with two live session timelines side by side.
 - `token-breakdown.png` - the token-breakdown panel with a label next to each color (where the session's own tokens went).
 - `codey-overhead.png` - the Codey Overhead panel: what Codey itself spent, split across narration, timeline, and summaries.
