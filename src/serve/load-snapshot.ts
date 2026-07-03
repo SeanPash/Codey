@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { statSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { SessionStore, defaultRoot } from "../store/session-store.js";
 import { readMeta } from "../store/session-meta.js";
@@ -55,6 +55,24 @@ export function isRunning(dir: string, now: number, cancelledAt = 0): boolean {
   // newer than every other signal, treat it exactly like a finish and drop live now.
   if (cancelledAt > 0 && cancelledAt >= lastSignal) return false;
   return withinWindow || isThinking;
+}
+
+// Persist a token total for every session with work but no total yet, so "Most tokens" sorting works
+// before each session is opened. Safe and free: AI segmentation only fires for live turns, and this
+// touches completed sessions, so building each snapshot just reads and attributes what is already on
+// disk. Runs once at server start; opened sessions keep their total fresh on their own.
+export function backfillTokens(root: string = defaultRoot()): void {
+  let ids: string[] = [];
+  try { ids = readdirSync(root); } catch { return; }
+  for (const id of ids) {
+    try {
+      const dir = join(root, id);
+      if (!statSync(dir).isDirectory()) continue;
+      if (!existsSync(join(dir, "events.jsonl"))) continue;   // only sessions that did real work
+      if (existsSync(join(dir, "tokens.json"))) continue;     // already have a persisted total
+      loadSnapshot(id, root);                                  // writes tokens.json as a side effect
+    } catch { /* skip a session that fails to load */ }
+  }
 }
 
 export function loadSnapshot(sessionId: string, root: string = defaultRoot(), saver = false): SessionSnapshot {

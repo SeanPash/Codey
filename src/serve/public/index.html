@@ -164,6 +164,11 @@
     .fchip.on { background:var(--sel-dim); border-color:var(--sel); color:var(--ink); }
     .fchip svg { width:12px; height:13px; }
     .fchip .bmp { fill:var(--warn); stroke:var(--warn); stroke-width:1.4; stroke-linejoin:round; }
+    .railempty { text-align:center; padding:30px 16px; }
+    .railempty .bmbig svg { width:26px; height:28px; margin:0 auto 11px; display:block; }
+    .railempty .bmbig .bmp { fill:none; stroke:var(--faint); stroke-width:1.4; stroke-linejoin:round; }
+    .railempty .et { font-size:13px; color:var(--body); font-weight:500; }
+    .railempty .eh { font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.45; }
     .sess:hover { background:var(--surf-h); border-color:var(--hair); }
     /* Session color dots are quiet markers: desaturated so a column of them never reads as a
        rainbow. The live session overrides to a green pulse, and the active row brightens its dot. */
@@ -905,6 +910,8 @@
     for (const k in SETTINGS_DEFAULTS) settings[k] = localStorage.getItem("codey-" + k) ?? SETTINGS_DEFAULTS[k];
     // Theme used to offer System; it was dropped. Fold any stored "system" back to dark.
     if (settings.theme !== "light" && settings.theme !== "dark") settings.theme = "dark";
+    // "Saved first" sort was dropped (redundant with the Saved filter). Fold it back to Recent.
+    if (!["recent", "tokens", "tasks"].includes(settings.sort)) settings.sort = "recent";
     function setSetting(key, val) {
       settings[key] = val;
       localStorage.setItem("codey-" + key, val);
@@ -1050,8 +1057,8 @@
     }
     function renderSessionsGroup() {
       return `<div class="sgrp"><h3>Sessions</h3><p class="gdesc">How the sidebar lists your terminals.</p>`
-        + segRow("Default sort", "Recent groups by day. The others sort across all your terminals.", "sort",
-            [["recent","Recent"],["tokens","Most tokens"],["tasks","Most tasks"],["saved","Saved first"]])
+        + segRow("Default sort", "Recent groups by day. The others rank across all your sessions.", "sort",
+            [["recent","Recent"],["tokens","Most tokens"],["tasks","Most tasks"]])
         + swRow("Confirm before delete", "Ask first when deleting a terminal.", "confirmdelete")
         + `</div>`;
     }
@@ -1060,10 +1067,9 @@
       const arr = list.slice();
       if (settings.sort === "tokens") return arr.sort((a, b) => (b.tokens || 0) - (a.tokens || 0));
       if (settings.sort === "tasks") return arr.sort((a, b) => (b.taskCount || 0) - (a.taskCount || 0));
-      if (settings.sort === "saved") return arr.sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
       return arr;
     }
-    const SORT_LABELS = { tokens: "Most tokens", tasks: "Most tasks", saved: "Saved first" };
+    const SORT_LABELS = { tokens: "Most tokens", tasks: "Most tasks" };
     function renderAboutGroup() {
       return `<div class="sgrp"><h3>About</h3>`
         + `<p class="gdesc">Codey narrates a live Claude Code session in plain English and flags when it looks stuck.</p>`
@@ -1930,7 +1936,7 @@
       if (railWired) return;
       document.getElementById("rail").innerHTML =
         `<p class="rh">Sessions</p>`
-        + `<input class="railsearch" id="railsearch" type="search" placeholder="Search terminals" autocomplete="off" />`
+        + `<input class="railsearch" id="railsearch" type="search" placeholder="Search sessions" autocomplete="off" />`
         + `<details class="datefilter" id="datefilter"><summary id="datesummary">Filter by date</summary>`
         + `<div class="daterow">`
         + `<label class="dlab">From<input type="date" id="date-from" class="dinput" /></label>`
@@ -2005,9 +2011,11 @@
         listHtml = `<div class="dayhd">${esc(SORT_LABELS[settings.sort] || "Sorted")}<span class="dcount">${rows.length}</span></div>`
           + rows.map(sessRowHtml).join("");
       }
-      const empty = (q || dateFrom || dateTo || savedFilter)
-        ? (savedFilter ? "No bookmarked terminals yet." : "No terminals match.") : "No terminals yet.";
-      list.innerHTML = shown.length ? listHtml : `<p class="smeta" style="padding-left:3px">${empty}</p>`;
+      const emptyHtml = savedFilter
+        ? `<div class="railempty"><span class="bmbig">${bmSvg()}</span><div class="et">No saved sessions yet</div>`
+          + `<div class="eh">Click the bookmark on a session to save it here.</div></div>`
+        : `<div class="railempty"><div class="et">${(q || dateFrom || dateTo) ? "No sessions match" : "No sessions yet"}</div></div>`;
+      list.innerHTML = shown.length ? listHtml : emptyHtml;
 
       list.querySelectorAll(".sess").forEach((el) => {
         el.addEventListener("click", (e) => {

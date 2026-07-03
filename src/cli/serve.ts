@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { rmSync } from "node:fs";
 import { createServer } from "../serve/server.js";
 import { buildIdFrom } from "../serve/build-id.js";
-import { loadSnapshot, loadLive, loadNow, runExplain } from "../serve/load-snapshot.js";
+import { loadSnapshot, loadLive, loadNow, runExplain, backfillTokens } from "../serve/load-snapshot.js";
 import { recordIntervention } from "../intervene/record.js";
 import { listSessions } from "./sessions.js";
 import { defaultRoot } from "../store/session-store.js";
@@ -31,6 +31,10 @@ export function runServe(opts: { session?: string; port: number }): void {
   } catch {
     // Never block serving due to a prune failure.
   }
+
+  // Backfill per-session token totals in the background so "Most tokens" sorting works for sessions
+  // the user has not opened yet. Fire-and-forget: it must never delay the server coming up.
+  setImmediate(() => { try { backfillTokens(defaultRoot()); } catch { /* best-effort */ } });
 
   const server = createServer({
     pagePath: join(publicDir(), "index.html"),
