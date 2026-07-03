@@ -17,7 +17,7 @@ export type RouteResult =
   | { type: "delete"; id: string }
   | { type: "dismiss"; id: string }
   | { type: "restore"; id: string }
-  | { type: "live" }
+  | { type: "live"; saver: boolean }
   | { type: "font"; file: string }
   | { type: "notfound" };
 
@@ -39,7 +39,7 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (path === "/" || path === "/index.html") return { type: "page" };
     if (path === "/health") return { type: "health" };
     if (path === "/api/sessions") return { type: "sessions" };
-    if (path === "/api/live") return { type: "live" };
+    if (path === "/api/live") return { type: "live", saver: /[?&]saver=1(?:&|$)/.test(url) };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
     const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
@@ -85,7 +85,7 @@ export interface ServerDeps {
   listSessions: () => SessionListItem[];
   getSnapshot: (id: string, saver: boolean) => SessionSnapshot;
   getNow: (id: string) => unknown;
-  getLive: () => LiveSnapshot;
+  getLive: (saver: boolean) => LiveSnapshot;
   intervene: (id: string, action: string) => boolean;
   rename: (id: string, name: string) => boolean;
   setSaved: (id: string, saved: boolean) => boolean;
@@ -123,7 +123,7 @@ export function createServer(deps: ServerDeps): Server {
       } else if (route.type === "now") {
         sendJson(res, 200, deps.getNow(route.id));
       } else if (route.type === "live") {
-        sendJson(res, 200, deps.getLive());
+        sendJson(res, 200, deps.getLive(route.saver));
       } else if (route.type === "font") {
         const ct = route.file.endsWith(".woff2") ? "font/woff2" : "font/woff";
         res.writeHead(200, { "content-type": ct, "cache-control": "max-age=86400" });

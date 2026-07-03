@@ -37,7 +37,7 @@ describe("resolveRoute", () => {
   });
 
   it("routes the live endpoint", () => {
-    expect(resolveRoute("GET", "/api/live")).toEqual({ type: "live" });
+    expect(resolveRoute("GET", "/api/live")).toEqual({ type: "live", saver: false });
   });
 
   it("routes the health check", () => {

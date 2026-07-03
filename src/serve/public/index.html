@@ -2499,7 +2499,8 @@
     function tick() { if (view === "single") return tickSingle(); return tickSplit(); }
     async function tickSplit() {
       try {
-        const live = await (await fetch("/api/live")).json();
+        // Token saver defers each pane's live AI segmentation too, matching the single view.
+        const live = await (await fetch("/api/live" + (settings.live === "saver" ? "?saver=1" : ""))).json();
         if (view !== "split") return; // a view switch landed while this fetch was in flight
         lastLive = live;
         renderSplit(lastLive);

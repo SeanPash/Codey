@@ -45,7 +45,7 @@ export function runServe(opts: { session?: string; port: number }): void {
       if (!safeId(id)) throw new Error("invalid session id");
       return loadNow(id);
     },
-    getLive: () => loadLive(),
+    getLive: (saver) => loadLive(undefined, saver),
     intervene: (id, action) => safeId(id) && recordIntervention(id, action),
     rename: (id, name) => {
       if (!safeId(id)) return false;

@@ -158,14 +158,15 @@ export async function runExplain(sessionId: string, body: unknown, root: string 
 
 // Compact snapshot for Live Split: one entry per active session, already ordered most
 // recent prompt first. runningTool is the tool of a still-open pre-event (Claude is mid-call).
-export function loadLive(root: string = defaultRoot()): LiveSnapshot {
+export function loadLive(root: string = defaultRoot(), saver = false): LiveSnapshot {
   const all = selectActive(listSessions(root));
   const dismissed = readDismissed(root);
   // Hidden terminals the user dismissed: dropped from the grid but offered back for restore.
   const hidden = all.filter((s) => dismissed.has(s.id)).map((s) => ({ sessionId: s.id, name: s.name, color: s.color }));
   const active = all.filter((s) => !dismissed.has(s.id));
   const sessions: LiveSession[] = active.map((s) => {
-    const snap = loadSnapshot(s.id, root);
+    // Token saver defers each pane's live AI segmentation, the same as the single view.
+    const snap = loadSnapshot(s.id, root, saver);
     const events = new SessionStore(s.id, root).readAll();
     const last = events[events.length - 1];
     // listSessions reads only the statusline, so a cancelled turn still looks "thinking" to it.
