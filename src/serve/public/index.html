@@ -996,7 +996,16 @@
       }
       if (lastSnap) renderSingle(lastSnap);
     }
-    function renderNarrationGroup() { return "<div class='sgrp'><h3>Narration</h3></div>"; }
+    function renderNarrationGroup() {
+      // Reads the live depth/genMode (not a settings key) so it always matches the title-row control.
+      return `<div class="sgrp"><h3>Narration</h3>`
+        + `<p class="gdesc">Also on the title-row controls. Changing it here changes it there too.</p>`
+        + segRow("Default depth", "Simple is one line. Deep explains why. Teach teaches the concept.", "depth",
+            [["simple","Simple"],["deep","Deep"],["teach","Teach"]], curDepth())
+        + segRow("Summaries", "Auto generates a recap per prompt. Manual waits for a click.", "gen",
+            [["auto","Auto"],["saver","Manual"]], genMode || "auto")
+        + `</div>`;
+    }
     function renderSessionsGroup() { return "<div class='sgrp'><h3>Sessions</h3></div>"; }
     function renderAboutGroup() { return "<div class='sgrp'><h3>About</h3></div>"; }
     function wireLiveControls(el) {
