@@ -634,8 +634,8 @@
     .phead .pname { font-weight:600; font-size:12.5px; color:var(--ink); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .phead .pproj { font-size:10px; color:var(--body); background:var(--surf-h); border:1px solid var(--line); border-radius:5px; padding:1px 6px; }
     .phead .pwork { font-size:10px; color:var(--muted); } .phead .pwork b { color:var(--ink2); }
-    /* per-pane Depth control: a compact Simple/Deep/Teach segmented switch, scoped to this terminal
-       so one pane can read Simple while another reads Deep. Mirrors the single view's top control. */
+    /* per-pane control shell: a compact labelled segmented switch, scoped to this terminal. Used for
+       both Depth (Simple/Deep/Teach) and Detail (Rich/Budget), so one pane can differ from another. */
     .pdepth { flex:none; display:inline-flex; align-items:center; gap:6px; }
     .pdepth .pdl { font-size:8.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); font-weight:700; }
     .pseg { display:flex; background:var(--inset); border:1px solid var(--line); border-radius:7px; padding:2px; }
@@ -712,12 +712,10 @@
     .dots { display:flex; gap:6px; } .dot { width:7px;height:7px;border-radius:50%;background:var(--surf-h);border:1px solid var(--line); }
     .dot.on { background:var(--ink2); border-color:var(--ink2); box-shadow:none; }
     .prange { font-size:11.5px; color:var(--ink2); font-weight:500; }
-    /* Active Terminals top bar: the pager (centered when present) plus a page-wide Detail control.
-       Detail is one switch for every pane here, since Rich/Budget is a global explanation setting.
-       The single view keeps its own copy in the hidden title row. */
+    /* Active Terminals top bar: just the pager, centered. Depth and Detail live per pane, in each
+       terminal's own header, so one terminal can read Rich while another reads Budget. */
     .splitbar { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; flex:none; padding:2px 2px 0; }
     .splitbar .pager { grid-column:2; }
-    .splitbar .sbdetail { grid-column:3; justify-self:end; }
 
     @keyframes beam { to { background-position:-200% 0; } }
 
@@ -1073,17 +1071,23 @@
         setSetting("autoopen", "1"); setSetting("follow", "1"); setSetting("explainmode", "rich");
         followLive = true;
       }
-      if (lastSnap) renderSingle(lastSnap);
+      // Repaint the view the user is actually looking at, then refetch. Active Terminals used to fall
+      // through to renderSingle, so switching a preset there painted stale saver data for a beat until
+      // the next poll corrected it. Routing to the live view and re-ticking makes the switch land at
+      // once: the saver flag reshapes the /api/live payload, so a fresh fetch is what settles it.
+      if (view === "split") { if (lastLive) renderSplit(lastLive); }
+      else if (lastSnap) renderSingle(lastSnap);
+      tick();
     }
     function renderNarrationGroup() {
       // Reads the live depth/genMode (not a settings key) so it always matches the title-row control.
       return `<div class="sgrp"><h3>Narration</h3>`
         + `<p class="gdesc">How much Codey explains as Claude works, and whether it recaps each prompt.</p>`
-        + segRow("Default depth", "Simple is one line. Deep explains why. Teach teaches the concept.", "depth",
+        + segRow("Default depth", "Simple is one line. Deep explains why. Teach teaches the concept. In Active Terminals each terminal can override this.", "depth",
             [["simple","Simple"],["deep","Deep"],["teach","Teach"]], curDepth())
         + segRow("Summaries", "Auto generates a recap per prompt. Manual waits for a click.", "gen",
             [["auto","Auto"],["saver","Manual"]], genMode || "saver")
-        + segRow("Explanation detail", "Rich grounds each recap in the real edits and searches, so it names the actual change. Budget is leaner and cheaper.", "explainmode",
+        + segRow("Explanation detail", "Rich grounds each recap in the real edits and searches, so it names the actual change. Budget is leaner and cheaper. In Active Terminals each terminal sets its own.", "explainmode",
             [["rich","Rich"],["budget","Budget"]])
         + `</div>`;
     }
@@ -1155,6 +1159,12 @@
     // It is null in the single view and reset to null after each pane, so nothing leaks across panes.
     let renderDepth = null;
     const activeDepth = () => renderDepth || curDepth();
+    // Same idea as renderDepth, but for Rich/Budget. While an Active Terminals pane is built this
+    // holds that pane's detail, so richFlag (and every cache key) resolves at the pane's level, not
+    // the page default. Null outside a pane build, so the single view falls back to the global
+    // explainmode setting. This is what lets one terminal read Rich while another reads Budget.
+    let renderDetail = null;
+    const activeDetail = () => renderDetail || settings.explainmode;
     // The session an id belongs to. Active Terminals panes embed it as "<sid>~<id>"; the single
     // view uses bare positional ids (p1, c2), so they belong to whatever session is open now.
     // Folding the session into every cache key is what stops one session's recap or explanation
@@ -1162,15 +1172,18 @@
     const idSession = (id) => { const t = String(id).indexOf("~"); return t !== -1 ? String(id).slice(0, t) : (currentId || ""); };
     // "r" in rich mode, "b" in budget: folded into the cache key so a rich and a budget
     // explanation for the same row never overwrite each other in the client cache.
-    const richFlag = () => (settings.explainmode === "budget" ? "b" : "r");
-    const cacheKey = (scope, id, d) => idSession(id) + "|" + scope + "|" + id + "|" + d + "|" + richFlag();
+    const richFlag = () => (activeDetail() === "budget" ? "b" : "r");
+    // r is the rich flag ("r"/"b"). It is threaded explicitly, like depth, so an async generate
+    // handler (where renderDetail is already reset to null) still keys at the pane's detail. Omit it
+    // at render time and it resolves from richFlag, which reads the pane's detail via renderDetail.
+    const cacheKey = (scope, id, d, r) => idSession(id) + "|" + scope + "|" + id + "|" + d + "|" + (r || richFlag());
     const ekey = (scope, id) => cacheKey(scope, id, activeDepth());
     const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
     // The one-line skim echo for a finished prompt. A sectioned recap leads with "What changed:",
     // so drop that label and take the first line and sentence, keeping the echo a clean phrase.
     const echoText = (s) => firstSentence(String(s).replace(/^\s*what changed\s*:\s*/i, "").split(/\n/)[0]);
 
-    async function generate(scope, id, rerender, gdepth) {
+    async function generate(scope, id, rerender, gdepth, grich) {
       // Active Terminals namespaces ids as "<sessionId>~<chunkId>" so a button knows its own
       // session; the single view uses a bare id and the current session. Split on the first ~.
       let sessionId = currentId, serverId = id;
@@ -1178,17 +1191,19 @@
       if (tilde !== -1) { sessionId = id.slice(0, tilde); serverId = id.slice(tilde + 1); }
       if (!sessionId) return;
       const redraw = rerender || (() => { if (lastSnap) renderSingle(lastSnap); });
-      // The depth comes from the button that was clicked (a pane carries its own), not the live
-      // render context, which is null by the time this async click handler runs.
+      // Depth and detail both come from the button that was clicked (a pane carries its own), not the
+      // live render context, which is null by the time this async click handler runs. grich is "1"
+      // (Rich) or "0" (Budget); absent means the single view, which uses the global explainmode.
       const d = gdepth || curDepth();
-      const key = cacheKey(scope, id, d);
+      const rich = grich === undefined ? settings.explainmode !== "budget" : grich === "1";
+      const key = cacheKey(scope, id, d, rich ? "r" : "b");
       if (explCache.has(key) || explLoading.has(key)) return;
       explLoading.add(key);
       redraw();
       try {
         const res = await fetch("/api/session/" + encodeURIComponent(sessionId) + "/explain", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ scope, id: serverId, depth: d, rich: settings.explainmode !== "budget" }),
+          body: JSON.stringify({ scope, id: serverId, depth: d, rich }),
         });
         const data = await res.json();
         if (data && data.paused) budgetPaused = true;
@@ -1233,17 +1248,25 @@
     // The hint under a generate button: what it makes and at which detail, plus a one-click switch
     // between Rich and Budget. Putting it here makes the tradeoff discoverable at the moment a user
     // spends tokens, instead of only in Settings. noun is "explanation" or "recap".
-    function genHint(noun) {
-      const rich = settings.explainmode !== "budget";
+    function genHint(noun, sid) {
+      const rich = activeDetail() !== "budget";
       const cur = rich ? "Rich" : "Budget";
       const other = rich ? "budget" : "rich";
       const otherLabel = rich ? "Budget" : "Rich";
       const pitch = rich
         ? `for a leaner, cheaper ${noun}`
         : `for ${noun}s grounded in the real edits and searches`;
+      // In a pane the switch flips only that terminal's detail; in the single view it flips the
+      // global setting. sid is present only when this hint is rendered inside an Active Terminals pane.
+      const switchAttr = sid
+        ? `data-pdetail-switch="${esc(sid)}" data-pd-detail="${other}"`
+        : `data-detail="${other}"`;
       return `<div class="genhint">Generates a ${esc(activeDepth())} ${noun} at <b>${cur}</b> detail. Uses your Codey tokens.`
-        + `<span class="dswitchline"><span class="ic">&#10022;</span> <button class="dswitch" type="button" data-detail="${other}">Switch to ${otherLabel}</button> ${pitch}.</span></div>`;
+        + `<span class="dswitchline"><span class="ic">&#10022;</span> <button class="dswitch" type="button" ${switchAttr}>Switch to ${otherLabel}</button> ${pitch}.</span></div>`;
     }
+    // The pane a namespaced id belongs to, or null for a bare single-view id. Used to scope the
+    // Explain-hint's Rich/Budget switch and the generated buttons to one terminal.
+    const paneSidOf = (id) => (String(id).indexOf("~") !== -1 ? idSession(id) : null);
 
     function renderControls(snap) {
       const el = document.getElementById("tlctl");
@@ -1279,8 +1302,9 @@
       if (cached) return `<div class="expla"><div class="et">&#9670; Why &amp; how <span class="edepth">${esc(activeDepth())}</span></div><div class="expls">${sectionCards(cached, TASK_LABELS, null)}</div></div>`;
       if (explLoading.has(key)) return `<div class="genwrap"><span class="gening"><span class="spin"></span>Explaining at ${esc(activeDepth())} depth…</span></div>`;
       if (budgetPaused) return `<div class="gpaused">Budget reached, so Codey paused explaining.</div>`;
-      return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#9670;</span> Explain this task</button>`
-        + genHint("explanation") + `</div>`;
+      const sid = paneSidOf(id);
+      return `<div class="genwrap"><button class="genbtn" type="button" data-gen-scope="${scope}" data-gen-id="${esc(id)}" data-gen-depth="${esc(activeDepth())}" data-gen-rich="${richFlag() === "b" ? "0" : "1"}"><span class="ic">&#9670;</span> Explain this task</button>`
+        + genHint("explanation", sid) + `</div>`;
     }
 
     // The closing recap card for a prompt group.
@@ -1291,8 +1315,9 @@
       if (explLoading.has(key)) return `<div class="recap"><span class="gening"><span class="spin"></span>Summarizing this prompt…</span></div>`;
       if (g.live) return `<div class="recap"><span class="pend">A recap appears here once Claude finishes this prompt.</span></div>`;
       if (budgetPaused) return `<div class="recap"><span class="pend warn">Budget reached, so Codey paused explaining.</span></div>`;
-      return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}" data-gen-depth="${esc(activeDepth())}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
-        + genHint("recap") + `</div>`;
+      const sid = paneSidOf(g.id);
+      return `<div class="recap"><button class="genbtn" type="button" data-gen-scope="summary" data-gen-id="${esc(g.id)}" data-gen-depth="${esc(activeDepth())}" data-gen-rich="${richFlag() === "b" ? "0" : "1"}"><span class="ic">&#10022;</span> Summarize this prompt</button>`
+        + genHint("recap", sid) + `</div>`;
     }
 
     // ---- Live NOW strip + Follow Live ----
@@ -1504,7 +1529,7 @@
       if (l && l.explainable === false) return "";
       const key = ekey("action", c.id + "#" + idx);
       if (explCache.has(key) || explLoading.has(key) || budgetPaused) return "";
-      return `<button class="whybtn primary" type="button" data-gen-scope="action" data-gen-id="${esc(c.id + "#" + idx)}" data-gen-depth="${esc(activeDepth())}">Explain this step</button>`;
+      return `<button class="whybtn primary" type="button" data-gen-scope="action" data-gen-id="${esc(c.id + "#" + idx)}" data-gen-depth="${esc(activeDepth())}" data-gen-rich="${richFlag() === "b" ? "0" : "1"}">Explain this step</button>`;
     }
     // The generated why/how panel for a step: cached sections, a spinner, or a budget notice.
     function actionWhyOut(c, idx) {
@@ -2189,7 +2214,7 @@
     function wireGenerate(scope, rerender) {
       scope.querySelectorAll("[data-gen-scope]").forEach((b) => b.addEventListener("click", (e) => {
         e.stopPropagation();
-        generate(b.dataset.genScope, b.dataset.genId, rerender, b.dataset.genDepth);
+        generate(b.dataset.genScope, b.dataset.genId, rerender, b.dataset.genDepth, b.dataset.genRich);
       }));
       scope.querySelectorAll("[data-detail]").forEach((b) => b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -2364,6 +2389,10 @@
     // reads Deep, with no swapping. Absent -> fall back to that session's seed depth, then "deep".
     const paneDepth = {};        // sessionId -> "simple" | "deep" | "teach"
     const paneDepthOn = (sid, seed) => paneDepth[sid] || seed || "deep";
+    // Each pane also carries its own Rich/Budget detail, so one terminal can read grounded Rich
+    // explanations while another stays on lean Budget. Absent -> the global explainmode is the seed.
+    const paneDetail = {};       // sessionId -> "rich" | "budget"
+    const paneDetailOn = (sid) => paneDetail[sid] || settings.explainmode;
 
     async function dismissTerminal(id) {
       try { await fetch("/api/session/" + encodeURIComponent(id) + "/dismiss", { method: "POST" }); } catch { /* refetch handles it */ }
@@ -2407,6 +2436,7 @@
       const liveChunkId = s.running && liveChunks.length ? liveChunks[liveChunks.length - 1].id : null;
       const follow = paneFollowOn(sid);
       const pd = paneDepthOn(sid, s.seedDepth);
+      const pdet = paneDetailOn(sid);
       // Pseudo-snapshot for the shared card/group renderers: this pane's own live flag and live row.
       const lastFinite = groups.reduce((m, g) => Math.max(m, g.endTs < 1e15 ? g.endTs : g.startTs), 0) || Date.now();
       const pseudo = { live: s.running, lastActivityAt: lastFinite, liveChunkId };
@@ -2414,9 +2444,11 @@
       const paneWarn = s.running ? s.activeWarning : null;
       const paneBar = (c) => (paneWarn && c.id === liveChunkId ? paneWarn : null);
 
-      // Build this pane's body under its own depth so every Explain/Summarize block keys and labels
-      // at the pane's depth. Reset to null right after, so the next pane (or the single view) is clean.
+      // Build this pane's body under its own depth and detail so every Explain/Summarize block keys
+      // and labels at the pane's level. Reset both to null right after, so the next pane (or the
+      // single view) is clean.
       renderDepth = pd;
+      renderDetail = pdet;
       let body;
       if (groups.length) {
         body = `<div class="feed">`
@@ -2430,6 +2462,7 @@
         body = `<div class="pnote"><span class="pn1">Answered directly</span>No tools used for this prompt.</div>`;
       }
       renderDepth = null;
+      renderDetail = null;
       // Per-pane Follow live toggle, shown only while the terminal is live. Off keeps the user's
       // scroll put; the "Jump to live" affordance below surfaces when new work lands out of view.
       // Token saver drops both, matching the single view: no live-follow chrome, the timeline just
@@ -2444,10 +2477,15 @@
       const dseg = (val, lab) => `<button class="${val === pd ? "on" : ""}" type="button" data-pdepth="${esc(sid)}" data-pd-val="${val}">${lab}</button>`;
       const depthCtl = `<span class="pdepth"><span class="pdl">Depth</span><span class="pseg">`
         + dseg("simple", "Simple") + dseg("deep", "Deep") + dseg("teach", "Teach") + `</span></span>`;
+      // And its own Rich/Budget detail control, scoped the same way, so each terminal trades tokens
+      // for grounded explanations independently.
+      const xseg = (val, lab) => `<button class="${val === pdet ? "on" : ""}" type="button" data-pdetail="${esc(sid)}" data-pdet-val="${val}">${lab}</button>`;
+      const detailCtl = `<span class="pdepth"><span class="pdl">Detail</span><span class="pseg">`
+        + xseg("rich", "Rich") + xseg("budget", "Budget") + `</span></span>`;
       return `<div class="${cls}" data-sid="${esc(sid)}"><div class="phead">`
         + `<span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>`
         + `<span class="pname">${esc(s.name)}</span>${proj}${pill}`
-        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${depthCtl}${followBtn}${dismissBtn}</div>`
+        + `<span class="pwork"><b>${fmt(s.workTotal)}</b> tokens</span>${depthCtl}${detailCtl}${followBtn}${dismissBtn}</div>`
         + `<div class="pbody" data-sid="${esc(sid)}">${body}</div>${jump}</div>`;
     }
 
@@ -2520,11 +2558,23 @@
       paneDepth[sid] = d;
       renderSplit(lastLive);
     }
+    // Switch one pane's Rich/Budget detail and re-render so its explanations re-key at the new detail.
+    // A flipped pane shows Explain/Summarize buttons for text it has not generated at this detail yet;
+    // clicking pulls it (the server returns disk-cached text for free when it already exists).
+    function setPaneDetail(sid, val) {
+      if (paneDetailOn(sid) === val) return;
+      paneDetail[sid] = val;
+      renderSplit(lastLive);
+    }
     // Wire each pane's follow toggle, jump button, and scroll/wheel behaviour. A deliberate scroll
     // up in a pane means "let me read", so it parks that pane (and only that pane).
     function wirePanes(main) {
       main.querySelectorAll("[data-pdepth]").forEach((b) =>
         b.addEventListener("click", (e) => { e.stopPropagation(); setPaneDepth(b.dataset.pdepth, b.dataset.pdVal); }));
+      main.querySelectorAll("[data-pdetail]").forEach((b) =>
+        b.addEventListener("click", (e) => { e.stopPropagation(); setPaneDetail(b.dataset.pdetail, b.dataset.pdetVal); }));
+      main.querySelectorAll("[data-pdetail-switch]").forEach((b) =>
+        b.addEventListener("click", (e) => { e.stopPropagation(); setPaneDetail(b.dataset.pdetailSwitch, b.dataset.pdDetail); }));
       main.querySelectorAll("[data-follow]").forEach((b) =>
         b.addEventListener("click", (e) => { e.stopPropagation(); setPaneFollow(b.dataset.follow, !paneFollowOn(b.dataset.follow)); }));
       main.querySelectorAll("[data-jump]").forEach((b) =>
@@ -2588,26 +2638,15 @@
           + `<button class="nav" id="pg-next" type="button"${splitPage === pages ? " disabled" : ""}>&#8250;</button>`
           + `<span class="prange">Page ${splitPage} of ${pages}</span></div>`
         : "";
-      // Page-wide Rich/Budget detail control. Explanation detail is a global setting, so one switch
-      // covers every pane here (the single view's copy lives in the title row, hidden on this page).
-      const isBudget = settings.explainmode === "budget";
-      const detailCtl = `<span class="pdepth sbdetail" title="How much real evidence feeds each explanation and recap, for every terminal here">`
-        + `<span class="pdl">Detail</span><span class="pseg">`
-        + `<button class="${!isBudget ? "on" : ""}" type="button" data-sdetail="rich">Rich</button>`
-        + `<button class="${isBudget ? "on" : ""}" type="button" data-sdetail="budget">Budget</button>`
-        + `</span></span>`;
-      // Controls (top bar: pager + Detail, then the hidden tray) pinned above; the two panes fill
-      // the row below. A lone pane on the last page spans the full width instead of leaving a gap.
+      // Detail (Rich/Budget) lives per pane now, in each terminal's header next to Depth, so the top
+      // bar just carries the pager. A lone pane on the last page spans the full width, no gap.
       const solo = pageItems.length === 1 ? " solo" : "";
-      main.innerHTML = `<div class="splitwrap"><div class="splitbar">${pager}${detailCtl}</div>${tray}<div class="tstack${solo}">${stack}</div></div>`;
+      main.innerHTML = `<div class="splitwrap"><div class="splitbar">${pager}</div>${tray}<div class="tstack${solo}">${stack}</div></div>`;
 
       const prev = document.getElementById("pg-prev");
       const next = document.getElementById("pg-next");
       if (prev) prev.addEventListener("click", () => { splitPinned = true; splitPage--; renderSplit(lastLive); });
       if (next) next.addEventListener("click", () => { splitPinned = true; splitPage++; renderSplit(lastLive); });
-      // Rich/Budget switch: setDetail persists the choice and re-ticks, which re-renders these panes.
-      main.querySelectorAll("[data-sdetail]").forEach((b) =>
-        b.addEventListener("click", () => setDetail(b.dataset.sdetail)));
       wireSplitControls(main);
       wireCards(main, () => renderSplit(lastLive));
       wireGenerate(main, () => renderSplit(lastLive));
