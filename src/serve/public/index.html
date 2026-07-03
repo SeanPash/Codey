@@ -410,8 +410,8 @@
     /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
        in green with a soft glow - unmistakably the live element on the page. */
     .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
-      background:linear-gradient(180deg,#0e1a15,#0b1410); border:1px solid var(--live-dim); border-radius:12px;
-      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(52,211,153,.10); }
+      background:var(--now-bg); border:1px solid var(--live-dim); border-radius:12px;
+      padding:11px 14px; box-shadow:var(--now-shadow); }
     .nowstrip .nowtop { display:flex; align-items:center; gap:10px; }
     .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#0b1410;
       font-weight:800; display:inline-flex; align-items:center; gap:6px; flex:none;
@@ -739,6 +739,13 @@
     .stgl::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--muted);transition:.15s;}
     .stgl.on{background:var(--live-deep);border-color:var(--live);}
     .stgl.on::after{left:19px;background:var(--live);}
+    .spresets{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 4px;}
+    .spreset{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--inset);cursor:pointer;}
+    .spreset.on{border-color:var(--live);background:var(--live-deep);}
+    .spreset .pt{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;color:var(--ink);}
+    .spreset .pt .dot{width:7px;height:7px;border-radius:50%;background:var(--live);}
+    .spreset.saver .pt .dot{background:var(--warn);}
+    .spreset .pp{font-size:12px;color:var(--body);margin:7px 0 0;line-height:1.45;}
 
     /* Reduce motion: kill the ambient pulse/glow animations. */
     :root[data-motion="reduced"] * { animation: none !important; }
@@ -959,13 +966,45 @@
       if (key === "depth") { depth = val; localStorage.setItem("codey-depth", val); autoFired.clear(); applyMode(); if (lastSnap) renderSingle(lastSnap); }
       if (key === "gen") { genMode = val; localStorage.setItem("codey-gen", val); if (lastSnap) renderSingle(lastSnap); }
       if (key === "sort" || key === "showdismissed") refreshRail();
+      if (key === "autoopen" || key === "overhead") { if (lastSnap) renderSingle(lastSnap); }
     }
     // Group renderers and extra wiring are defined in later tasks. Stubs keep the panel running.
-    function renderLiveGroup() { return "<div class='sgrp'><h3>Live &amp; tokens</h3></div>"; }
+    function renderLiveGroup() {
+      const card = (val, cls, title, body) =>
+        `<div class="spreset ${cls} ${settings.live === val ? "on" : ""}" data-preset="${val}">`
+        + `<div class="pt"><span class="dot"></span>${title}</div><p class="pp">${body}</p></div>`;
+      return `<div class="sgrp"><h3>Live &amp; tokens</h3>`
+        + `<p class="gdesc">Watch it happen live, or save tokens and read the finished story.</p>`
+        + `<div class="spresets">`
+        + card("follow", "", "Follow live", "Auto-scrolls to the newest step, auto-opens the running task, fast refresh.")
+        + card("saver", "saver", "Token saver", "Stays quiet, reveals the whole prompt and its tasks once the turn finishes. No auto-summaries.")
+        + `</div>`
+        + swRow("Auto-open the live task", "Expands the running task so its current step shows.", "autoopen")
+        + swRow("Show Codey's own token cost", "The overhead footer: what narration and summaries spent.", "overhead")
+        + `</div>`;
+    }
+    // A preset is a bundle: choosing it seeds the individual toggles, which stay adjustable after.
+    // It also drives the existing genMode (summaries) so token-saver truly stops auto-generation.
+    function applyPreset(preset) {
+      setSetting("live", preset);
+      if (preset === "saver") {
+        setSetting("autoopen", "0"); setSetting("follow", "0");
+        followLive = false; genMode = "saver"; localStorage.setItem("codey-gen", "saver");
+      } else {
+        setSetting("autoopen", "1"); setSetting("follow", "1");
+        followLive = true; genMode = "auto"; localStorage.setItem("codey-gen", "auto");
+      }
+      if (lastSnap) renderSingle(lastSnap);
+    }
     function renderNarrationGroup() { return "<div class='sgrp'><h3>Narration</h3></div>"; }
     function renderSessionsGroup() { return "<div class='sgrp'><h3>Sessions</h3></div>"; }
     function renderAboutGroup() { return "<div class='sgrp'><h3>About</h3></div>"; }
-    function wireLiveControls(_el) { /* filled in Task 9 */ }
+    function wireLiveControls(el) {
+      el.querySelectorAll(".spreset[data-preset]").forEach((p) => p.addEventListener("click", () => {
+        applyPreset(p.dataset.preset);
+        renderSettings();
+      }));
+    }
     function wireAboutControls(_el) { /* filled in Task 13 */ }
     function refreshRail() { /* filled in Task 11 */ }
 
@@ -1098,7 +1137,7 @@
     }
 
     // ---- Live NOW strip + Follow Live ----
-    let followLive = true;   // when live, keep the newest activity in view
+    let followLive = settings.follow === "1";   // persisted; token-saver turns it off
     let nowState = null;     // last /now payload, for re-rendering the strip on toggle
     let lastLiveGroupId = null; // the live prompt group last seen, so a new prompt re-engages follow
 
@@ -1134,6 +1173,8 @@
 
     function setFollow(on) {
       followLive = on;
+      settings.follow = on ? "1" : "0";
+      localStorage.setItem("codey-follow", settings.follow);
       renderNow(nowState);
       // Reflect the followed anchor right away without a full re-render.
       document.querySelectorAll(".grp.live").forEach((el) => el.classList.toggle("following", on));
@@ -1673,7 +1714,9 @@
         + `<div><div class="ovtok">${kfmt(t.tokens)}<small>tok</small></div>`
         + `<div class="ovcost">${approxCost(t.costUsd)}</div></div>`
         + `</div>`;
-      const overheadCard = ov.total.calls === 0
+      const overheadCard = settings.overhead !== "1"
+        ? ""
+        : ov.total.calls === 0
         ? `<div class="scard"><div class="tokhd"><span class="k">Codey overhead</span></div>`
           + `<div class="toksub">What Codey itself cost this session</div>`
           + `<div class="tokempty">Nothing yet. Codey narrates as Claude works.</div></div>`
@@ -1879,7 +1922,7 @@
       // prompt's trailing step: a fresh group has no tasks yet, so nothing reads as "running now".
       const liveGroup = groups.find((g) => g.live);
       const liveChunks = liveGroup ? liveGroup.chunks : (groups.length ? [] : chunks);
-      liveOpenId = snap.live && liveChunks.length ? liveChunks[liveChunks.length - 1].id : null;
+      liveOpenId = (settings.autoopen === "1" && snap.live && liveChunks.length) ? liveChunks[liveChunks.length - 1].id : null;
       // A fresh prompt re-engages Follow Live: if the live group changed since the last render,
       // the user just sent a new prompt, so snap back to following its work even if they had
       // scrolled up to read the previous turn.
