@@ -759,6 +759,9 @@
     .spreset .pt .dot{width:7px;height:7px;border-radius:50%;background:var(--live);}
     .spreset.saver .pt .dot{background:var(--warn);}
     .spreset .pp{font-size:12px;color:var(--body);margin:7px 0 0;line-height:1.45;}
+    .sresetbtn{flex-shrink:0;background:none;border:1px solid var(--line);color:var(--body);font:inherit;
+      font-size:12.5px;padding:6px 14px;border-radius:8px;cursor:pointer;}
+    .sresetbtn:hover{border-color:var(--coral);color:var(--coral);}
 
     /* Reduce motion: kill the ambient pulse/glow animations. */
     :root[data-motion="reduced"] * { animation: none !important; }
@@ -899,6 +902,12 @@
       localStorage.setItem("codey-" + key, val);
       applySettings();
     }
+    // Restore the panel's own settings to their defaults. Bookmarks are server-side data, not a
+    // preference here, so they are untouched.
+    function resetSettings() {
+      for (const k in SETTINGS_DEFAULTS) { localStorage.removeItem("codey-" + k); settings[k] = SETTINGS_DEFAULTS[k]; }
+      applySettings();
+    }
     // Pure-CSS switches: theme, motion, density and text size are attributes on <html>.
     function applySettings() {
       const r = document.documentElement;
@@ -1035,14 +1044,38 @@
       if (settings.sort === "saved") return arr.sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
       return arr;
     }
-    function renderAboutGroup() { return "<div class='sgrp'><h3>About</h3></div>"; }
+    function renderAboutGroup() {
+      // knownBuild is the /health build id; in dev it is a path, so show its last segment.
+      const b = knownBuild ? String(knownBuild).split(/[\\/]/).pop() : "";
+      return `<div class="sgrp"><h3>About</h3>`
+        + `<p class="gdesc">Codey timeline${b ? " &middot; build " + esc(b) : ""}.</p>`
+        + `<div class="srow"><div class="srmeta"><div class="rt">Reset all settings</div>`
+        + `<div class="rd">Restores every setting on this page to its default. Does not touch your bookmarks.</div></div>`
+        + `<button class="sresetbtn" id="reset-settings" type="button">Reset</button></div>`
+        + `</div>`;
+    }
     function wireLiveControls(el) {
       el.querySelectorAll(".spreset[data-preset]").forEach((p) => p.addEventListener("click", () => {
         applyPreset(p.dataset.preset);
         renderSettings();
       }));
     }
-    function wireAboutControls(_el) { /* filled in Task 13 */ }
+    function wireAboutControls(el) {
+      const rb = el.querySelector("#reset-settings");
+      if (!rb) return;
+      rb.addEventListener("click", () => {
+        resetSettings();
+        // Narration lives in its own null-until-seeded vars; clear them too so reset is honest,
+        // then let the next render re-seed them from the open session's mode.
+        localStorage.removeItem("codey-depth"); localStorage.removeItem("codey-gen");
+        depth = null; genMode = null;
+        followLive = settings.follow === "1";
+        applyMode();
+        if (lastSnap) renderSingle(lastSnap);
+        refreshRail();
+        renderSettings();
+      });
+    }
     function refreshRail() { if (lastSessions && lastSessions.length) renderRailList(lastSessions); }
 
     // ---- Explanations: generated why/how and per-prompt summaries ----
