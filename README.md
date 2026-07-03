@@ -90,6 +90,10 @@ Flip the depth toggle on the timeline and every recap rewrites itself to match, 
   <br><em>Teach</em>
 </p>
 
+## Rich or Budget detail
+
+There's a second knob that sits next to every explanation and summary: **Detail**, set to either **Rich** or **Budget**. Where the mode decides how a recap is shaped, Detail decides how much goes into it. **Rich** grounds each explanation in the actual edits and searches Claude ran, so it names the real change instead of talking in general terms, and it spends a bit more to do that. **Budget** keeps things leaner and cheaper. Rich is the default, and you can flip it from the header or right where you click to generate, so the tradeoff is in front of you at the moment you're about to spend. Token Saver quietly drops to Budget for you.
+
 ## Live narration in your terminal
 
 If you turn on a mode, the bottom of your terminal becomes a two-line readout: the current step on top, the plain-English reason for it underneath. It updates as Claude works, so a glance tells you whether things are on track, and when a turn ends it settles into a short recap and points you at the full timeline. At the lightest setting it costs almost nothing, and you choose how much it says.
