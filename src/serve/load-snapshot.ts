@@ -6,6 +6,7 @@ import { readPrompts } from "../capture/prompts.js";
 import { readTranscriptTurns, readFirstPrompt, readUserPrompts, readLastInterrupt, type UserPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
 import { readCustomName } from "../store/session-name-store.js";
+import { writeTokens } from "../store/session-tokens-store.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import { readSpend } from "../cost/spend-log.js";
@@ -111,6 +112,9 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   // flat cachedExplanations map carries the rest (other depths, action-level) so the browser can
   // repaint everything the user ever clicked, even after a tab close or in a fresh session.
   const filled = fillCachedExplanations(withMeta, seedDepth, root);
+  // Persist the session's work-token total so the sidebar can sort by "Most tokens" cheaply,
+  // without every poll reparsing the transcript. The heavy work is already done above.
+  try { writeTokens(store.dir, filled.workTotal || 0); } catch { /* sorting is best-effort */ }
   return { ...filled, cachedExplanations: collectCachedExplanations(filled, root) };
 }
 

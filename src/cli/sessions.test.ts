@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { latestSessionId, listSessions, dayBucket, turnInFlight, TURN_BACKSTOP_MS, THINKING_WINDOW_MS } from "./sessions.js";
 import { writeSaved } from "../store/session-saved-store.js";
+import { writeTokens } from "../store/session-tokens-store.js";
 
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), "codey-")); });
@@ -168,6 +169,20 @@ describe("listSessions", () => {
     const items = listSessions(dir, now);
     expect(items.find((s) => s.id === "saved-one")?.saved).toBe(true);
     expect(items.find((s) => s.id === "plain-one")?.saved).toBe(false);
+  });
+
+  it("includes the persisted token total (0 when never opened)", () => {
+    const now = Date.now();
+    const withTok = join(dir, "tok-one");
+    mkdirSync(withTok);
+    writeFileSync(join(withTok, "events.jsonl"), '{"phase":"pre"}\n');
+    writeTokens(withTok, 4200);
+    const noTok = join(dir, "notok-one");
+    mkdirSync(noTok);
+    writeFileSync(join(noTok, "events.jsonl"), '{"phase":"pre"}\n');
+    const items = listSessions(dir, now);
+    expect(items.find((s) => s.id === "tok-one")?.tokens).toBe(4200);
+    expect(items.find((s) => s.id === "notok-one")?.tokens).toBe(0);
   });
 
   // A terminal where the user only sent a prompt (e.g. just said "hi") shows up dimmed so it
