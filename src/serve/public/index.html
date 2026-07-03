@@ -59,16 +59,6 @@
       --sel:#2f6fb0; --sel-dim:#bcd4ec;
       --now-bg:linear-gradient(180deg,#eafaf3,#dff5ec); --now-shadow:0 6px 18px rgba(18,168,119,.14);
     }
-    @media (prefers-color-scheme: light) {
-      :root[data-theme="system"] {
-        --bg:#f6f7f9; --surf:#ffffff; --surf-h:#eef1f5; --line:#dde2e9; --hair:#e7ebf0; --inset:#f0f2f6;
-        --ink:#1a1f27; --ink2:#39414d; --body:#5a6472; --muted:#818b99; --faint:#b7bfca;
-        --live:#12a877; --live-ink:#0c7d58; --live-dim:#8fd9bf; --live-deep:#d6f0e6;
-        --warn:#b9791a; --coral:#d1462f;
-        --sel:#2f6fb0; --sel-dim:#bcd4ec;
-        --now-bg:linear-gradient(180deg,#eafaf3,#dff5ec); --now-shadow:0 6px 18px rgba(18,168,119,.14);
-      }
-    }
     body.split { --titlerow:0px; --head:52px; }
     * { box-sizing:border-box; }
     body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink);
@@ -866,7 +856,7 @@
     // Narration depth/summaries are NOT here: they keep their own null-until-seeded variables
     // (depth, genMode) so a session still inherits its running mode. The panel reads those live.
     const SETTINGS_DEFAULTS = {
-      theme: "dark",          // dark | light | system (Codey is dark by heritage; System follows the OS)
+      theme: "dark",          // dark | light
       motion: "full",         // full | reduced
       density: "comfortable", // comfortable | compact
       textsize: "m",          // s | m | l
@@ -880,6 +870,8 @@
     };
     const settings = {};
     for (const k in SETTINGS_DEFAULTS) settings[k] = localStorage.getItem("codey-" + k) ?? SETTINGS_DEFAULTS[k];
+    // Theme used to offer System; it was dropped. Fold any stored "system" back to dark.
+    if (settings.theme !== "light" && settings.theme !== "dark") settings.theme = "dark";
     function setSetting(key, val) {
       settings[key] = val;
       localStorage.setItem("codey-" + key, val);
@@ -930,12 +922,12 @@
       const groups = {
         appearance: () =>
           `<div class="sgrp"><h3>Appearance</h3><p class="gdesc">How the timeline looks on this machine.</p>`
-          + segRow("Theme", "System follows your OS light/dark setting.", "theme",
-              [["system","System"],["dark","Dark"],["light","Light"]])
+          + segRow("Theme", "Dark is Codey's default. Light is easier in a bright room.", "theme",
+              [["dark","Dark"],["light","Light"]])
           + segRow("Reduce motion", "Turns off the live pulse and ambient glow.", "motion",
               [["full","Off"],["reduced","On"]])
           + segRow("Density", "Compact tightens row spacing.", "density",
-              [["comfortable","Comfortable"],["compact","Compact"]])
+              [["comfortable","Relaxed"],["compact","Compact"]])
           + segRow("Text size", "Scales the whole page.", "textsize",
               [["s","S"],["m","M"],["l","L"]])
           + `</div>`,
