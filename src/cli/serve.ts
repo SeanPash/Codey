@@ -9,6 +9,7 @@ import { listSessions } from "./sessions.js";
 import { defaultRoot } from "../store/session-store.js";
 import { pruneEventless } from "../store/session-prune.js";
 import { writeCustomName } from "../store/session-name-store.js";
+import { writeSaved } from "../store/session-saved-store.js";
 import { dismiss, restore } from "../store/dismissed-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -50,6 +51,15 @@ export function runServe(opts: { session?: string; port: number }): void {
       if (!safeId(id)) return false;
       try {
         writeCustomName(join(defaultRoot(), id), name);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    setSaved: (id, saved) => {
+      if (!safeId(id)) return false;
+      try {
+        writeSaved(join(defaultRoot(), id), saved);
         return true;
       } catch {
         return false;

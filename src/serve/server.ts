@@ -12,6 +12,7 @@ export type RouteResult =
   | { type: "now"; id: string }
   | { type: "intervene"; id: string }
   | { type: "rename"; id: string }
+  | { type: "save"; id: string }
   | { type: "explain"; id: string }
   | { type: "delete"; id: string }
   | { type: "dismiss"; id: string }
@@ -51,6 +52,8 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (mi) { const id = decodeId(mi[1]); return id == null ? { type: "notfound" } : { type: "intervene", id }; }
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
     if (mn) { const id = decodeId(mn[1]); return id == null ? { type: "notfound" } : { type: "rename", id }; }
+    const msave = /^\/api\/session\/([^/]+)\/save$/.exec(path);
+    if (msave) { const id = decodeId(msave[1]); return id == null ? { type: "notfound" } : { type: "save", id }; }
     const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
     if (me) { const id = decodeId(me[1]); return id == null ? { type: "notfound" } : { type: "explain", id }; }
     const md = /^\/api\/session\/([^/]+)\/dismiss$/.exec(path);
@@ -80,6 +83,7 @@ export interface ServerDeps {
   getLive: () => LiveSnapshot;
   intervene: (id: string, action: string) => boolean;
   rename: (id: string, name: string) => boolean;
+  setSaved: (id: string, saved: boolean) => boolean;
   remove: (id: string) => boolean;
   dismiss: (id: string) => boolean;
   restore: (id: string) => boolean;
@@ -131,6 +135,13 @@ export function createServer(deps: ServerDeps): Server {
           let name = "";
           try { name = String((JSON.parse(body || "{}") as { name?: unknown }).name ?? ""); } catch { name = ""; }
           const ok = deps.rename(route.id, name);
+          sendJson(res, ok ? 200 : 400, { ok });
+        });
+      } else if (route.type === "save") {
+        void readBody(req).then((body) => {
+          let saved = false;
+          try { saved = (JSON.parse(body || "{}") as { saved?: unknown }).saved === true; } catch { saved = false; }
+          const ok = deps.setSaved(route.id, saved);
           sendJson(res, ok ? 200 : 400, { ok });
         });
       } else if (route.type === "explain") {

@@ -54,6 +54,10 @@ describe("resolveRoute", () => {
     expect(resolveRoute("POST", "/api/session/abc/explain")).toEqual({ type: "explain", id: "abc" });
   });
 
+  it("routes POST /api/session/:id/save to save", () => {
+    expect(resolveRoute("POST", "/api/session/abc/save")).toEqual({ type: "save", id: "abc" });
+  });
+
   it("does not treat a GET on the explain path as a snapshot", () => {
     expect(resolveRoute("GET", "/api/session/abc/explain")).toEqual({ type: "notfound" });
   });
