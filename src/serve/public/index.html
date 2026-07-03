@@ -817,6 +817,7 @@
           <a data-grp="live">Live &amp; tokens</a>
           <a data-grp="narration">Narration</a>
           <a data-grp="sessions">Sessions</a>
+          <a data-grp="stats">Stats</a>
           <a data-grp="about">About</a>
         </nav>
         <div class="spcontent" id="spcontent"></div>
@@ -888,7 +889,10 @@
       textsize: "m",          // s | m | l
       live: "follow",         // follow | saver  (the headline preset)
       autoopen: "1",          // auto-open the running task
-      overhead: "1",          // show Codey's own token cost
+      overhead: "1",          // show the Codey overhead card
+      stat_now: "1",          // show the "Right now" stats card
+      stat_session: "1",      // show the "This session" stats card
+      stat_tokens: "1",       // show the "Token breakdown" stats card
       follow: "1",            // follow-live (persisted; was in-memory only)
       sort: "recent",         // recent | tasks | saved
       confirmdelete: "1",     // ask before deleting a terminal
@@ -965,6 +969,7 @@
         live: () => renderLiveGroup(),
         narration: () => renderNarrationGroup(),
         sessions: () => renderSessionsGroup(),
+        stats: () => renderStatsGroup(),
         about: () => renderAboutGroup(),
       };
       el.innerHTML = (groups[settingsGroup] || groups.appearance)();
@@ -990,7 +995,7 @@
       if (key === "depth") { depth = val; localStorage.setItem("codey-depth", val); autoFired.clear(); applyMode(); if (lastSnap) renderSingle(lastSnap); }
       if (key === "gen") { genMode = val; localStorage.setItem("codey-gen", val); if (lastSnap) renderSingle(lastSnap); }
       if (key === "sort") refreshRail();
-      if (key === "autoopen" || key === "overhead") { if (lastSnap) renderSingle(lastSnap); }
+      if (["autoopen", "overhead", "stat_now", "stat_session", "stat_tokens"].includes(key)) { if (lastSnap) renderSingle(lastSnap); }
     }
     // Group renderers and extra wiring are defined in later tasks. Stubs keep the panel running.
     function renderLiveGroup() {
@@ -1004,7 +1009,14 @@
         + card("saver", "saver", "Token saver", "Stays quiet, reveals the whole prompt and its tasks once the turn finishes. No auto-summaries.")
         + `</div>`
         + swRow("Auto-open the live task", "Expands the running task so its current step shows.", "autoopen")
-        + swRow("Show Codey's own token cost", "The overhead footer: what narration and summaries spent.", "overhead")
+        + `</div>`;
+    }
+    function renderStatsGroup() {
+      return `<div class="sgrp"><h3>Session stats</h3><p class="gdesc">Which cards show in the right-hand stats panel.</p>`
+        + swRow("Right now", "The live activity card at the top of the panel.", "stat_now")
+        + swRow("This session", "Duration, prompts, tasks, and total tokens.", "stat_session")
+        + swRow("Token breakdown", "Where your tokens went, by category.", "stat_tokens")
+        + swRow("Codey overhead", "What Codey's own narration and summaries cost.", "overhead")
         + `</div>`;
     }
     // A preset is a bundle: choosing it seeds the individual toggles, which stay adjustable after.
@@ -1802,24 +1814,28 @@
           + ovRow("Total", ov.total, " ovtot")
           + `</div></div>`;
 
-      document.getElementById("summary").innerHTML =
-        `<div class="sidehd"><span class="t">Session stats</span>`
-        + `<button class="tog" id="stats-tog" type="button" aria-label="${expanded ? "Collapse" : "Expand"} stats" aria-expanded="${expanded}">${glyph}</button></div>`
-        + `<div class="statsbody">`
-        + `<div class="scard${nowLive ? " nowcard" : ""}" aria-live="polite"><div class="k">Right now</div>${nowCardInner}</div>`
-        + `<div class="scard"><div class="k">This session</div>`
+      // Each stats card can be hidden from the Stats settings group. Build then conditionally include.
+      const nowCard = `<div class="scard${nowLive ? " nowcard" : ""}" aria-live="polite"><div class="k">Right now</div>${nowCardInner}</div>`;
+      const sessionCard = `<div class="scard"><div class="k">This session</div>`
         + `<div class="pair"><span class="l">Total duration</span><span class="v num">${sessDur}</span></div>`
         + `<div class="pair"><span class="l">Prompts</span><span class="v num">${prompts}</span></div>`
         + `<div class="pair"><span class="l">Tasks</span><span class="v num">${total}</span></div>`
         + `<div class="pair"><span class="l">Total tokens</span><span class="v num">${fmt(bd.total)}</span></div>`
-        + `</div>`
-        + `<div class="scard tokcard"><div class="tokhd"><span class="k">Token breakdown</span>`
+        + `</div>`;
+      const tokCard = `<div class="scard tokcard"><div class="tokhd"><span class="k">Token breakdown</span>`
         + `<span class="toktot">${kfmt(bd.total)}<small>tok</small></span></div>`
         + `<div class="toksub">Where your tokens went</div>`
         + stackBar
         + `<div class="brk">${brkRows}</div>`
         + priciest
-        + `</div>`
+        + `</div>`;
+      document.getElementById("summary").innerHTML =
+        `<div class="sidehd"><span class="t">Session stats</span>`
+        + `<button class="tog" id="stats-tog" type="button" aria-label="${expanded ? "Collapse" : "Expand"} stats" aria-expanded="${expanded}">${glyph}</button></div>`
+        + `<div class="statsbody">`
+        + (settings.stat_now === "1" ? nowCard : "")
+        + (settings.stat_session === "1" ? sessionCard : "")
+        + (settings.stat_tokens === "1" ? tokCard : "")
         + overheadCard
         + `</div>`;
 
