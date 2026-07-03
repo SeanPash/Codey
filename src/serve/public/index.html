@@ -1034,18 +1034,20 @@
     }
     function renderSessionsGroup() {
       return `<div class="sgrp"><h3>Sessions</h3><p class="gdesc">How the sidebar lists your terminals.</p>`
-        + segRow("Default sort", "Order of the sessions list, within each day.", "sort",
-            [["recent","Recent"],["tasks","Most tasks"],["saved","Saved first"]])
+        + segRow("Default sort", "Recent groups by day. The others sort across all your terminals.", "sort",
+            [["recent","Recent"],["tokens","Most tokens"],["tasks","Most tasks"],["saved","Saved first"]])
         + swRow("Confirm before delete", "Ask first when deleting a terminal.", "confirmdelete")
         + `</div>`;
     }
     // Sort a session list per the chosen order. "recent" keeps the server's mtime-desc order.
     function sortSessions(list) {
       const arr = list.slice();
+      if (settings.sort === "tokens") return arr.sort((a, b) => (b.tokens || 0) - (a.tokens || 0));
       if (settings.sort === "tasks") return arr.sort((a, b) => (b.taskCount || 0) - (a.taskCount || 0));
       if (settings.sort === "saved") return arr.sort((a, b) => (b.saved ? 1 : 0) - (a.saved ? 1 : 0));
       return arr;
     }
+    const SORT_LABELS = { tokens: "Most tokens", tasks: "Most tasks", saved: "Saved first" };
     function renderAboutGroup() {
       return `<div class="sgrp"><h3>About</h3>`
         + `<p class="gdesc">Codey narrates a live Claude Code session in plain English and flags when it looks stuck.</p>`
@@ -1854,7 +1856,7 @@
       }
       return `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
-        + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span>`
+        + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${s.tokens ? " &middot; " + kfmt(s.tokens) + " tok" : ""}${proj}</span>`
         + `<span class="bm${s.saved ? " on" : ""}" data-bm role="button" aria-label="${s.saved ? "Remove bookmark" : "Bookmark"}" aria-pressed="${s.saved ? "true" : "false"}">${bmSvg()}</span>`
         + `</button>`;
     }
@@ -1952,22 +1954,30 @@
       const shown = sessions.filter((s) =>
         (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q))
         && inDateRange(s) && (!savedFilter || s.saved));
-      // Group by day, preserving the most-recent-first order the server already sorted by.
-      const days = [];
-      const byDay = new Map();
-      for (const s of shown) {
-        const d = s.day || "Earlier";
-        if (!byDay.has(d)) { byDay.set(d, []); days.push(d); }
-        byDay.get(d).push(s);
-      }
-      const groups = days.map((d) => {
-        const rows = sortSessions(byDay.get(d));
-        return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
+      let listHtml;
+      if (settings.sort === "recent") {
+        // Group by day, preserving the most-recent-first order the server already sorted by.
+        const days = [];
+        const byDay = new Map();
+        for (const s of shown) {
+          const d = s.day || "Earlier";
+          if (!byDay.has(d)) { byDay.set(d, []); days.push(d); }
+          byDay.get(d).push(s);
+        }
+        listHtml = days.map((d) => {
+          const rows = byDay.get(d);
+          return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
+            + rows.map(sessRowHtml).join("");
+        }).join("");
+      } else {
+        // Any other sort applies across every terminal, not just within a day: one flat ranked list.
+        const rows = sortSessions(shown);
+        listHtml = `<div class="dayhd">${esc(SORT_LABELS[settings.sort] || "Sorted")}<span class="dcount">${rows.length}</span></div>`
           + rows.map(sessRowHtml).join("");
-      }).join("");
+      }
       const empty = (q || dateFrom || dateTo || savedFilter)
         ? (savedFilter ? "No bookmarked terminals yet." : "No terminals match.") : "No terminals yet.";
-      list.innerHTML = shown.length ? groups : `<p class="smeta" style="padding-left:3px">${empty}</p>`;
+      list.innerHTML = shown.length ? listHtml : `<p class="smeta" style="padding-left:3px">${empty}</p>`;
 
       list.querySelectorAll(".sess").forEach((el) => {
         el.addEventListener("click", (e) => {
