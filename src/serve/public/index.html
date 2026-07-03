@@ -17,6 +17,8 @@
       --ink:#f1f4f9; --ink2:#c6cdd9; --body:#97a0af; --muted:#6b7482; --faint:#3c4452;
       /* live = green, only for the single thing happening right now */
       --live:#34d399; --live-ink:#7fe9c2; --live-dim:#246c54; --live-deep:#173f31;
+      /* live NOW strip: themed so it reads as a green panel in dark and a soft green tint in light */
+      --now-bg:linear-gradient(180deg,#0e1a15,#0b1410); --now-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(52,211,153,.10);
       /* state */
       --warn:#e0a23a; --coral:#f0654f;
       /* selected/focused UI accent: a single calm cyan, used only to mark the active session */
@@ -55,6 +57,7 @@
       --live:#12a877; --live-ink:#0c7d58; --live-dim:#8fd9bf; --live-deep:#d6f0e6;
       --warn:#b9791a; --coral:#d1462f;
       --sel:#2f6fb0; --sel-dim:#bcd4ec;
+      --now-bg:linear-gradient(180deg,#eafaf3,#dff5ec); --now-shadow:0 6px 18px rgba(18,168,119,.14);
     }
     @media (prefers-color-scheme: light) {
       :root[data-theme="system"] {
@@ -63,6 +66,7 @@
         --live:#12a877; --live-ink:#0c7d58; --live-dim:#8fd9bf; --live-deep:#d6f0e6;
         --warn:#b9791a; --coral:#d1462f;
         --sel:#2f6fb0; --sel-dim:#bcd4ec;
+        --now-bg:linear-gradient(180deg,#eafaf3,#dff5ec); --now-shadow:0 6px 18px rgba(18,168,119,.14);
       }
     }
     body.split { --titlerow:0px; --head:52px; }
@@ -170,18 +174,18 @@
        matching the live-task card. Cyan (never green) stays reserved for "which session you're viewing". */
     .sess.active { border-color:var(--sel-dim);
       background:linear-gradient(180deg,rgba(95,168,224,.07),transparent 60%),var(--surf-h);
-      box-shadow:0 0 12px -6px rgba(95,168,224,.38); }
+      box-shadow:inset 3px 0 0 var(--sel), 0 0 12px -6px rgba(95,168,224,.38); }
     .sess.active .sname { color:var(--ink); }
-    /* running session: a quiet green wash + glow so the live row reads as "lit" in the list, like the
-       live task. The green dot carries any motion; the row stays still to keep a busy list calm. */
+    /* running session: a quiet green wash + a solid left ledge so the live row reads as "lit" in the
+       list, like the live task. The green dot carries any motion; the row stays still to keep a busy list calm. */
     .sess.live { border-color:var(--live-dim);
       background:linear-gradient(180deg,rgba(52,211,153,.055),transparent 60%),transparent;
-      box-shadow:0 0 12px -7px rgba(52,211,153,.34); }
-    /* selected AND running: the cyan selection layers on top of the live green - both cues stack. */
+      box-shadow:inset 3px 0 0 var(--live), 0 0 12px -7px rgba(52,211,153,.34); }
+    /* selected AND running: the cyan selection ledge wins; the green wash still tints the row. */
     .sess.active.live { border-color:var(--sel-dim);
       background:linear-gradient(180deg,rgba(95,168,224,.07),transparent 60%),
                  linear-gradient(180deg,rgba(52,211,153,.05),transparent 60%),var(--surf-h);
-      box-shadow:0 0 12px -6px rgba(95,168,224,.38), 0 0 13px -7px rgba(52,211,153,.30); }
+      box-shadow:inset 3px 0 0 var(--sel), 0 0 12px -6px rgba(95,168,224,.38), 0 0 13px -7px rgba(52,211,153,.30); }
     .sess .sname { font-weight:600; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:8px; }
     .sess .smeta { color:var(--muted); font-size:9.5px; margin-top:4px; padding-left:15px; }
     .sess .rproj { color:var(--body); }
@@ -431,8 +435,8 @@
     .nowstrip .nact.think { color:var(--ink2); }
     .nowstrip .ntime { font-variant-numeric:tabular-nums; color:var(--live-ink); font-size:13px; flex:none; }
     .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
-      background:var(--inset); border:1px solid var(--line); color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
-    .nowstrip .follow.on { background:rgba(52,211,153,.14); color:var(--live-ink); border-color:rgba(52,211,153,.42); }
+      background:var(--surf); border:1px solid var(--line); color:var(--body); border-radius:8px; padding:5px 11px; cursor:pointer; }
+    .nowstrip .follow.on { background:var(--live-deep); color:var(--live-ink); border-color:var(--live-dim); }
     .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
     .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
     .nowstrip .ntrail .lab { color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:9px; font-weight:600; }
@@ -740,11 +744,11 @@
     .srmeta .rd{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;}
     .sseg{display:inline-flex;background:var(--inset);border:1px solid var(--line);border-radius:8px;padding:2px;}
     .sseg button{border:none;background:none;color:var(--body);font-size:12.5px;padding:5px 11px;border-radius:6px;cursor:pointer;font-family:inherit;}
-    .sseg button.on{background:var(--surf-h);color:var(--ink);}
-    .sw{width:40px;height:23px;border-radius:99px;background:var(--inset);border:1px solid var(--line);position:relative;cursor:pointer;flex-shrink:0;}
-    .sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--muted);transition:.15s;}
-    .sw.on{background:var(--live-deep);border-color:var(--live);}
-    .sw.on::after{left:19px;background:var(--live);}
+    .sseg button.on{background:var(--surf);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.18), 0 0 0 1px var(--line);}
+    .stgl{width:40px;height:23px;border-radius:99px;background:var(--inset);border:1px solid var(--line);position:relative;cursor:pointer;flex-shrink:0;}
+    .stgl::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--muted);transition:.15s;}
+    .stgl.on{background:var(--live-deep);border-color:var(--live);}
+    .stgl.on::after{left:19px;background:var(--live);}
 
     /* Reduce motion: kill the ambient pulse/glow animations. */
     :root[data-motion="reduced"] * { animation: none !important; }
@@ -919,7 +923,7 @@
     }
     function swRow(title, desc, key) {
       return `<div class="srow"><div class="srmeta"><div class="rt">${title}</div><div class="rd">${desc}</div></div>`
-        + `<div class="sw ${settings[key] === "1" ? "on" : ""}" data-toggle="${key}"></div></div>`;
+        + `<div class="stgl ${settings[key] === "1" ? "on" : ""}" data-toggle="${key}"></div></div>`;
     }
     function renderSettings() {
       const el = document.getElementById("spcontent");
@@ -950,7 +954,7 @@
         applySettingChange(b.dataset.set, b.dataset.val);
         renderSettings();
       }));
-      el.querySelectorAll(".sw[data-toggle]").forEach((s) => s.addEventListener("click", () => {
+      el.querySelectorAll(".stgl[data-toggle]").forEach((s) => s.addEventListener("click", () => {
         applySettingChange(s.dataset.toggle, settings[s.dataset.toggle] === "1" ? "0" : "1");
         renderSettings();
       }));
