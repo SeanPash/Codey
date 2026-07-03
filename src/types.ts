@@ -44,6 +44,7 @@ export interface ReceiptLine {
   resolved: boolean;             // failed, but a later same-tool action in the chunk succeeded
   raw: string | null;            // full command or file path, revealed when the row expands
   why: string | null;            // the owning task's narration, reused (no extra tokens)
+  evidence: string | null;       // grounded change substance (the real edit/search/command), for rich explanations
   failSummary: string | null;    // plain-English failure sentence shown inline on a fail
   ts: number;                    // when this action happened (ms since epoch)
   thoughtFirst: boolean;         // a run of thinking was folded into this action row

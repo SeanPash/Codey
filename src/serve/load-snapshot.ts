@@ -75,7 +75,7 @@ export function backfillTokens(root: string = defaultRoot()): void {
   }
 }
 
-export function loadSnapshot(sessionId: string, root: string = defaultRoot(), saver = false): SessionSnapshot {
+export function loadSnapshot(sessionId: string, root: string = defaultRoot(), saver = false, rich = true): SessionSnapshot {
   const store = new SessionStore(sessionId, root);
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
@@ -129,11 +129,11 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot(), sa
   // Show any explanations already generated at the seed depth without another round-trip. The
   // flat cachedExplanations map carries the rest (other depths, action-level) so the browser can
   // repaint everything the user ever clicked, even after a tab close or in a fresh session.
-  const filled = fillCachedExplanations(withMeta, seedDepth, root);
+  const filled = fillCachedExplanations(withMeta, seedDepth, root, rich);
   // Persist the session's work-token total so the sidebar can sort by "Most tokens" cheaply,
   // without every poll reparsing the transcript. The heavy work is already done above.
   try { writeTokens(store.dir, filled.workTotal || 0); } catch { /* sorting is best-effort */ }
-  return { ...filled, cachedExplanations: collectCachedExplanations(filled, root) };
+  return { ...filled, cachedExplanations: collectCachedExplanations(filled, root, rich) };
 }
 
 // Cheap live view for the NOW strip: events tail + statusline only, no transcript or
@@ -166,10 +166,12 @@ export async function runExplain(sessionId: string, body: unknown, root: string 
   if (!isScope(b.scope) || !isDepth(b.depth) || typeof b.id !== "string") {
     return { text: null, cached: false, paused: false };
   }
-  const snap = loadSnapshot(sessionId, root);
+  // Rich is the default; a Budget client sends rich:false to get the lean, cheaper prompt.
+  const rich = b.rich !== false;
+  const snap = loadSnapshot(sessionId, root, false, rich);
   return explain(
     snap,
-    { sessionId, scope: b.scope, id: b.id, depth: b.depth },
+    { sessionId, scope: b.scope, id: b.id, depth: b.depth, rich },
     { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join(root, sessionId) },
   );
 }

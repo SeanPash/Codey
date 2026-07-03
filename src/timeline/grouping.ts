@@ -13,7 +13,7 @@ function loneThinkRow(run: ReceiptLine[]): ReceiptLine {
   }
   return { label: "Thought about the next step.", title: "Planning the next step",
     subtitle: "Claude weighed the next step before continuing.", tool: "thinking", tokens, status: "none",
-    errorText: null, resolved: false, raw: null, why: last?.why ?? null, failSummary: null,
+    errorText: null, resolved: false, raw: null, why: last?.why ?? null, evidence: null, failSummary: null,
     ts: run[0]?.ts ?? 0, thoughtFirst: false, explainable: false };
 }
 

@@ -224,4 +224,17 @@ describe("attributeChunk", () => {
     const b = attributeChunk([turn({ ts: 1, outputTokens: 40, tool: "Read", input: { file_path: "/x.ts" } })], 0, 10);
     expect(b.workLines[0].explainable).not.toBe(false);
   });
+
+  it("captures the grounded change substance as evidence for an edit", () => {
+    const t = [turn({ ts: 1, outputTokens: 50, tool: "Edit",
+      input: { file_path: "/p/index.html", old_string: ".sw {", new_string: ".stgl {" } })];
+    const b = attributeChunk(t, 0, 10);
+    expect(b.workLines[0].evidence).toContain(".sw");
+    expect(b.workLines[0].evidence).toContain(".stgl");
+  });
+
+  it("leaves evidence null for a read, which changed nothing", () => {
+    const b = attributeChunk([turn({ ts: 1, outputTokens: 40, tool: "Read", input: { file_path: "/x.ts" } })], 0, 10);
+    expect(b.workLines[0].evidence).toBeNull();
+  });
 });

@@ -5,7 +5,7 @@ import type { ReceiptLine } from "../types.js";
 
 function line(p: Partial<ReceiptLine>): ReceiptLine {
   return { label: "", title: "", subtitle: "", tool: "Bash", tokens: 0, status: "ok",
-    errorText: null, resolved: false, raw: null, why: null, failSummary: null, ts: 0,
+    errorText: null, resolved: false, raw: null, why: null, evidence: null, failSummary: null, ts: 0,
     thoughtFirst: false, ...p };
 }
 

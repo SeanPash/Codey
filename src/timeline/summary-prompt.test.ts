@@ -7,7 +7,7 @@ function line(why: string): ReceiptLine {
   return {
     label: "Editing budget.ts", title: "Updating budget.ts", subtitle: "Changing budget.ts to adjust how it works.",
     tool: "Edit", tokens: 50, status: "ok", errorText: null,
-    resolved: false, raw: "src/budget/budget.ts", why, failSummary: null, ts: 1, thoughtFirst: false,
+    resolved: false, raw: "src/budget/budget.ts", why, evidence: null, failSummary: null, ts: 1, thoughtFirst: false,
   };
 }
 
@@ -19,7 +19,7 @@ function bashLine(command: string): ReceiptLine {
   return {
     label: "Running the tests", title: "Verifying the tests", subtitle: "Running the tests to check it passes.",
     tool: "Bash", tokens: 10, status: "ok", errorText: null,
-    resolved: false, raw: command, why: "checking the work", failSummary: null, ts: 2, thoughtFirst: false,
+    resolved: false, raw: command, why: "checking the work", evidence: null, failSummary: null, ts: 2, thoughtFirst: false,
   };
 }
 
@@ -83,16 +83,65 @@ describe("buildSummaryPrompt", () => {
     expect(p).toContain("not a basic term the reader already knows");
   });
 
-  it("scales the What changed detail with how many files the prompt touched", () => {
-    const small = buildSummaryPrompt("p", [{ name: "tweak", lines: [fileLine("src/a.ts")] }], "deep");
+  it("scales the What changed detail with how many files the prompt touched, in budget mode", () => {
+    const small = buildSummaryPrompt("p", [{ name: "tweak", lines: [fileLine("src/a.ts")] }], "deep", false);
     expect(small).not.toMatch(/three to five/);
 
     const manyFiles = Array.from({ length: 9 }, (_, i) => fileLine(`src/file${i}.ts`));
-    const big = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep");
+    const big = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep", false);
     expect(big).toMatch(/three to five/);
     // teach scales the same way
-    const bigTeach = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "teach");
+    const bigTeach = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "teach", false);
     expect(bigTeach).toMatch(/three to five/);
+  });
+
+  it("asks for a markedly longer What changed walkthrough in rich mode than budget", () => {
+    const manyFiles = Array.from({ length: 9 }, (_, i) => fileLine(`src/file${i}.ts`));
+    const budget = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep", false);
+    const rich = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "deep", true);
+    expect(budget).toMatch(/three to five/);
+    expect(rich).toMatch(/six to ten/);
+    expect(rich.toLowerCase()).toContain("walk through");
+  });
+
+  it("gives the secondary sections more room in rich mode than budget", () => {
+    const budget = buildSummaryPrompt("p", tasks, "deep", false);
+    const rich = buildSummaryPrompt("p", tasks, "deep", true);
+    expect(budget).toContain("one or two plain sentences");
+    expect(rich).toContain("one to three plain sentences");
+  });
+
+  it("in rich mode, feeds the concrete change substance so the recap names the real change", () => {
+    const editLine: ReceiptLine = { ...line("renaming the class"), evidence: 'replaced ".sw {" with ".stgl {"' };
+    const p = buildSummaryPrompt("fix toggles", [{ name: "Rename", lines: [editLine] }], "deep", true);
+    expect(p).toContain(".stgl");
+  });
+
+  it("in budget mode, omits the concrete change substance to stay cheap", () => {
+    const editLine: ReceiptLine = { ...line("renaming the class"), evidence: 'replaced ".sw {" with ".stgl {"' };
+    const p = buildSummaryPrompt("fix toggles", [{ name: "Rename", lines: [editLine] }], "deep", false);
+    expect(p).not.toContain(".stgl");
+  });
+
+  it("in rich mode, asks the recap to name the specific identifiers and root cause", () => {
+    const p = buildSummaryPrompt("p", tasks, "deep", true).toLowerCase();
+    expect(p).toMatch(/name the (actual|real|specific)/);
+  });
+
+  it("teaches every concept in rich teach mode, but only the main one in budget teach", () => {
+    const richTeach = buildSummaryPrompt("p", tasks, "teach", true).toLowerCase();
+    const budgetTeach = buildSummaryPrompt("p", tasks, "teach", false).toLowerCase();
+    expect(budgetTeach).toContain("the one technique");
+    expect(richTeach).not.toContain("the one technique");
+    expect(richTeach).toMatch(/every (notable )?technique/);
+  });
+
+  it("keeps rich and budget distinct in simple mode too", () => {
+    const editLine: ReceiptLine = { ...line("x"), evidence: 'replaced ".sw {" with ".stgl {"' };
+    const rich = buildSummaryPrompt("p", [{ name: "t", lines: [editLine] }], "simple", true);
+    const budget = buildSummaryPrompt("p", [{ name: "t", lines: [editLine] }], "simple", false);
+    expect(rich).toContain(".stgl");
+    expect(budget).not.toContain(".stgl");
   });
 
   it("only offers verification as grounding when a check actually ran", () => {

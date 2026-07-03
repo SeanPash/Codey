@@ -41,9 +41,9 @@ export function runServe(opts: { session?: string; port: number }): void {
     fontsDir: join(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
-    getSnapshot: (id, saver) => {
+    getSnapshot: (id, saver, rich) => {
       if (!safeId(id)) throw new Error("invalid session id");
-      return loadSnapshot(id, undefined, saver);
+      return loadSnapshot(id, undefined, saver, rich);
     },
     getNow: (id) => {
       if (!safeId(id)) throw new Error("invalid session id");
