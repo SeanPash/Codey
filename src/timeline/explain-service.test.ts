@@ -10,7 +10,7 @@ import type { SessionSnapshot, ReceiptLine, TimelineChunk, PromptGroup } from ".
 function rl(over: Partial<ReceiptLine> = {}): ReceiptLine {
   return { label: "Reading a.ts", title: "Checking a.ts", subtitle: "Reading a.ts to follow how it works.",
     tool: "Read", tokens: 10, status: "ok", errorText: null,
-    resolved: false, raw: "a.ts", why: "checking the shape", failSummary: null, ts: 1, thoughtFirst: false, ...over };
+    resolved: false, raw: "a.ts", why: "checking the shape", evidence: null, failSummary: null, ts: 1, thoughtFirst: false, ...over };
 }
 function chunk(id: string, lines: ReceiptLine[]): TimelineChunk {
   return { id, name: `Task ${id}`, narration: "did stuff", startTs: 0, endTs: 1, tokenTotal: 0,
@@ -89,6 +89,27 @@ describe("explain", () => {
     narrate.mockResolvedValueOnce({ text: "Reread a.ts to line up the new helper.", tokens: 12 });
     const retry = await explain(snap, { sessionId: "s1", scope: "action", id: "c0#0", depth: "deep" }, deps);
     expect(retry.text).toBe("Reread a.ts to line up the new helper.");
+  });
+
+  it("keeps rich and budget explanations in separate cache entries", async () => {
+    const snap = snapshot();
+    narrate.mockResolvedValueOnce({ text: "RICH answer", tokens: 10 });
+    const rich = await explain(snap, { sessionId: "s1", scope: "task", id: "c0", depth: "deep", rich: true }, deps);
+    expect(rich.text).toBe("RICH answer");
+
+    // A budget request at the same id/depth must not be served the rich cache entry; it generates
+    // its own, so the two richness levels never bleed into each other.
+    narrate.mockResolvedValueOnce({ text: "BUDGET answer", tokens: 10 });
+    const budget = await explain(snap, { sessionId: "s1", scope: "task", id: "c0", depth: "deep", rich: false }, deps);
+    expect(budget.text).toBe("BUDGET answer");
+    expect(narrate).toHaveBeenCalledTimes(2);
+  });
+
+  it("feeds the grounded change substance to the narrator in rich mode", async () => {
+    const c = chunk("c0", [rl({ label: "Editing index.html", tool: "Edit", evidence: 'replaced ".sw {" with ".stgl {"' })]);
+    const snap: SessionSnapshot = { ...snapshot(), chunks: [c], groups: [group("p0", [c])] };
+    await explain(snap, { sessionId: "s1", scope: "task", id: "c0", depth: "deep", rich: true }, deps);
+    expect(narrate.mock.calls[0][0]).toContain(".stgl");
   });
 
   it("returns null text for an unknown id", async () => {

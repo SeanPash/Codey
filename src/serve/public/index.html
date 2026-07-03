@@ -909,6 +909,7 @@
       density: "comfortable", // comfortable | compact
       textsize: "m",          // s | m | l
       live: "follow",         // follow | saver  (the headline preset)
+      explainmode: "rich",    // rich | budget  (how much evidence feeds each explanation/summary)
       autoopen: "1",          // auto-open the running task
       overhead: "1",          // show the Codey overhead card
       stat_now: "1",          // show the "Right now" stats card
@@ -1017,6 +1018,9 @@
       setSetting(key, val);
       if (key === "depth") { depth = val; localStorage.setItem("codey-depth", val); autoFired.clear(); applyMode(); if (lastSnap) renderSingle(lastSnap); }
       if (key === "gen") { genMode = val; localStorage.setItem("codey-gen", val); if (lastSnap) renderSingle(lastSnap); }
+      // Switching rich/budget changes what every explanation says, so drop the auto-fired guard and
+      // refetch: the snapshot comes back with the new detail level's cached text (keyed by richFlag).
+      if (key === "explainmode") { autoFired.clear(); tick(); }
       if (key === "sort") refreshRail();
       if (["autoopen", "overhead", "stat_now", "stat_session", "stat_tokens"].includes(key)) { if (lastSnap) renderSingle(lastSnap); }
     }
@@ -1047,12 +1051,13 @@
     function applyPreset(preset) {
       setSetting("live", preset);
       if (preset === "saver") {
-        // Token saver forces summaries to Manual and defers the AI timeline (see the saver flag
-        // on the snapshot fetch). Follow live only governs scrolling, so it leaves summaries alone.
-        setSetting("autoopen", "0"); setSetting("follow", "0");
+        // Token saver forces summaries to Manual, defers the AI timeline (see the saver flag on the
+        // snapshot fetch), and drops explanations to budget so they cost less. Follow live only
+        // governs scrolling, so it leaves summaries alone.
+        setSetting("autoopen", "0"); setSetting("follow", "0"); setSetting("explainmode", "budget");
         followLive = false; genMode = "saver"; localStorage.setItem("codey-gen", "saver");
       } else {
-        setSetting("autoopen", "1"); setSetting("follow", "1");
+        setSetting("autoopen", "1"); setSetting("follow", "1"); setSetting("explainmode", "rich");
         followLive = true;
       }
       if (lastSnap) renderSingle(lastSnap);
@@ -1065,6 +1070,8 @@
             [["simple","Simple"],["deep","Deep"],["teach","Teach"]], curDepth())
         + segRow("Summaries", "Auto generates a recap per prompt. Manual waits for a click.", "gen",
             [["auto","Auto"],["saver","Manual"]], genMode || "auto")
+        + segRow("Explanation detail", "Rich grounds each recap in the real edits and searches, so it names the actual change. Budget is leaner and cheaper.", "explainmode",
+            [["rich","Rich"],["budget","Budget"]])
         + `</div>`;
     }
     function renderSessionsGroup() {
@@ -1138,7 +1145,10 @@
     // Folding the session into every cache key is what stops one session's recap or explanation
     // from showing under another session's prompt when their positional ids happen to line up.
     const idSession = (id) => { const t = String(id).indexOf("~"); return t !== -1 ? String(id).slice(0, t) : (currentId || ""); };
-    const cacheKey = (scope, id, d) => idSession(id) + "|" + scope + "|" + id + "|" + d;
+    // "r" in rich mode, "b" in budget: folded into the cache key so a rich and a budget
+    // explanation for the same row never overwrite each other in the client cache.
+    const richFlag = () => (settings.explainmode === "budget" ? "b" : "r");
+    const cacheKey = (scope, id, d) => idSession(id) + "|" + scope + "|" + id + "|" + d + "|" + richFlag();
     const ekey = (scope, id) => cacheKey(scope, id, activeDepth());
     const firstSentence = (t) => String(t).split(/(?<=[.?!])\s+/)[0] || String(t);
     // The one-line skim echo for a finished prompt. A sectioned recap leads with "What changed:",
@@ -1163,7 +1173,7 @@
       try {
         const res = await fetch("/api/session/" + encodeURIComponent(sessionId) + "/explain", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ scope, id: serverId, depth: d }),
+          body: JSON.stringify({ scope, id: serverId, depth: d, rich: settings.explainmode !== "budget" }),
         });
         const data = await res.json();
         if (data && data.paused) budgetPaused = true;
@@ -2213,9 +2223,13 @@
       document.getElementById("jumplive").hidden = !(pinned && anyRunning);
       if (!currentId) { document.getElementById("main").innerHTML = '<div class="empty">No sessions found.</div>'; return; }
       try {
-        // Token saver appends ?saver=1 so the server defers live AI segmentation off the hot path.
-        const saverQ = settings.live === "saver" ? "?saver=1" : "";
-        const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId) + saverQ)).json();
+        // Token saver appends saver=1 so the server defers live AI segmentation off the hot path.
+        // Budget mode appends rich=0 so a reopened timeline repaints the cheaper budget explanations.
+        const qs = [];
+        if (settings.live === "saver") qs.push("saver=1");
+        if (settings.explainmode === "budget") qs.push("rich=0");
+        const q = qs.length ? "?" + qs.join("&") : "";
+        const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId) + q)).json();
         if (view !== "single") return;
         renderSingle(snap);
       } catch { /* keep last view on a transient error */ }

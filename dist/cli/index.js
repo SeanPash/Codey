@@ -582,14 +582,14 @@ var require_help = __commonJS({
        * @return {string}
        *
        */
-      wrap(str2, width, indent, minColumnWidth = 40) {
+      wrap(str3, width, indent, minColumnWidth = 40) {
         const indents = " \\f\\t\\v\xA0\u1680\u2000-\u200A\u202F\u205F\u3000\uFEFF";
         const manualIndent = new RegExp(`[\\n][${indents}]+`);
-        if (str2.match(manualIndent)) return str2;
+        if (str3.match(manualIndent)) return str3;
         const columnWidth = width - indent;
-        if (columnWidth < minColumnWidth) return str2;
-        const leadingStr = str2.slice(0, indent);
-        const columnText = str2.slice(indent).replace("\r\n", "\n");
+        if (columnWidth < minColumnWidth) return str3;
+        const leadingStr = str3.slice(0, indent);
+        const columnText = str3.slice(indent).replace("\r\n", "\n");
         const indentString = " ".repeat(indent);
         const zeroWidthSpace = "\u200B";
         const breaks = `\\s${zeroWidthSpace}`;
@@ -858,9 +858,9 @@ var require_option = __commonJS({
         return option.negate === (negativeValue === value);
       }
     };
-    function camelcase(str2) {
-      return str2.split("-").reduce((str3, word) => {
-        return str3 + word[0].toUpperCase() + word.slice(1);
+    function camelcase(str3) {
+      return str3.split("-").reduce((str4, word) => {
+        return str4 + word[0].toUpperCase() + word.slice(1);
       });
     }
     function splitOptionFlags(flags) {
@@ -1014,11 +1014,11 @@ var require_command = __commonJS({
         this._showHelpAfterError = false;
         this._showSuggestionAfterError = true;
         this._outputConfiguration = {
-          writeOut: (str2) => process2.stdout.write(str2),
-          writeErr: (str2) => process2.stderr.write(str2),
+          writeOut: (str3) => process2.stdout.write(str3),
+          writeErr: (str3) => process2.stderr.write(str3),
           getOutHelpWidth: () => process2.stdout.isTTY ? process2.stdout.columns : void 0,
           getErrHelpWidth: () => process2.stderr.isTTY ? process2.stderr.columns : void 0,
-          outputError: (str2, write2) => write2(str2)
+          outputError: (str3, write2) => write2(str3)
         };
         this._hidden = false;
         this._helpOption = void 0;
@@ -2654,18 +2654,18 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [description]
        * @return {(this | string | undefined)} `this` command for chaining, or version string if no arguments
        */
-      version(str2, flags, description) {
-        if (str2 === void 0) return this._version;
-        this._version = str2;
+      version(str3, flags, description) {
+        if (str3 === void 0) return this._version;
+        this._version = str3;
         flags = flags || "-V, --version";
         description = description || "output the version number";
         const versionOption = this.createOption(flags, description);
         this._versionOptionName = versionOption.attributeName();
         this._registerOption(versionOption);
         this.on("option:" + versionOption.name(), () => {
-          this._outputConfiguration.writeOut(`${str2}
+          this._outputConfiguration.writeOut(`${str3}
 `);
-          this._exit(0, "commander.version", str2);
+          this._exit(0, "commander.version", str3);
         });
         return this;
       }
@@ -2676,10 +2676,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {object} [argsDescription]
        * @return {(string|Command)}
        */
-      description(str2, argsDescription) {
-        if (str2 === void 0 && argsDescription === void 0)
+      description(str3, argsDescription) {
+        if (str3 === void 0 && argsDescription === void 0)
           return this._description;
-        this._description = str2;
+        this._description = str3;
         if (argsDescription) {
           this._argsDescription = argsDescription;
         }
@@ -2691,9 +2691,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [str]
        * @return {(string|Command)}
        */
-      summary(str2) {
-        if (str2 === void 0) return this._summary;
-        this._summary = str2;
+      summary(str3) {
+        if (str3 === void 0) return this._summary;
+        this._summary = str3;
         return this;
       }
       /**
@@ -2741,8 +2741,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [str]
        * @return {(string|Command)}
        */
-      usage(str2) {
-        if (str2 === void 0) {
+      usage(str3) {
+        if (str3 === void 0) {
           if (this._usage) return this._usage;
           const args = this.registeredArguments.map((arg) => {
             return humanReadableArgName(arg);
@@ -2753,7 +2753,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
             this.registeredArguments.length ? args : []
           ).join(" ");
         }
-        this._usage = str2;
+        this._usage = str3;
         return this;
       }
       /**
@@ -2762,9 +2762,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [str]
        * @return {(string|Command)}
        */
-      name(str2) {
-        if (str2 === void 0) return this._name;
-        this._name = str2;
+      name(str3) {
+        if (str3 === void 0) return this._name;
+        this._name = str3;
         return this;
       }
       /**
@@ -3420,14 +3420,14 @@ function summarizeEvent(e) {
   const status = e.phase === "post" ? e.isError ? " [ERROR]" : " [done]" : "";
   const err = e.phase === "post" && e.isError && e.errorText ? ` error: ${clip(e.errorText, 140)}` : "";
   const input = e.input ?? {};
-  const str2 = (k) => typeof input[k] === "string" ? input[k] : null;
-  const file7 = str2("file_path") ?? str2("path") ?? str2("notebook_path");
+  const str3 = (k) => typeof input[k] === "string" ? input[k] : null;
+  const file7 = str3("file_path") ?? str3("path") ?? str3("notebook_path");
   let line;
   switch (e.tool) {
     case "Edit":
     case "MultiEdit": {
-      const newS = str2("new_string");
-      const oldS = str2("old_string");
+      const newS = str3("new_string");
+      const oldS = str3("old_string");
       if (file7 && newS != null) {
         const from = oldS ? `, replacing "${clip(oldS, 80)}"` : "";
         line = `- Edit ${file7}${status}: new code "${clip(newS, 220)}"${from}`;
@@ -3436,20 +3436,20 @@ function summarizeEvent(e) {
     }
     case "Write":
     case "NotebookEdit": {
-      const content = str2("new_source") ?? str2("content");
+      const content = str3("new_source") ?? str3("content");
       line = `- Write ${file7 ?? "a file"}${status}: ${content ? `"${clip(content, 220)}"` : "new file"}`;
       break;
     }
     case "Bash":
     case "PowerShell": {
-      const cmd = str2("command");
+      const cmd = str3("command");
       line = cmd ? `- Run${status}: ${clip(cmd, 200)}` : `- ${e.tool}${status}`;
       break;
     }
     case "Grep":
     case "Glob": {
-      const pat = str2("pattern");
-      const where = file7 ?? str2("glob");
+      const pat = str3("pattern");
+      const where = file7 ?? str3("glob");
       line = pat ? `- Search${status} for "${clip(pat, 80)}"${where ? ` in ${where}` : ""}` : `- ${e.tool}${status}`;
       break;
     }
@@ -5969,7 +5969,8 @@ function resolveRoute(method, url) {
     if (m) {
       const id = decodeId(m[1]);
       const saver = /[?&]saver=1(?:&|$)/.test(url);
-      return id == null ? { type: "notfound" } : { type: "session", id, saver };
+      const rich = !/[?&]rich=0(?:&|$)/.test(url);
+      return id == null ? { type: "notfound" } : { type: "session", id, saver, rich };
     }
   }
   if (method === "POST") {
@@ -6037,7 +6038,7 @@ function createServer(deps) {
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
-        sendJson(res, 200, deps.getSnapshot(route.id, route.saver));
+        sendJson(res, 200, deps.getSnapshot(route.id, route.saver, route.rich));
       } else if (route.type === "now") {
         sendJson(res, 200, deps.getNow(route.id));
       } else if (route.type === "live") {
@@ -6143,6 +6144,64 @@ function cleanReasoning(text, _ctx = {}) {
   const clamped = kept.length > MAX_CHARS ? kept.slice(0, MAX_CHARS).replace(/\s+\S*$/, "").trim() : kept;
   const ended = /[.!?]$/.test(clamped) ? clamped : clamped + ".";
   return stripEllipsis(ended);
+}
+
+// src/timeline/change-facts.ts
+function clip2(s, max) {
+  const t = s.replace(/\s+/g, " ").trim();
+  return t.length > max ? t.slice(0, max) + "\u2026" : t;
+}
+function str2(input, key2) {
+  if (input && typeof input === "object") {
+    const v = input[key2];
+    if (typeof v === "string") return v;
+  }
+  return null;
+}
+function editFact(oldS, newS) {
+  if (newS == null) return null;
+  const from = (oldS ?? "").trim();
+  if (!from) return `added "${clip2(newS, 120)}"`;
+  return `replaced "${clip2(from, 80)}" with "${clip2(newS, 80)}"`;
+}
+function multiEditFact(input) {
+  const edits = input && typeof input === "object" ? input.edits : null;
+  if (!Array.isArray(edits) || edits.length === 0) return null;
+  const first = edits[0];
+  const one = editFact(
+    typeof first.old_string === "string" ? first.old_string : null,
+    typeof first.new_string === "string" ? first.new_string : null
+  );
+  if (!one) return null;
+  const rest2 = edits.length - 1;
+  return rest2 > 0 ? `${one} (and ${rest2} more edit${rest2 > 1 ? "s" : ""})` : one;
+}
+function changeFact(tool, input) {
+  if (!tool) return null;
+  switch (tool) {
+    case "Edit":
+      return editFact(str2(input, "old_string"), str2(input, "new_string"));
+    case "MultiEdit":
+      return multiEditFact(input);
+    case "NotebookEdit":
+      return editFact(null, str2(input, "new_source"));
+    case "Write": {
+      const content = str2(input, "content") ?? str2(input, "new_source");
+      return content ? `wrote "${clip2(content, 140)}"` : "wrote a new file";
+    }
+    case "Bash":
+    case "PowerShell": {
+      const cmd = str2(input, "command");
+      return cmd ? `ran: ${clip2(cmd, 160)}` : null;
+    }
+    case "Grep":
+    case "Glob": {
+      const pat = str2(input, "pattern");
+      return pat ? `searched for "${clip2(pat, 80)}"` : null;
+    }
+    default:
+      return null;
+  }
 }
 
 // src/timeline/attribution.ts
@@ -6305,6 +6364,7 @@ function attributeChunk(turns, startTs, endTs) {
       resolved: false,
       raw: rawDetail(t.tool, t.input),
       why: t.assistantText ?? null,
+      evidence: changeFact(t.tool, t.input),
       failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
       ts: t.ts,
       thoughtFirst: false,
@@ -6346,6 +6406,7 @@ function loneThinkRow(run) {
     resolved: false,
     raw: null,
     why: last?.why ?? null,
+    evidence: null,
     failSummary: null,
     ts: run[0]?.ts ?? 0,
     thoughtFirst: false,
@@ -6544,12 +6605,16 @@ function selectActive(items) {
 }
 
 // src/timeline/explain-prompt.ts
-function actionContext(l) {
+function actionContext(l, rich) {
   const status = l.status === "fail" ? " [failed]" : "";
   const detail = l.raw ? ` (${l.raw})` : "";
   const reason = l.why ? ` reasoning: ${l.why}` : "";
+  const change = rich && l.evidence ? ` change: ${l.evidence}` : "";
   const fail = l.failSummary ? ` ${l.failSummary}` : "";
-  return `- ${l.label}${detail}${status}${reason}${fail}`;
+  return `- ${l.label}${detail}${status}${reason}${change}${fail}`;
+}
+function specificityRule(rich) {
+  return rich ? " Name the actual files, identifiers, values, and root cause from the changes and reasoning above; be as specific as the evidence allows." : "";
 }
 function taskInstruction(depth) {
   switch (depth) {
@@ -6584,21 +6649,21 @@ function actionInstruction(depth) {
 }
 var SELF_CONTAINED = "Explain only the steps shown above. The steps are all the context that exists, so never ask the user for more information, never say you lack context, and never ask them to describe what happened. If the detail is sparse, give your best plain high-level explanation from what is shown.";
 var TAIL = "Describe the goal, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Write the labels and body as plain text, with no markdown formatting: no asterisks, backticks, or bold. Reply with only the explanation, no preamble.";
-function buildTaskExplainPrompt(taskName, lines, depth) {
-  const body = lines.map(actionContext).join("\n");
+function buildTaskExplainPrompt(taskName, lines, depth, rich = true) {
+  const body = lines.map((l) => actionContext(l, rich)).join("\n");
   return [
     `Codey automatically grouped these steps from an AI coding agent and labeled the group "${taskName}". That label is a rough guess, not the agent's stated goal, so explain what the steps below actually accomplish and do not claim the agent did the wrong thing just because the steps differ from the label. These are the steps, with the agent's own reasoning:`,
     body,
     "",
-    `${taskInstruction(depth)} ${SELF_CONTAINED} ${TAIL}`
+    `${taskInstruction(depth)}${specificityRule(rich)} ${SELF_CONTAINED} ${TAIL}`
   ].join("\n");
 }
-function buildActionExplainPrompt(line, depth) {
+function buildActionExplainPrompt(line, depth, rich = true) {
   const intro = line.tool === "thinking" ? "An AI coding agent was deciding what to do next. This is that decision point, with the agent's own words:" : "An AI coding agent took this single step, with its own reasoning:";
-  const decisionRule = line.tool === "thinking" ? " Explain the specific decision the agent was making and what it chose to do next, grounded in its words above. Do not say the agent paused, reflected, or thought; name the actual choice." : "";
+  const decisionRule = line.tool === "thinking" ? " Explain the specific decision the agent was making and what it chose to do next, grounded in its words above. Do not say the agent paused, reflected, or thought; name the actual choice." : specificityRule(rich);
   return [
     intro,
-    actionContext(line),
+    actionContext(line, rich),
     "",
     `${actionInstruction(depth)}${decisionRule} ${SELF_CONTAINED} ${TAIL}`
   ].join("\n");
@@ -6609,6 +6674,18 @@ function taskBlock(t) {
   const reasons = t.lines.map((l) => l.why ? `    - ${l.why}` : `    - ${l.label}`).join("\n");
   return `- ${t.name}
 ${reasons}`;
+}
+function changeFacts(tasks) {
+  const edits = [];
+  const rest2 = [];
+  for (const t of tasks) {
+    for (const l of t.lines) {
+      if (!l.evidence) continue;
+      const bucket = EDIT_TOOLS.has(l.tool) ? edits : rest2;
+      if (!edits.includes(l.evidence) && !rest2.includes(l.evidence)) bucket.push(l.evidence);
+    }
+  }
+  return [...edits, ...rest2];
 }
 function basename5(p) {
   return p.replace(/["']/g, "").split(/[\\/]/).pop() || p;
@@ -6641,7 +6718,7 @@ function verifications(tasks) {
   }
   return out;
 }
-function evidenceBlock(tasks) {
+function evidenceBlock(tasks, rich) {
   const files = changedFiles(tasks);
   const checks = verifications(tasks);
   const lines = [
@@ -6649,6 +6726,18 @@ function evidenceBlock(tasks) {
     `Files touched: ${files.length ? files.join(", ") : "none (Claude only looked around, did not change files)"}`,
     `Verification that ran: ${checks.length ? checks.join(", ") : "none (do not claim anything was tested or verified)"}`
   ];
+  if (rich) {
+    const facts = changeFacts(tasks);
+    if (facts.length) {
+      const MAX = 12;
+      const shown = facts.slice(0, MAX);
+      const extra = facts.length - shown.length;
+      const tail = extra > 0 ? `
+    - (and ${extra} more change${extra > 1 ? "s" : ""})` : "";
+      lines.push("Concrete changes (the actual edits, searches, and commands):");
+      lines.push(shown.map((f) => `    - ${f}`).join("\n") + tail);
+    }
+  }
   return lines.join("\n");
 }
 function whatChangedGuidance(fileCount) {
@@ -6660,11 +6749,15 @@ function whatChangedGuidance(fileCount) {
   }
   return "What changed: the actual behavior that changed, in concrete terms, in one or two plain sentences (or, if nothing changed, what Claude inspected or found).";
 }
-function instruction(depth, fileCount) {
+function specificityRule2(rich) {
+  return rich ? " Name the specific identifiers, values, files, and root cause from the concrete changes above; be as precise as the evidence allows instead of paraphrasing." : "";
+}
+function instruction(depth, fileCount, rich) {
   const whatChanged = whatChangedGuidance(fileCount);
+  const specifics = specificityRule2(rich);
   switch (depth) {
     case "simple":
-      return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found.";
+      return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found." + specifics;
     case "teach":
       return [
         "Recap what Claude accomplished, for someone learning to code, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
@@ -6675,7 +6768,7 @@ function instruction(depth, fileCount) {
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
         "Concept: teach the one technique, tool, or skill worth learning from this work. Choose something concrete that Claude actually used here (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then say how Claude used it in this work. Two or three sentences, and define any term you introduce.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
-        "Write the report from the evidence above; do not just repeat Claude's closing chat message back."
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back." + specifics
       ].join("\n");
     default:
       return [
@@ -6686,11 +6779,11 @@ function instruction(depth, fileCount) {
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
-        "Write the report from the evidence above; do not just repeat Claude's closing chat message back."
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back." + specifics
       ].join("\n");
   }
 }
-function buildSummaryPrompt(promptText, tasks, depth) {
+function buildSummaryPrompt(promptText, tasks, depth, rich = true) {
   const body = tasks.map(taskBlock).join("\n");
   const fileCount = changedFiles(tasks).length;
   return [
@@ -6698,9 +6791,9 @@ function buildSummaryPrompt(promptText, tasks, depth) {
     "It worked through these tasks, with its own reasoning:",
     body,
     "",
-    evidenceBlock(tasks),
+    evidenceBlock(tasks, rich),
     "",
-    `${instruction(depth, fileCount)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`
+    `${instruction(depth, fileCount, rich)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`
   ].join("\n");
 }
 
@@ -6769,7 +6862,7 @@ function timelineDefaults(mode) {
   }
 }
 function lineKey(l) {
-  return [l.label, l.tool, l.status, l.why, l.raw, l.failSummary];
+  return [l.label, l.tool, l.status, l.why, l.raw, l.evidence, l.failSummary];
 }
 function actionId(chunkId, index) {
   return `${chunkId}#${index}`;
@@ -6785,11 +6878,12 @@ function summaryTasks(chunks) {
   return chunks.map((c) => ({ name: c.name, lines: c.receipt.workLines }));
 }
 function locate(snap, req) {
+  const rich = req.rich !== false;
   if (req.scope === "task") {
     const c = snap.chunks.find((x) => x.id === req.id);
     if (!c) return null;
     const lines = c.receipt.workLines;
-    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth), hash: hashContent(lines.map(lineKey)) };
+    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth, rich), hash: hashContent([lines.map(lineKey), rich]) };
   }
   if (req.scope === "action") {
     const parsed = parseActionId(req.id);
@@ -6797,13 +6891,13 @@ function locate(snap, req) {
     const c = snap.chunks.find((x) => x.id === parsed.chunkId);
     const line = c?.receipt.workLines[parsed.index];
     if (!line) return null;
-    return { prompt: buildActionExplainPrompt(line, req.depth), hash: hashContent(lineKey(line)) };
+    return { prompt: buildActionExplainPrompt(line, req.depth, rich), hash: hashContent([lineKey(line), rich]) };
   }
   const g = snap.groups.find((x) => x.id === req.id);
   if (!g) return null;
   const tasks = summaryTasks(g.chunks);
-  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)])]);
-  return { prompt: buildSummaryPrompt(g.prompt, tasks, req.depth), hash };
+  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)]), rich]);
+  return { prompt: buildSummaryPrompt(g.prompt, tasks, req.depth, rich), hash };
 }
 async function explain(snap, req, deps) {
   const loc = locate(snap, req);
@@ -6822,11 +6916,11 @@ async function explain(snap, req, deps) {
   return { text, cached: false, paused: false };
 }
 var ALL_DEPTHS = ["simple", "deep", "teach"];
-function collectCachedExplanations(snap, root) {
+function collectCachedExplanations(snap, root, rich = true) {
   const out = {};
   const take = (scope, id) => {
     for (const depth of ALL_DEPTHS) {
-      const loc = locate(snap, { sessionId: snap.sessionId, scope, id, depth });
+      const loc = locate(snap, { sessionId: snap.sessionId, scope, id, depth, rich });
       if (!loc) continue;
       const hit = readExplanation(snap.sessionId, scope, id, loc.hash, depth, root);
       if (hit != null) out[`${scope}|${id}|${depth}`] = hit;
@@ -6839,15 +6933,15 @@ function collectCachedExplanations(snap, root) {
   for (const g of snap.groups) take("summary", g.id);
   return out;
 }
-function fillCachedExplanations(snap, depth, root) {
+function fillCachedExplanations(snap, depth, root, rich = true) {
   const chunks = snap.chunks.map((c) => {
-    const loc = locate(snap, { sessionId: snap.sessionId, scope: "task", id: c.id, depth });
+    const loc = locate(snap, { sessionId: snap.sessionId, scope: "task", id: c.id, depth, rich });
     const hit = loc ? readExplanation(snap.sessionId, "task", c.id, loc.hash, depth, root) : null;
     return { ...c, explanation: hit };
   });
   const byId = new Map(chunks.map((c) => [c.id, c]));
   const groups = snap.groups.map((g) => {
-    const loc = locate(snap, { sessionId: snap.sessionId, scope: "summary", id: g.id, depth });
+    const loc = locate(snap, { sessionId: snap.sessionId, scope: "summary", id: g.id, depth, rich });
     const hit = loc ? readExplanation(snap.sessionId, "summary", g.id, loc.hash, depth, root) : null;
     return { ...g, summary: hit, chunks: g.chunks.map((c) => byId.get(c.id) ?? c) };
   });
@@ -6999,7 +7093,7 @@ function backfillTokens(root = defaultRoot()) {
     }
   }
 }
-function loadSnapshot(sessionId, root = defaultRoot(), saver = false) {
+function loadSnapshot(sessionId, root = defaultRoot(), saver = false, rich = true) {
   const store = new SessionStore(sessionId, root);
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
@@ -7050,12 +7144,12 @@ function loadSnapshot(sessionId, root = defaultRoot(), saver = false) {
     activeWarning: live ? resolveActiveWarning(reconciled, Date.now()) : null,
     budgetLeft: budgetLeftLabel(readBudget(store.dir))
   };
-  const filled = fillCachedExplanations(withMeta, seedDepth, root);
+  const filled = fillCachedExplanations(withMeta, seedDepth, root, rich);
   try {
     writeTokens(store.dir, filled.workTotal || 0);
   } catch {
   }
-  return { ...filled, cachedExplanations: collectCachedExplanations(filled, root) };
+  return { ...filled, cachedExplanations: collectCachedExplanations(filled, root, rich) };
 }
 function loadNow(sessionId, root = defaultRoot()) {
   const store = new SessionStore(sessionId, root);
@@ -7079,10 +7173,11 @@ async function runExplain(sessionId, body, root = defaultRoot()) {
   if (!isScope(b.scope) || !isDepth(b.depth) || typeof b.id !== "string") {
     return { text: null, cached: false, paused: false };
   }
-  const snap = loadSnapshot(sessionId, root);
+  const rich = b.rich !== false;
+  const snap = loadSnapshot(sessionId, root, false, rich);
   return explain(
     snap,
-    { sessionId, scope: b.scope, id: b.id, depth: b.depth },
+    { sessionId, scope: b.scope, id: b.id, depth: b.depth, rich },
     { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join19(root, sessionId) }
   );
 }
@@ -7228,9 +7323,9 @@ function runServe(opts) {
     fontsDir: join22(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
-    getSnapshot: (id, saver) => {
+    getSnapshot: (id, saver, rich) => {
       if (!safeId2(id)) throw new Error("invalid session id");
-      return loadSnapshot(id, void 0, saver);
+      return loadSnapshot(id, void 0, saver, rich);
     },
     getNow: (id) => {
       if (!safeId2(id)) throw new Error("invalid session id");

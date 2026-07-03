@@ -12,11 +12,15 @@ describe("resolveRoute", () => {
   });
 
   it("routes a session snapshot and decodes the id", () => {
-    expect(resolveRoute("GET", "/api/session/abc?t=1")).toEqual({ type: "session", id: "abc", saver: false });
+    expect(resolveRoute("GET", "/api/session/abc?t=1")).toEqual({ type: "session", id: "abc", saver: false, rich: true });
   });
 
   it("reads the saver flag from the query", () => {
-    expect(resolveRoute("GET", "/api/session/abc?saver=1")).toEqual({ type: "session", id: "abc", saver: true });
+    expect(resolveRoute("GET", "/api/session/abc?saver=1")).toEqual({ type: "session", id: "abc", saver: true, rich: true });
+  });
+
+  it("reads the budget flag from the query, defaulting to rich", () => {
+    expect(resolveRoute("GET", "/api/session/abc?rich=0")).toEqual({ type: "session", id: "abc", saver: false, rich: false });
   });
 
   it("routes GET /api/session/:id/now to now, not snapshot", () => {
@@ -80,7 +84,7 @@ describe("resolveRoute", () => {
   });
 
   it("GET /api/session/:id still resolves to session (not delete)", () => {
-    expect(resolveRoute("GET", "/api/session/abc")).toEqual({ type: "session", id: "abc", saver: false });
+    expect(resolveRoute("GET", "/api/session/abc")).toEqual({ type: "session", id: "abc", saver: false, rich: true });
   });
 
   it("POST /api/session/:id/intervene still resolves to intervene", () => {

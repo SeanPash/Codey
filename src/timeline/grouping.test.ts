@@ -7,7 +7,7 @@ function line(p: Partial<ReceiptLine>): ReceiptLine {
   return { label: "Thought about the next step.", title: "Planning the next step",
     subtitle: "Claude weighed the next step before continuing.",
     tool: "thinking", tokens: 0, status: "none", errorText: null, resolved: false,
-    raw: null, why: null, failSummary: null, ts: 0, thoughtFirst: false, ...p };
+    raw: null, why: null, evidence: null, failSummary: null, ts: 0, thoughtFirst: false, ...p };
 }
 
 describe("groupThinking", () => {

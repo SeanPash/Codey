@@ -14,6 +14,7 @@ function line(over: Partial<ReceiptLine> = {}): ReceiptLine {
     resolved: false,
     raw: "src/serve/server.ts",
     why: "I'll add the route so the page can fetch explanations.",
+    evidence: null,
     failSummary: null,
     ts: 1000,
     thoughtFirst: false,
@@ -70,6 +71,18 @@ describe("buildTaskExplainPrompt", () => {
     expect(p).toContain("rough guess");
     expect(p).toContain("do not claim the agent did the wrong thing");
   });
+
+  it("in rich mode, feeds the concrete change substance so it can name the real change", () => {
+    const l = line({ evidence: 'replaced ".sw {" with ".stgl {"' });
+    const p = buildTaskExplainPrompt("Rename the class", [l], "deep", true);
+    expect(p).toContain(".stgl");
+  });
+
+  it("in budget mode, leaves the concrete change substance out to stay cheap", () => {
+    const l = line({ evidence: 'replaced ".sw {" with ".stgl {"' });
+    const p = buildTaskExplainPrompt("Rename the class", [l], "deep", false);
+    expect(p).not.toContain(".stgl");
+  });
 });
 
 describe("buildActionExplainPrompt", () => {
@@ -105,5 +118,15 @@ describe("buildActionExplainPrompt", () => {
     // It must steer the model toward the real choice and away from empty hedging.
     expect(low).toContain("name the actual choice");
     expect(low).toMatch(/do not say the agent paused/);
+  });
+
+  it("in rich mode, includes the action's concrete change substance", () => {
+    const p = buildActionExplainPrompt(line({ evidence: 'replaced ".sw {" with ".stgl {"' }), "deep", true);
+    expect(p).toContain(".stgl");
+  });
+
+  it("in budget mode, leaves the change substance out", () => {
+    const p = buildActionExplainPrompt(line({ evidence: 'replaced ".sw {" with ".stgl {"' }), "deep", false);
+    expect(p).not.toContain(".stgl");
   });
 });

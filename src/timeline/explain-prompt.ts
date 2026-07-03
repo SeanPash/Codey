@@ -5,12 +5,23 @@ export type ExplainDepth = "simple" | "deep" | "teach";
 
 // One line of context per action: what it was, whether it worked, and the reasoning Claude
 // wrote at the time. The reasoning is what lets the model explain why and how, not just what.
-function actionContext(l: ReceiptLine): string {
+// In rich mode we also feed the grounded change substance (the real edit/search/command), which
+// is what lets the explanation name the actual change instead of only naming a file.
+function actionContext(l: ReceiptLine, rich: boolean): string {
   const status = l.status === "fail" ? " [failed]" : "";
   const detail = l.raw ? ` (${l.raw})` : "";
   const reason = l.why ? ` reasoning: ${l.why}` : "";
+  const change = rich && l.evidence ? ` change: ${l.evidence}` : "";
   const fail = l.failSummary ? ` ${l.failSummary}` : "";
-  return `- ${l.label}${detail}${status}${reason}${fail}`;
+  return `- ${l.label}${detail}${status}${reason}${change}${fail}`;
+}
+
+// In rich mode, push the explanation to name the concrete things it was handed instead of
+// staying generic. Empty in budget mode so the lean prompt is unchanged.
+function specificityRule(rich: boolean): string {
+  return rich
+    ? " Name the actual files, identifiers, values, and root cause from the changes and reasoning above; be as specific as the evidence allows."
+    : "";
 }
 
 function taskInstruction(depth: ExplainDepth): string {
@@ -56,19 +67,19 @@ const TAIL = "Describe the goal, do not list the tools. Do not use em dashes or 
 // why and how. The task name is Codey's own automatic guess, so we say so plainly: the model
 // must explain what the steps actually do, not accuse the agent of going off-task when the
 // steps happen to differ from a label Codey invented.
-export function buildTaskExplainPrompt(taskName: string, lines: ReceiptLine[], depth: ExplainDepth): string {
-  const body = lines.map(actionContext).join("\n");
+export function buildTaskExplainPrompt(taskName: string, lines: ReceiptLine[], depth: ExplainDepth, rich = true): string {
+  const body = lines.map((l) => actionContext(l, rich)).join("\n");
   return [
     `Codey automatically grouped these steps from an AI coding agent and labeled the group "${taskName}". That label is a rough guess, not the agent's stated goal, so explain what the steps below actually accomplish and do not claim the agent did the wrong thing just because the steps differ from the label. These are the steps, with the agent's own reasoning:`,
     body,
     "",
-    `${taskInstruction(depth)} ${SELF_CONTAINED} ${TAIL}`,
+    `${taskInstruction(depth)}${specificityRule(rich)} ${SELF_CONTAINED} ${TAIL}`,
   ].join("\n");
 }
 
 // Explain one action in isolation, at the chosen depth. A lone step is the thinnest context of
 // all (often just "Thought it through"), so the self-contained rules matter most here.
-export function buildActionExplainPrompt(line: ReceiptLine, depth: ExplainDepth): string {
+export function buildActionExplainPrompt(line: ReceiptLine, depth: ExplainDepth, rich = true): string {
   const intro = line.tool === "thinking"
     ? "An AI coding agent was deciding what to do next. This is that decision point, with the agent's own words:"
     : "An AI coding agent took this single step, with its own reasoning:";
@@ -76,10 +87,10 @@ export function buildActionExplainPrompt(line: ReceiptLine, depth: ExplainDepth)
   // narrate that it "paused and reflected". That filler says nothing and is explicitly unwanted.
   const decisionRule = line.tool === "thinking"
     ? " Explain the specific decision the agent was making and what it chose to do next, grounded in its words above. Do not say the agent paused, reflected, or thought; name the actual choice."
-    : "";
+    : specificityRule(rich);
   return [
     intro,
-    actionContext(line),
+    actionContext(line, rich),
     "",
     `${actionInstruction(depth)}${decisionRule} ${SELF_CONTAINED} ${TAIL}`,
   ].join("\n");

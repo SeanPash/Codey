@@ -7,7 +7,7 @@ function line(why: string): ReceiptLine {
   return {
     label: "Editing budget.ts", title: "Updating budget.ts", subtitle: "Changing budget.ts to adjust how it works.",
     tool: "Edit", tokens: 50, status: "ok", errorText: null,
-    resolved: false, raw: "src/budget/budget.ts", why, failSummary: null, ts: 1, thoughtFirst: false,
+    resolved: false, raw: "src/budget/budget.ts", why, evidence: null, failSummary: null, ts: 1, thoughtFirst: false,
   };
 }
 
@@ -19,7 +19,7 @@ function bashLine(command: string): ReceiptLine {
   return {
     label: "Running the tests", title: "Verifying the tests", subtitle: "Running the tests to check it passes.",
     tool: "Bash", tokens: 10, status: "ok", errorText: null,
-    resolved: false, raw: command, why: "checking the work", failSummary: null, ts: 2, thoughtFirst: false,
+    resolved: false, raw: command, why: "checking the work", evidence: null, failSummary: null, ts: 2, thoughtFirst: false,
   };
 }
 
@@ -93,6 +93,23 @@ describe("buildSummaryPrompt", () => {
     // teach scales the same way
     const bigTeach = buildSummaryPrompt("p", [{ name: "overhaul", lines: manyFiles }], "teach");
     expect(bigTeach).toMatch(/three to five/);
+  });
+
+  it("in rich mode, feeds the concrete change substance so the recap names the real change", () => {
+    const editLine: ReceiptLine = { ...line("renaming the class"), evidence: 'replaced ".sw {" with ".stgl {"' };
+    const p = buildSummaryPrompt("fix toggles", [{ name: "Rename", lines: [editLine] }], "deep", true);
+    expect(p).toContain(".stgl");
+  });
+
+  it("in budget mode, omits the concrete change substance to stay cheap", () => {
+    const editLine: ReceiptLine = { ...line("renaming the class"), evidence: 'replaced ".sw {" with ".stgl {"' };
+    const p = buildSummaryPrompt("fix toggles", [{ name: "Rename", lines: [editLine] }], "deep", false);
+    expect(p).not.toContain(".stgl");
+  });
+
+  it("in rich mode, asks the recap to name the specific identifiers and root cause", () => {
+    const p = buildSummaryPrompt("p", tasks, "deep", true).toLowerCase();
+    expect(p).toMatch(/name the (actual|real|specific)/);
   });
 
   it("only offers verification as grounding when a check actually ran", () => {

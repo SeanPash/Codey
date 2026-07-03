@@ -6,6 +6,7 @@ import { describeShellIntent } from "../caption/shell.js";
 import { cleanReasoning } from "../caption/reasoning.js";
 import { actionLabel, shortTarget } from "../statusline/labels.js";
 import { hasBannedPhrase } from "../caption/banned.js";
+import { changeFact } from "./change-facts.js";
 
 function basename(p: string): string {
   const parts = p.split(/[\\/]/);
@@ -211,6 +212,7 @@ export function attributeChunk(turns: AssistantTurn[], startTs: number, endTs: n
       resolved: false,
       raw: rawDetail(t.tool, t.input),
       why: t.assistantText ?? null,
+      evidence: changeFact(t.tool, t.input),
       failSummary: isFail ? failSummaryFrom(t.tool, t.errorText) : null,
       ts: t.ts,
       thoughtFirst: false,

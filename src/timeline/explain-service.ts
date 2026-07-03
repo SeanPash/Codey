@@ -14,6 +14,7 @@ export interface ExplainRequest {
   scope: ExplainScope;
   id: string;            // chunk id, group id, or "chunkId#lineIndex" for an action
   depth: ExplainDepth;
+  rich?: boolean;        // rich = grounded change-facts fed in; budget = the lean prompt. Default rich.
 }
 
 export interface ExplainResult {
@@ -48,9 +49,10 @@ export function timelineDefaults(mode: "simple" | "deep" | "teach" | null): { se
 }
 
 // Just the parts of a line that change its meaning, so the cache key moves only when the
-// content actually changes (not on token counts or timestamps).
+// content actually changes (not on token counts or timestamps). Evidence is included so a rich
+// explanation is regenerated when the underlying change substance shifts.
 function lineKey(l: ReceiptLine): unknown[] {
-  return [l.label, l.tool, l.status, l.why, l.raw, l.failSummary];
+  return [l.label, l.tool, l.status, l.why, l.raw, l.evidence, l.failSummary];
 }
 
 export function actionId(chunkId: string, index: number): string {
@@ -74,11 +76,14 @@ interface Located { prompt: string; hash: string; }
 // Find what a request points at and build both its prompt and its content hash. Returns null
 // when the id does not resolve, so a stale browser id degrades to "nothing to show".
 function locate(snap: SessionSnapshot, req: ExplainRequest): Located | null {
+  // Rich is the default; only an explicit false selects the lean budget prompt. Richness is folded
+  // into every cache hash so a rich and a budget explanation never resolve to the same entry.
+  const rich = req.rich !== false;
   if (req.scope === "task") {
     const c = snap.chunks.find((x) => x.id === req.id);
     if (!c) return null;
     const lines = c.receipt.workLines;
-    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth), hash: hashContent(lines.map(lineKey)) };
+    return { prompt: buildTaskExplainPrompt(c.name, lines, req.depth, rich), hash: hashContent([lines.map(lineKey), rich]) };
   }
   if (req.scope === "action") {
     const parsed = parseActionId(req.id);
@@ -86,14 +91,14 @@ function locate(snap: SessionSnapshot, req: ExplainRequest): Located | null {
     const c = snap.chunks.find((x) => x.id === parsed.chunkId);
     const line = c?.receipt.workLines[parsed.index];
     if (!line) return null;
-    return { prompt: buildActionExplainPrompt(line, req.depth), hash: hashContent(lineKey(line)) };
+    return { prompt: buildActionExplainPrompt(line, req.depth, rich), hash: hashContent([lineKey(line), rich]) };
   }
   // summary
   const g = snap.groups.find((x) => x.id === req.id);
   if (!g) return null;
   const tasks = summaryTasks(g.chunks);
-  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)])]);
-  return { prompt: buildSummaryPrompt(g.prompt, tasks, req.depth), hash };
+  const hash = hashContent([g.prompt, tasks.map((t) => [t.name, t.lines.map(lineKey)]), rich]);
+  return { prompt: buildSummaryPrompt(g.prompt, tasks, req.depth, rich), hash };
 }
 
 // Resolve a request to text: cache first, then generate through the metered path while the
@@ -133,11 +138,11 @@ const ALL_DEPTHS: ExplainDepth[] = ["simple", "deep", "teach"];
 // what lets a reopened timeline (even in a brand new session) repaint everything that was
 // clicked without spending tokens again: the work is already on disk, so we just hand it back.
 // Only entries whose content still matches survive, since locate keys off the live content hash.
-export function collectCachedExplanations(snap: SessionSnapshot, root: string): Record<string, string> {
+export function collectCachedExplanations(snap: SessionSnapshot, root: string, rich = true): Record<string, string> {
   const out: Record<string, string> = {};
   const take = (scope: ExplainScope, id: string) => {
     for (const depth of ALL_DEPTHS) {
-      const loc = locate(snap, { sessionId: snap.sessionId, scope, id, depth });
+      const loc = locate(snap, { sessionId: snap.sessionId, scope, id, depth, rich });
       if (!loc) continue;
       const hit = readExplanation(snap.sessionId, scope, id, loc.hash, depth, root);
       if (hit != null) out[`${scope}|${id}|${depth}`] = hit;
@@ -153,15 +158,15 @@ export function collectCachedExplanations(snap: SessionSnapshot, root: string): 
 
 // Fill a freshly built snapshot with any explanations already cached at the given depth, so a
 // reopened timeline shows what the user generated before without another round-trip.
-export function fillCachedExplanations(snap: SessionSnapshot, depth: ExplainDepth, root: string): SessionSnapshot {
+export function fillCachedExplanations(snap: SessionSnapshot, depth: ExplainDepth, root: string, rich = true): SessionSnapshot {
   const chunks = snap.chunks.map((c) => {
-    const loc = locate(snap, { sessionId: snap.sessionId, scope: "task", id: c.id, depth });
+    const loc = locate(snap, { sessionId: snap.sessionId, scope: "task", id: c.id, depth, rich });
     const hit = loc ? readExplanation(snap.sessionId, "task", c.id, loc.hash, depth, root) : null;
     return { ...c, explanation: hit };
   });
   const byId = new Map(chunks.map((c) => [c.id, c]));
   const groups = snap.groups.map((g) => {
-    const loc = locate(snap, { sessionId: snap.sessionId, scope: "summary", id: g.id, depth });
+    const loc = locate(snap, { sessionId: snap.sessionId, scope: "summary", id: g.id, depth, rich });
     const hit = loc ? readExplanation(snap.sessionId, "summary", g.id, loc.hash, depth, root) : null;
     return { ...g, summary: hit, chunks: g.chunks.map((c) => byId.get(c.id) ?? c) };
   });

@@ -7,11 +7,30 @@ export interface SummaryTask {
   lines: ReceiptLine[];
 }
 
+// The task's reasoning list. The concrete change substance is not inlined here; it lives once, in
+// the capped "Concrete changes" block, so a prompt with hundreds of edits cannot flood the window.
 function taskBlock(t: SummaryTask): string {
   const reasons = t.lines
     .map((l) => (l.why ? `    - ${l.why}` : `    - ${l.label}`))
     .join("\n");
   return `- ${t.name}\n${reasons}`;
+}
+
+// The concrete change substance across the whole prompt, gathered from the per-line change-facts.
+// This is the honest, grounded detail (the real edits, searches, commands) that lets a rich recap
+// name what actually changed instead of paraphrasing. Edits and writes lead, since a captured
+// sample should name real code changes before searches or commands. Empty when nothing happened.
+function changeFacts(tasks: SummaryTask[]): string[] {
+  const edits: string[] = [];
+  const rest: string[] = [];
+  for (const t of tasks) {
+    for (const l of t.lines) {
+      if (!l.evidence) continue;
+      const bucket = EDIT_TOOLS.has(l.tool) ? edits : rest;
+      if (!edits.includes(l.evidence) && !rest.includes(l.evidence)) bucket.push(l.evidence);
+    }
+  }
+  return [...edits, ...rest];
 }
 
 function basename(p: string): string {
@@ -55,7 +74,7 @@ function verifications(tasks: SummaryTask[]): string[] {
 
 // The grounding block: the concrete files and checks the recap is allowed to cite, so the model
 // stays honest instead of inventing changes or claiming a verification that never ran.
-function evidenceBlock(tasks: SummaryTask[]): string {
+function evidenceBlock(tasks: SummaryTask[], rich: boolean): string {
   const files = changedFiles(tasks);
   const checks = verifications(tasks);
   const lines = [
@@ -63,6 +82,20 @@ function evidenceBlock(tasks: SummaryTask[]): string {
     `Files touched: ${files.length ? files.join(", ") : "none (Claude only looked around, did not change files)"}`,
     `Verification that ran: ${checks.length ? checks.join(", ") : "none (do not claim anything was tested or verified)"}`,
   ];
+  // In rich mode, list the concrete changes so the recap can name the real edit or search. The
+  // list is capped so a huge prompt cannot flood the window; the count tells the model there was
+  // more without paying for every line.
+  if (rich) {
+    const facts = changeFacts(tasks);
+    if (facts.length) {
+      const MAX = 12;
+      const shown = facts.slice(0, MAX);
+      const extra = facts.length - shown.length;
+      const tail = extra > 0 ? `\n    - (and ${extra} more change${extra > 1 ? "s" : ""})` : "";
+      lines.push("Concrete changes (the actual edits, searches, and commands):");
+      lines.push(shown.map((f) => `    - ${f}`).join("\n") + tail);
+    }
+  }
   return lines.join("\n");
 }
 
@@ -79,11 +112,20 @@ function whatChangedGuidance(fileCount: number): string {
   return "What changed: the actual behavior that changed, in concrete terms, in one or two plain sentences (or, if nothing changed, what Claude inspected or found).";
 }
 
-function instruction(depth: ExplainDepth, fileCount: number): string {
+// In rich mode, push the recap to name the concrete things the evidence hands it (the real
+// identifiers, values, and root cause) instead of paraphrasing. Empty in budget mode.
+function specificityRule(rich: boolean): string {
+  return rich
+    ? " Name the specific identifiers, values, files, and root cause from the concrete changes above; be as precise as the evidence allows instead of paraphrasing."
+    : "";
+}
+
+function instruction(depth: ExplainDepth, fileCount: number, rich: boolean): string {
   const whatChanged = whatChangedGuidance(fileCount);
+  const specifics = specificityRule(rich);
   switch (depth) {
     case "simple":
-      return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found.";
+      return "In one plain English sentence for a non-technical person, recap what Claude accomplished for this prompt. Only say it changed, fixed, or verified something if the evidence shows it; otherwise say what it inspected or found." + specifics;
     case "teach":
       return [
         "Recap what Claude accomplished, for someone learning to code, as a short, organized work report. Use these labeled sections, each on its own line starting with the label and a colon, with a blank line between sections. Keep the secondary sections to one or two plain sentences, give the lengths noted below, no bullet characters:",
@@ -94,7 +136,7 @@ function instruction(depth: ExplainDepth, fileCount: number): string {
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
         "Concept: teach the one technique, tool, or skill worth learning from this work. Choose something concrete that Claude actually used here (for example an API, caching, a hash, a data structure, a file watcher), not a basic term the reader already knows like a prompt, a file, or a function. Name it, explain what it is in plain terms with a short everyday analogy, then say how Claude used it in this work. Two or three sentences, and define any term you introduce.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
-        "Write the report from the evidence above; do not just repeat Claude's closing chat message back.",
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back." + specifics,
       ].join("\n");
     default:
       return [
@@ -105,14 +147,14 @@ function instruction(depth: ExplainDepth, fileCount: number): string {
         "Verification: the checks from the evidence, or omit this section entirely if none ran.",
         "What's left: anything still open or unverified, or omit this section if the work is complete.",
         "Only say fixed, updated, reinstalled, or verified when the evidence supports it.",
-        "Write the report from the evidence above; do not just repeat Claude's closing chat message back.",
+        "Write the report from the evidence above; do not just repeat Claude's closing chat message back." + specifics,
       ].join("\n");
   }
 }
 
 // Build a per-prompt recap prompt: the user's words, the tasks Claude ran with its reasoning,
 // and the grounded evidence of what really changed, asking for an honest outcome.
-export function buildSummaryPrompt(promptText: string, tasks: SummaryTask[], depth: ExplainDepth): string {
+export function buildSummaryPrompt(promptText: string, tasks: SummaryTask[], depth: ExplainDepth, rich = true): string {
   const body = tasks.map(taskBlock).join("\n");
   const fileCount = changedFiles(tasks).length;
   return [
@@ -120,8 +162,8 @@ export function buildSummaryPrompt(promptText: string, tasks: SummaryTask[], dep
     "It worked through these tasks, with its own reasoning:",
     body,
     "",
-    evidenceBlock(tasks),
+    evidenceBlock(tasks, rich),
     "",
-    `${instruction(depth, fileCount)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`,
+    `${instruction(depth, fileCount, rich)} Focus on the outcome, do not list the tools. Do not use em dashes or hyphens to join clauses; write plain sentences with commas or periods. Reply with only the recap, no preamble.`,
   ].join("\n");
 }
