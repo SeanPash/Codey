@@ -57,7 +57,7 @@ export function isRunning(dir: string, now: number, cancelledAt = 0): boolean {
   return withinWindow || isThinking;
 }
 
-export function loadSnapshot(sessionId: string, root: string = defaultRoot()): SessionSnapshot {
+export function loadSnapshot(sessionId: string, root: string = defaultRoot(), saver = false): SessionSnapshot {
   const store = new SessionStore(sessionId, root);
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
@@ -71,7 +71,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const lastPrompt = promptMarks.length ? promptMarks[promptMarks.length - 1] : 0;
   const foundTurn = lastPrompt > 0 ? events.findIndex((e) => e.timestamp >= lastPrompt) : 0;
   const turnStartIndex = foundTurn >= 0 ? foundTurn : events.length;
-  const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex });
+  const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex, saver });
   let mtimeMs = 0;
   try { mtimeMs = statSync(store.path).mtimeMs; } catch { mtimeMs = 0; }
   const name = sessionDisplayName({

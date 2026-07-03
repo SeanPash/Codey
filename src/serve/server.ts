@@ -8,7 +8,7 @@ export type RouteResult =
   | { type: "page" }
   | { type: "health" }
   | { type: "sessions" }
-  | { type: "session"; id: string }
+  | { type: "session"; id: string; saver: boolean }
   | { type: "now"; id: string }
   | { type: "intervene"; id: string }
   | { type: "rename"; id: string }
@@ -45,7 +45,12 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
     if (mnow) { const id = decodeId(mnow[1]); return id == null ? { type: "notfound" } : { type: "now", id }; }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
-    if (m) { const id = decodeId(m[1]); return id == null ? { type: "notfound" } : { type: "session", id }; }
+    if (m) {
+      const id = decodeId(m[1]);
+      // Token-saver clients pass ?saver=1 so the server defers live AI segmentation off the hot path.
+      const saver = /[?&]saver=1(?:&|$)/.test(url);
+      return id == null ? { type: "notfound" } : { type: "session", id, saver };
+    }
   }
   if (method === "POST") {
     const mi = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
@@ -78,7 +83,7 @@ export interface ServerDeps {
   fontsDir: string;
   buildId: string;          // identity the launcher checks to detect a stale server
   listSessions: () => SessionListItem[];
-  getSnapshot: (id: string) => SessionSnapshot;
+  getSnapshot: (id: string, saver: boolean) => SessionSnapshot;
   getNow: (id: string) => unknown;
   getLive: () => LiveSnapshot;
   intervene: (id: string, action: string) => boolean;
@@ -114,7 +119,7 @@ export function createServer(deps: ServerDeps): Server {
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
-        sendJson(res, 200, deps.getSnapshot(route.id));
+        sendJson(res, 200, deps.getSnapshot(route.id, route.saver));
       } else if (route.type === "now") {
         sendJson(res, 200, deps.getNow(route.id));
       } else if (route.type === "live") {

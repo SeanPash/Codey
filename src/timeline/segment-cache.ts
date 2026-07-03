@@ -109,16 +109,25 @@ function refresh(sessionId: string, events: ToolEvent[], lockBefore: number, pre
     .finally(() => { refreshing.delete(sessionId); });
 }
 
-export interface ChunksOpts { live: boolean; turnStartIndex: number; }
+export interface ChunksOpts { live: boolean; turnStartIndex: number; saver?: boolean }
 
 // Synchronous chunk source for a snapshot read: return cached chunks (or naive), and kick off a
 // background refresh of the live turn when it is stale. Completed prompts stay frozen.
+//
+// Token-saver defers all AI work off the live path: while the turn runs it shows the free naive
+// grouping and never fires a headless pass. It does a single paid pass once the turn is done and
+// the cache is behind, so the finished timeline still gets one clean AI grouping ("reveal on done").
 export function chunksFor(
   sessionId: string, events: ToolEvent[], root: string = defaultRoot(),
   opts: ChunksOpts = { live: true, turnStartIndex: 0 },
 ): RawChunk[] {
   const cache = readCache(sessionId, root);
   const plan = segmentPlan(cache, events.length, opts.live, opts.turnStartIndex);
-  if (plan.refresh) refresh(sessionId, events, plan.lockBefore, cache?.chunks ?? [], root);
+  let doRefresh = plan.refresh;
+  if (opts.saver) {
+    const behind = isStale(cache, events.length) && plan.lockBefore < events.length;
+    doRefresh = !opts.live && behind;   // never during a live turn; one pass once it finishes
+  }
+  if (doRefresh) refresh(sessionId, events, plan.lockBefore, cache?.chunks ?? [], root);
   return cache && cache.chunks.length > 0 ? cache.chunks : naiveSegment(events);
 }
