@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { statSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { SessionStore, defaultRoot } from "../store/session-store.js";
 import { readMeta } from "../store/session-meta.js";
@@ -6,6 +6,7 @@ import { readPrompts } from "../capture/prompts.js";
 import { readTranscriptTurns, readFirstPrompt, readUserPrompts, readLastInterrupt, type UserPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
 import { readCustomName } from "../store/session-name-store.js";
+import { writeTokens } from "../store/session-tokens-store.js";
 import { chunksFor } from "../timeline/segment-cache.js";
 import { buildSnapshot } from "./snapshot.js";
 import { readSpend } from "../cost/spend-log.js";
@@ -56,7 +57,25 @@ export function isRunning(dir: string, now: number, cancelledAt = 0): boolean {
   return withinWindow || isThinking;
 }
 
-export function loadSnapshot(sessionId: string, root: string = defaultRoot()): SessionSnapshot {
+// Persist a token total for every session with work but no total yet, so "Most tokens" sorting works
+// before each session is opened. Safe and free: AI segmentation only fires for live turns, and this
+// touches completed sessions, so building each snapshot just reads and attributes what is already on
+// disk. Runs once at server start; opened sessions keep their total fresh on their own.
+export function backfillTokens(root: string = defaultRoot()): void {
+  let ids: string[] = [];
+  try { ids = readdirSync(root); } catch { return; }
+  for (const id of ids) {
+    try {
+      const dir = join(root, id);
+      if (!statSync(dir).isDirectory()) continue;
+      if (!existsSync(join(dir, "events.jsonl"))) continue;   // only sessions that did real work
+      if (existsSync(join(dir, "tokens.json"))) continue;     // already have a persisted total
+      loadSnapshot(id, root);                                  // writes tokens.json as a side effect
+    } catch { /* skip a session that fails to load */ }
+  }
+}
+
+export function loadSnapshot(sessionId: string, root: string = defaultRoot(), saver = false): SessionSnapshot {
   const store = new SessionStore(sessionId, root);
   const events = store.readAll();
   const meta = readMeta(sessionId, root);
@@ -70,7 +89,7 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   const lastPrompt = promptMarks.length ? promptMarks[promptMarks.length - 1] : 0;
   const foundTurn = lastPrompt > 0 ? events.findIndex((e) => e.timestamp >= lastPrompt) : 0;
   const turnStartIndex = foundTurn >= 0 ? foundTurn : events.length;
-  const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex });
+  const rawChunks = chunksFor(sessionId, events, root, { live, turnStartIndex, saver });
   let mtimeMs = 0;
   try { mtimeMs = statSync(store.path).mtimeMs; } catch { mtimeMs = 0; }
   const name = sessionDisplayName({
@@ -111,6 +130,9 @@ export function loadSnapshot(sessionId: string, root: string = defaultRoot()): S
   // flat cachedExplanations map carries the rest (other depths, action-level) so the browser can
   // repaint everything the user ever clicked, even after a tab close or in a fresh session.
   const filled = fillCachedExplanations(withMeta, seedDepth, root);
+  // Persist the session's work-token total so the sidebar can sort by "Most tokens" cheaply,
+  // without every poll reparsing the transcript. The heavy work is already done above.
+  try { writeTokens(store.dir, filled.workTotal || 0); } catch { /* sorting is best-effort */ }
   return { ...filled, cachedExplanations: collectCachedExplanations(filled, root) };
 }
 
@@ -154,14 +176,15 @@ export async function runExplain(sessionId: string, body: unknown, root: string 
 
 // Compact snapshot for Live Split: one entry per active session, already ordered most
 // recent prompt first. runningTool is the tool of a still-open pre-event (Claude is mid-call).
-export function loadLive(root: string = defaultRoot()): LiveSnapshot {
+export function loadLive(root: string = defaultRoot(), saver = false): LiveSnapshot {
   const all = selectActive(listSessions(root));
   const dismissed = readDismissed(root);
   // Hidden terminals the user dismissed: dropped from the grid but offered back for restore.
   const hidden = all.filter((s) => dismissed.has(s.id)).map((s) => ({ sessionId: s.id, name: s.name, color: s.color }));
   const active = all.filter((s) => !dismissed.has(s.id));
   const sessions: LiveSession[] = active.map((s) => {
-    const snap = loadSnapshot(s.id, root);
+    // Token saver defers each pane's live AI segmentation, the same as the single view.
+    const snap = loadSnapshot(s.id, root, saver);
     const events = new SessionStore(s.id, root).readAll();
     const last = events[events.length - 1];
     // listSessions reads only the statusline, so a cancelled turn still looks "thinking" to it.

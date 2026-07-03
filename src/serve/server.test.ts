@@ -12,7 +12,11 @@ describe("resolveRoute", () => {
   });
 
   it("routes a session snapshot and decodes the id", () => {
-    expect(resolveRoute("GET", "/api/session/abc?t=1")).toEqual({ type: "session", id: "abc" });
+    expect(resolveRoute("GET", "/api/session/abc?t=1")).toEqual({ type: "session", id: "abc", saver: false });
+  });
+
+  it("reads the saver flag from the query", () => {
+    expect(resolveRoute("GET", "/api/session/abc?saver=1")).toEqual({ type: "session", id: "abc", saver: true });
   });
 
   it("routes GET /api/session/:id/now to now, not snapshot", () => {
@@ -33,7 +37,7 @@ describe("resolveRoute", () => {
   });
 
   it("routes the live endpoint", () => {
-    expect(resolveRoute("GET", "/api/live")).toEqual({ type: "live" });
+    expect(resolveRoute("GET", "/api/live")).toEqual({ type: "live", saver: false });
   });
 
   it("routes the health check", () => {
@@ -54,6 +58,10 @@ describe("resolveRoute", () => {
     expect(resolveRoute("POST", "/api/session/abc/explain")).toEqual({ type: "explain", id: "abc" });
   });
 
+  it("routes POST /api/session/:id/save to save", () => {
+    expect(resolveRoute("POST", "/api/session/abc/save")).toEqual({ type: "save", id: "abc" });
+  });
+
   it("does not treat a GET on the explain path as a snapshot", () => {
     expect(resolveRoute("GET", "/api/session/abc/explain")).toEqual({ type: "notfound" });
   });
@@ -72,7 +80,7 @@ describe("resolveRoute", () => {
   });
 
   it("GET /api/session/:id still resolves to session (not delete)", () => {
-    expect(resolveRoute("GET", "/api/session/abc")).toEqual({ type: "session", id: "abc" });
+    expect(resolveRoute("GET", "/api/session/abc")).toEqual({ type: "session", id: "abc", saver: false });
   });
 
   it("POST /api/session/:id/intervene still resolves to intervene", () => {

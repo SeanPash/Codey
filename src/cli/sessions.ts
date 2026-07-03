@@ -7,6 +7,8 @@ import { readMeta } from "../store/session-meta.js";
 import { readFirstPrompt } from "../timeline/transcript.js";
 import { sessionDisplayName, projectFrom, sessionColor } from "../timeline/session-name.js";
 import { readCustomName } from "../store/session-name-store.js";
+import { readSaved } from "../store/session-saved-store.js";
+import { readTokens } from "../store/session-tokens-store.js";
 import { readStatus } from "../statusline/state.js";
 
 // The mtime of a session's events.jsonl, or null if it has none. This is the real
@@ -51,6 +53,8 @@ export interface SessionListItem {
   open: boolean;           // used recently, so the terminal is probably still open
   acted: boolean;          // has captured at least one tool call (false = prompted, no work yet)
   live: boolean;           // alias of running, kept for existing callers
+  saved: boolean;          // user bookmarked this terminal (durable, server-side)
+  tokens: number;          // persisted work-token total, for the "Most tokens" sort (0 if never opened)
   day: string;             // "Today", "Yesterday", or a locale date string
 }
 
@@ -163,6 +167,8 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         open: !closed && lastActivity > 0 && now - lastActivity < OPEN_WINDOW_MS,
         acted: evMtime != null,
         live: running,
+        saved: readSaved(dir),
+        tokens: readTokens(dir),
         day: dayBucket(mtime, now),
         // carried only for the filter below; not part of the public shape
         _hasEvents: evMtime != null,

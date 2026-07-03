@@ -8,15 +8,16 @@ export type RouteResult =
   | { type: "page" }
   | { type: "health" }
   | { type: "sessions" }
-  | { type: "session"; id: string }
+  | { type: "session"; id: string; saver: boolean }
   | { type: "now"; id: string }
   | { type: "intervene"; id: string }
   | { type: "rename"; id: string }
+  | { type: "save"; id: string }
   | { type: "explain"; id: string }
   | { type: "delete"; id: string }
   | { type: "dismiss"; id: string }
   | { type: "restore"; id: string }
-  | { type: "live" }
+  | { type: "live"; saver: boolean }
   | { type: "font"; file: string }
   | { type: "notfound" };
 
@@ -38,19 +39,26 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (path === "/" || path === "/index.html") return { type: "page" };
     if (path === "/health") return { type: "health" };
     if (path === "/api/sessions") return { type: "sessions" };
-    if (path === "/api/live") return { type: "live" };
+    if (path === "/api/live") return { type: "live", saver: /[?&]saver=1(?:&|$)/.test(url) };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
     const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
     if (mnow) { const id = decodeId(mnow[1]); return id == null ? { type: "notfound" } : { type: "now", id }; }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
-    if (m) { const id = decodeId(m[1]); return id == null ? { type: "notfound" } : { type: "session", id }; }
+    if (m) {
+      const id = decodeId(m[1]);
+      // Token-saver clients pass ?saver=1 so the server defers live AI segmentation off the hot path.
+      const saver = /[?&]saver=1(?:&|$)/.test(url);
+      return id == null ? { type: "notfound" } : { type: "session", id, saver };
+    }
   }
   if (method === "POST") {
     const mi = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
     if (mi) { const id = decodeId(mi[1]); return id == null ? { type: "notfound" } : { type: "intervene", id }; }
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
     if (mn) { const id = decodeId(mn[1]); return id == null ? { type: "notfound" } : { type: "rename", id }; }
+    const msave = /^\/api\/session\/([^/]+)\/save$/.exec(path);
+    if (msave) { const id = decodeId(msave[1]); return id == null ? { type: "notfound" } : { type: "save", id }; }
     const me = /^\/api\/session\/([^/]+)\/explain$/.exec(path);
     if (me) { const id = decodeId(me[1]); return id == null ? { type: "notfound" } : { type: "explain", id }; }
     const md = /^\/api\/session\/([^/]+)\/dismiss$/.exec(path);
@@ -75,11 +83,12 @@ export interface ServerDeps {
   fontsDir: string;
   buildId: string;          // identity the launcher checks to detect a stale server
   listSessions: () => SessionListItem[];
-  getSnapshot: (id: string) => SessionSnapshot;
+  getSnapshot: (id: string, saver: boolean) => SessionSnapshot;
   getNow: (id: string) => unknown;
-  getLive: () => LiveSnapshot;
+  getLive: (saver: boolean) => LiveSnapshot;
   intervene: (id: string, action: string) => boolean;
   rename: (id: string, name: string) => boolean;
+  setSaved: (id: string, saved: boolean) => boolean;
   remove: (id: string) => boolean;
   dismiss: (id: string) => boolean;
   restore: (id: string) => boolean;
@@ -110,11 +119,11 @@ export function createServer(deps: ServerDeps): Server {
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
       } else if (route.type === "session") {
-        sendJson(res, 200, deps.getSnapshot(route.id));
+        sendJson(res, 200, deps.getSnapshot(route.id, route.saver));
       } else if (route.type === "now") {
         sendJson(res, 200, deps.getNow(route.id));
       } else if (route.type === "live") {
-        sendJson(res, 200, deps.getLive());
+        sendJson(res, 200, deps.getLive(route.saver));
       } else if (route.type === "font") {
         const ct = route.file.endsWith(".woff2") ? "font/woff2" : "font/woff";
         res.writeHead(200, { "content-type": ct, "cache-control": "max-age=86400" });
@@ -131,6 +140,13 @@ export function createServer(deps: ServerDeps): Server {
           let name = "";
           try { name = String((JSON.parse(body || "{}") as { name?: unknown }).name ?? ""); } catch { name = ""; }
           const ok = deps.rename(route.id, name);
+          sendJson(res, ok ? 200 : 400, { ok });
+        });
+      } else if (route.type === "save") {
+        void readBody(req).then((body) => {
+          let saved = false;
+          try { saved = (JSON.parse(body || "{}") as { saved?: unknown }).saved === true; } catch { saved = false; }
+          const ok = deps.setSaved(route.id, saved);
           sendJson(res, ok ? 200 : 400, { ok });
         });
       } else if (route.type === "explain") {

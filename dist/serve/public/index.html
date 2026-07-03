@@ -17,6 +17,8 @@
       --ink:#f1f4f9; --ink2:#c6cdd9; --body:#97a0af; --muted:#6b7482; --faint:#3c4452;
       /* live = green, only for the single thing happening right now */
       --live:#34d399; --live-ink:#7fe9c2; --live-dim:#246c54; --live-deep:#173f31;
+      /* live NOW strip: themed so it reads as a green panel in dark and a soft green tint in light */
+      --now-bg:linear-gradient(180deg,#0e1a15,#0b1410); --now-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(52,211,153,.10);
       /* state */
       --warn:#e0a23a; --coral:#f0654f;
       /* selected/focused UI accent: a single calm cyan, used only to mark the active session */
@@ -46,6 +48,16 @@
       --sky:var(--ink2); --sky-dim:var(--muted); --sky-ink:var(--ink2);
       --info:var(--ink2); --info-ink:var(--ink2);
       --structure:var(--muted); --structure-ink:var(--ink2);
+    }
+    /* Light theme: same variable names, light values. Applied on explicit Light, or on
+       System when the OS prefers light. Live green stays the one saturated accent. */
+    :root[data-theme="light"] {
+      --bg:#f6f7f9; --surf:#ffffff; --surf-h:#eef1f5; --line:#dde2e9; --hair:#e7ebf0; --inset:#f0f2f6;
+      --ink:#1a1f27; --ink2:#39414d; --body:#5a6472; --muted:#818b99; --faint:#b7bfca;
+      --live:#12a877; --live-ink:#0c7d58; --live-dim:#8fd9bf; --live-deep:#d6f0e6;
+      --warn:#b9791a; --coral:#d1462f;
+      --sel:#2f6fb0; --sel-dim:#bcd4ec;
+      --now-bg:linear-gradient(180deg,#eafaf3,#dff5ec); --now-shadow:0 6px 18px rgba(18,168,119,.14);
     }
     body.split { --titlerow:0px; --head:52px; }
     * { box-sizing:border-box; }
@@ -138,7 +150,26 @@
     .dayhd .dcount { margin-left:auto; color:var(--muted); font-weight:600; font-size:9px;
       background:var(--surf); border:1px solid var(--line); border-radius:20px; padding:1px 7px; }
     .dayhd:first-of-type { margin-top:2px; }
-    .sess { position:relative; padding:8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
+    .sess { position:relative; padding:8px 30px 8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
+    /* bookmark ribbon on each session row: faint outline when unsaved, amber when saved */
+    .bm { position:absolute; top:50%; right:7px; transform:translateY(-50%); width:20px; height:20px; display:grid; place-items:center; cursor:pointer; border-radius:5px; }
+    .bm svg { width:14px; height:15px; display:block; }
+    .bm .bmp { fill:none; stroke:var(--faint); stroke-width:1.7; stroke-linejoin:round; }
+    .bm:hover { background:var(--surf-h); box-shadow:0 0 0 1px var(--line); }
+    .bm:not(.on):hover .bmp { stroke:var(--body); }
+    .bm.on .bmp { fill:var(--warn); stroke:var(--warn); }
+    .bm.on:hover { box-shadow:0 0 0 1px var(--warn); }
+    /* the All / Saved filter chips above the list */
+    .railfilters { display:flex; gap:6px; margin:2px 2px 10px; }
+    .fchip { display:inline-flex; align-items:center; gap:6px; background:var(--inset); border:1px solid var(--line); color:var(--body); font-size:11.5px; padding:5px 11px; border-radius:99px; cursor:pointer; font-family:inherit; }
+    .fchip.on { background:var(--sel-dim); border-color:var(--sel); color:var(--ink); }
+    .fchip svg { width:12px; height:13px; }
+    .fchip .bmp { fill:var(--warn); stroke:var(--warn); stroke-width:1.4; stroke-linejoin:round; }
+    .railempty { text-align:center; padding:30px 16px; }
+    .railempty .bmbig svg { width:26px; height:28px; margin:0 auto 11px; display:block; }
+    .railempty .bmbig .bmp { fill:none; stroke:var(--faint); stroke-width:1.4; stroke-linejoin:round; }
+    .railempty .et { font-size:13px; color:var(--body); font-weight:500; }
+    .railempty .eh { font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.45; }
     .sess:hover { background:var(--surf-h); border-color:var(--hair); }
     /* Session color dots are quiet markers: desaturated so a column of them never reads as a
        rainbow. The live session overrides to a green pulse, and the active row brightens its dot. */
@@ -152,18 +183,18 @@
        matching the live-task card. Cyan (never green) stays reserved for "which session you're viewing". */
     .sess.active { border-color:var(--sel-dim);
       background:linear-gradient(180deg,rgba(95,168,224,.07),transparent 60%),var(--surf-h);
-      box-shadow:0 0 12px -6px rgba(95,168,224,.38); }
+      box-shadow:inset 3px 0 0 var(--sel), 0 0 12px -6px rgba(95,168,224,.38); }
     .sess.active .sname { color:var(--ink); }
-    /* running session: a quiet green wash + glow so the live row reads as "lit" in the list, like the
-       live task. The green dot carries any motion; the row stays still to keep a busy list calm. */
+    /* running session: a quiet green wash + a solid left ledge so the live row reads as "lit" in the
+       list, like the live task. The green dot carries any motion; the row stays still to keep a busy list calm. */
     .sess.live { border-color:var(--live-dim);
       background:linear-gradient(180deg,rgba(52,211,153,.055),transparent 60%),transparent;
-      box-shadow:0 0 12px -7px rgba(52,211,153,.34); }
-    /* selected AND running: the cyan selection layers on top of the live green - both cues stack. */
+      box-shadow:inset 3px 0 0 var(--live), 0 0 12px -7px rgba(52,211,153,.34); }
+    /* selected AND running: the cyan selection ledge wins; the green wash still tints the row. */
     .sess.active.live { border-color:var(--sel-dim);
       background:linear-gradient(180deg,rgba(95,168,224,.07),transparent 60%),
                  linear-gradient(180deg,rgba(52,211,153,.05),transparent 60%),var(--surf-h);
-      box-shadow:0 0 12px -6px rgba(95,168,224,.38), 0 0 13px -7px rgba(52,211,153,.30); }
+      box-shadow:inset 3px 0 0 var(--sel), 0 0 12px -6px rgba(95,168,224,.38), 0 0 13px -7px rgba(52,211,153,.30); }
     .sess .sname { font-weight:600; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:8px; }
     .sess .smeta { color:var(--muted); font-size:9.5px; margin-top:4px; padding-left:15px; }
     .sess .rproj { color:var(--body); }
@@ -398,8 +429,12 @@
     /* live NOW strip: what Claude is on right now, sticky at the top of the single view. Framed
        in green with a soft glow - unmistakably the live element on the page. */
     .nowstrip { position:sticky; top:calc(var(--head) + 8px); z-index:3; margin-bottom:14px;
-      background:linear-gradient(180deg,#0e1a15,#0b1410); border:1px solid var(--live-dim); border-radius:12px;
-      padding:11px 14px; box-shadow:0 8px 22px rgba(0,0,0,.38), 0 0 22px rgba(52,211,153,.10); }
+      background:var(--now-bg); border:1px solid var(--live-dim); border-radius:12px;
+      padding:11px 14px; box-shadow:var(--now-shadow); }
+    /* token-saver quiet banner: neutral, no live-green, no glow */
+    .nowstrip.quiet { background:var(--surf-h); border-color:var(--line); box-shadow:none; }
+    .nowstrip.quiet .neye { background:var(--muted); color:var(--surf); }
+    .nowstrip.quiet .ndot { background:var(--surf); animation:none; }
     .nowstrip .nowtop { display:flex; align-items:center; gap:10px; }
     .nowstrip .neye { font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:#0b1410;
       font-weight:800; display:inline-flex; align-items:center; gap:6px; flex:none;
@@ -413,8 +448,8 @@
     .nowstrip .nact.think { color:var(--ink2); }
     .nowstrip .ntime { font-variant-numeric:tabular-nums; color:var(--live-ink); font-size:13px; flex:none; }
     .nowstrip .follow { flex:none; font:inherit; font-size:11.5px; display:inline-flex; align-items:center; gap:6px;
-      background:var(--inset); border:1px solid var(--line); color:var(--muted); border-radius:8px; padding:5px 11px; cursor:pointer; }
-    .nowstrip .follow.on { background:rgba(52,211,153,.14); color:var(--live-ink); border-color:rgba(52,211,153,.42); }
+      background:var(--surf); border:1px solid var(--line); color:var(--body); border-radius:8px; padding:5px 11px; cursor:pointer; }
+    .nowstrip .follow.on { background:var(--live-deep); color:var(--live-ink); border-color:var(--live-dim); }
     .nowstrip .follow .fd { width:7px; height:7px; border-radius:50%; background:currentColor; }
     .nowstrip .ntrail { display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px; margin-top:9px; font-size:11.5px; color:var(--body); }
     .nowstrip .ntrail .lab { color:var(--muted); letter-spacing:.06em; text-transform:uppercase; font-size:9px; font-weight:600; }
@@ -693,6 +728,62 @@
       .rail { display:none; }
       .rline .tag { display:none; }
     }
+
+    /* ---- Settings panel ---- */
+    .gearbtn{margin-left:auto;background:none;border:1px solid var(--line);color:var(--body);
+      width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1;}
+    .gearbtn:hover{color:var(--ink);background:var(--surf-h);}
+    .soverlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:50;}
+    .soverlay[hidden]{display:none;}
+    .spanel{width:min(920px,92vw);height:min(620px,88vh);background:var(--surf);border:1px solid var(--line);
+      border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);display:flex;flex-direction:column;}
+    .sphead{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg,var(--surf-h),var(--surf));}
+    .sphead h2{font-size:15px;margin:0;font-weight:600;}
+    .sphead .gear{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--inset);border:1px solid var(--line);}
+    .sclose{margin-left:auto;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;}
+    .sclose:hover{color:var(--ink);}
+    .spbody{display:grid;grid-template-columns:180px 1fr;flex:1;min-height:0;}
+    .spnav{border-right:1px solid var(--line);background:var(--inset);padding:12px 8px;display:flex;flex-direction:column;gap:2px;}
+    .spnav a{padding:8px 11px;border-radius:8px;color:var(--body);font-size:13px;cursor:pointer;}
+    .spnav a.on{background:var(--surf-h);color:var(--ink);}
+    .spnav a:hover{color:var(--ink);}
+    .spcontent{padding:20px 24px;overflow:auto;}
+    .sgrp>h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;}
+    .sgrp>.gdesc{color:var(--body);font-size:12.5px;margin:0 0 14px;}
+    .srow{display:flex;align-items:center;gap:16px;padding:13px 0;border-top:1px solid var(--hair);}
+    .srow:first-of-type{border-top:none;}
+    .srmeta{flex:1;min-width:0;} .srmeta .rt{font-size:13.5px;color:var(--ink);font-weight:500;}
+    .srmeta .rd{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;}
+    .sseg{display:inline-flex;background:var(--inset);border:1px solid var(--line);border-radius:8px;padding:2px;}
+    .sseg button{border:none;background:none;color:var(--body);font-size:12.5px;padding:5px 11px;border-radius:6px;cursor:pointer;font-family:inherit;}
+    .sseg button.on{background:var(--surf);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.18), 0 0 0 1px var(--line);}
+    .stgl{width:40px;height:23px;border-radius:99px;background:var(--inset);border:1px solid var(--line);position:relative;cursor:pointer;flex-shrink:0;}
+    .stgl::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--muted);transition:.15s;}
+    .stgl.on{background:var(--live-deep);border-color:var(--live);}
+    .stgl.on::after{left:19px;background:var(--live);}
+    .spresets{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 4px;}
+    .spreset{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--inset);cursor:pointer;}
+    .spreset.on{border-color:var(--live);background:var(--live-deep);}
+    .spreset .pt{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;color:var(--ink);}
+    .spreset .pt .dot{width:7px;height:7px;border-radius:50%;background:var(--live);}
+    .spreset.saver .pt .dot{background:var(--warn);}
+    .spreset .pp{font-size:12px;color:var(--body);margin:7px 0 0;line-height:1.45;}
+    .sresetbtn{flex-shrink:0;background:none;border:1px solid var(--line);color:var(--body);font:inherit;
+      font-size:12.5px;padding:6px 14px;border-radius:8px;cursor:pointer;}
+    .sresetbtn:hover{border-color:var(--coral);color:var(--coral);}
+
+    /* Reduce motion: kill the ambient pulse/glow animations. */
+    :root[data-motion="reduced"] * { animation: none !important; }
+    :root[data-motion="reduced"] .feed .task.live::before,
+    :root[data-motion="reduced"] .feed .pmark.live::before { box-shadow: 0 0 0 3px var(--bg); }
+    /* Density: compact tightens the timeline rows. */
+    :root[data-density="compact"] .feed .task { padding-top:6px; padding-bottom:6px; }
+    :root[data-density="compact"] .srow { padding:9px 0; }
+    /* Text size: scale the root font. */
+    :root[data-textsize="s"] { font-size:14px; }
+    :root[data-textsize="m"] { font-size:16px; }
+    :root[data-textsize="l"] { font-size:18px; }
   </style>
 </head>
 <body data-mode="deep">
@@ -704,6 +795,7 @@
       <button id="tb-split" type="button">Active terminals</button>
     </div>
     <button id="jumplive" class="jumplive" type="button" hidden>Jump to live</button>
+    <button id="open-settings" class="gearbtn" type="button" title="Settings" aria-label="Settings">&#9881;</button>
   </div>
 
   <div class="titlerow" id="titlerow">
@@ -723,6 +815,24 @@
       <div id="main"></div>
     </main>
     <aside class="summary" id="summary"></aside>
+  </div>
+
+  <div id="settings-overlay" class="soverlay" hidden>
+    <div class="spanel" role="dialog" aria-label="Settings">
+      <div class="sphead"><span class="gear">&#9881;</span><h2>Settings</h2>
+        <button id="close-settings" class="sclose" type="button" aria-label="Close">&#10005;</button></div>
+      <div class="spbody">
+        <nav class="spnav" id="spnav">
+          <a data-grp="appearance" class="on">Appearance</a>
+          <a data-grp="live">Live &amp; tokens</a>
+          <a data-grp="narration">Narration</a>
+          <a data-grp="sessions">Sessions</a>
+          <a data-grp="stats">Stats</a>
+          <a data-grp="about">About</a>
+        </nav>
+        <div class="spcontent" id="spcontent"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -770,11 +880,239 @@
     let splitPinned = false;
     let lastSessions = [];         // last /api/sessions payload, for search re-render without refetch
     let railFilter = "";           // sidebar search text
+    let savedFilter = false;       // the All / Saved chip: show only bookmarked terminals
+    // Bookmarks the user just toggled, held until a poll shows the server agreeing. Without this the
+    // next /api/sessions poll (still reading the pre-POST value) would clobber the optimistic state
+    // and the star would flicker off, then back on a second later.
+    const bmPending = new Map();   // id -> desired saved bool
+    function applyBmPending(sessions) {
+      for (const s of sessions) {
+        if (!bmPending.has(s.id)) continue;
+        if (s.saved === bmPending.get(s.id)) bmPending.delete(s.id); // server caught up
+        else s.saved = bmPending.get(s.id);                          // hold the optimistic value
+      }
+    }
+    // The bookmark ribbon, drawn as inline SVG so it renders identically everywhere (no emoji).
+    const bmSvg = () => `<svg viewBox="0 0 24 24"><path class="bmp" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>`;
     let dateFrom = "";             // sidebar date filter, lower bound (YYYY-MM-DD, "" = open)
     let dateTo = "";               // sidebar date filter, upper bound (YYYY-MM-DD, "" = open)
     let railWired = false;         // the rail shell (search + date inputs) is built once, then reused
     let renamingId = null;         // session id being renamed inline (pauses rail refresh)
     let statsCollapsed = localStorage.getItem("codey-stats-collapsed") === "1"; // sidebar collapse state
+
+    // ---- Settings: one place that reads, applies, and persists every preference ----
+    // Narration depth/summaries are NOT here: they keep their own null-until-seeded variables
+    // (depth, genMode) so a session still inherits its running mode. The panel reads those live.
+    const SETTINGS_DEFAULTS = {
+      theme: "dark",          // dark | light
+      motion: "full",         // full | reduced
+      density: "comfortable", // comfortable | compact
+      textsize: "m",          // s | m | l
+      live: "follow",         // follow | saver  (the headline preset)
+      autoopen: "1",          // auto-open the running task
+      overhead: "1",          // show the Codey overhead card
+      stat_now: "1",          // show the "Right now" stats card
+      stat_session: "1",      // show the "This session" stats card
+      stat_tokens: "1",       // show the "Token breakdown" stats card
+      follow: "1",            // follow-live (persisted; was in-memory only)
+      sort: "recent",         // recent | tasks | saved
+      confirmdelete: "1",     // ask before deleting a terminal
+    };
+    const settings = {};
+    for (const k in SETTINGS_DEFAULTS) settings[k] = localStorage.getItem("codey-" + k) ?? SETTINGS_DEFAULTS[k];
+    // Theme used to offer System; it was dropped. Fold any stored "system" back to dark.
+    if (settings.theme !== "light" && settings.theme !== "dark") settings.theme = "dark";
+    // "Saved first" sort was dropped (redundant with the Saved filter). Fold it back to Recent.
+    if (!["recent", "tokens", "tasks"].includes(settings.sort)) settings.sort = "recent";
+    function setSetting(key, val) {
+      settings[key] = val;
+      localStorage.setItem("codey-" + key, val);
+      applySettings();
+    }
+    // Restore the panel's own settings to their defaults. Bookmarks are server-side data, not a
+    // preference here, so they are untouched.
+    function resetSettings() {
+      for (const k in SETTINGS_DEFAULTS) { localStorage.removeItem("codey-" + k); settings[k] = SETTINGS_DEFAULTS[k]; }
+      applySettings();
+    }
+    // Pure-CSS switches: theme, motion, density and text size are attributes on <html>.
+    function applySettings() {
+      const r = document.documentElement;
+      r.dataset.theme = settings.theme;       // "system" leaves it to the media query
+      r.dataset.motion = settings.motion;
+      r.dataset.density = settings.density;
+      r.dataset.textsize = settings.textsize;
+    }
+    applySettings();
+
+    // ---- Settings panel open/close + group switching ----
+    let settingsGroup = "appearance";
+    function openSettings() { document.getElementById("settings-overlay").hidden = false; renderSettings(); }
+    function closeSettings() { document.getElementById("settings-overlay").hidden = true; }
+    document.getElementById("open-settings").addEventListener("click", openSettings);
+    document.getElementById("close-settings").addEventListener("click", closeSettings);
+    document.getElementById("settings-overlay").addEventListener("click", (e) => {
+      if (e.target.id === "settings-overlay") closeSettings();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !document.getElementById("settings-overlay").hidden) closeSettings();
+    });
+    document.getElementById("spnav").addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-grp]"); if (!a) return;
+      settingsGroup = a.dataset.grp;
+      document.querySelectorAll("#spnav a").forEach((n) => n.classList.toggle("on", n === a));
+      renderSettings();
+    });
+    // Small builders for a settings row. segRow renders a segmented control; swRow a toggle.
+    function segRow(title, desc, key, opts, cur) {
+      const val = cur !== undefined ? cur : settings[key];
+      const btns = opts.map(([v, label]) =>
+        `<button data-set="${key}" data-val="${v}" class="${val === v ? "on" : ""}">${label}</button>`).join("");
+      return `<div class="srow"><div class="srmeta"><div class="rt">${title}</div><div class="rd">${desc}</div></div>`
+        + `<div class="sseg">${btns}</div></div>`;
+    }
+    function swRow(title, desc, key) {
+      return `<div class="srow"><div class="srmeta"><div class="rt">${title}</div><div class="rd">${desc}</div></div>`
+        + `<div class="stgl ${settings[key] === "1" ? "on" : ""}" data-toggle="${key}"></div></div>`;
+    }
+    function renderSettings() {
+      const el = document.getElementById("spcontent");
+      const groups = {
+        appearance: () =>
+          `<div class="sgrp"><h3>Appearance</h3><p class="gdesc">How the timeline looks on this machine.</p>`
+          + segRow("Theme", "Choose the interface color scheme.", "theme",
+              [["dark","Dark"],["light","Light"]])
+          + segRow("Reduce motion", "Turns off the live pulse and ambient glow.", "motion",
+              [["full","Off"],["reduced","On"]])
+          + segRow("Density", "How tightly the timeline rows are packed.", "density",
+              [["comfortable","Relaxed"],["compact","Compact"]])
+          + segRow("Text size", "Scales the whole page.", "textsize",
+              [["s","S"],["m","M"],["l","L"]])
+          + `</div>`,
+        live: () => renderLiveGroup(),
+        narration: () => renderNarrationGroup(),
+        sessions: () => renderSessionsGroup(),
+        stats: () => renderStatsGroup(),
+        about: () => renderAboutGroup(),
+      };
+      el.innerHTML = (groups[settingsGroup] || groups.appearance)();
+      wireSettingsControls();
+    }
+    // One delegated wiring pass for every seg/toggle the current group rendered.
+    function wireSettingsControls() {
+      const el = document.getElementById("spcontent");
+      el.querySelectorAll("button[data-set]").forEach((b) => b.addEventListener("click", () => {
+        applySettingChange(b.dataset.set, b.dataset.val);
+        renderSettings();
+      }));
+      el.querySelectorAll(".stgl[data-toggle]").forEach((s) => s.addEventListener("click", () => {
+        applySettingChange(s.dataset.toggle, settings[s.dataset.toggle] === "1" ? "0" : "1");
+        renderSettings();
+      }));
+      wireLiveControls(el);
+      wireAboutControls(el);
+    }
+    // Central place to react to a changed setting beyond persisting it. Extended per group below.
+    function applySettingChange(key, val) {
+      setSetting(key, val);
+      if (key === "depth") { depth = val; localStorage.setItem("codey-depth", val); autoFired.clear(); applyMode(); if (lastSnap) renderSingle(lastSnap); }
+      if (key === "gen") { genMode = val; localStorage.setItem("codey-gen", val); if (lastSnap) renderSingle(lastSnap); }
+      if (key === "sort") refreshRail();
+      if (["autoopen", "overhead", "stat_now", "stat_session", "stat_tokens"].includes(key)) { if (lastSnap) renderSingle(lastSnap); }
+    }
+    // Group renderers and extra wiring are defined in later tasks. Stubs keep the panel running.
+    function renderLiveGroup() {
+      const card = (val, cls, title, body) =>
+        `<div class="spreset ${cls} ${settings.live === val ? "on" : ""}" data-preset="${val}">`
+        + `<div class="pt"><span class="dot"></span>${title}</div><p class="pp">${body}</p></div>`;
+      return `<div class="sgrp"><h3>Live &amp; tokens</h3>`
+        + `<p class="gdesc">Watch it happen live, or save tokens and read the finished story.</p>`
+        + `<div class="spresets">`
+        + card("follow", "", "Follow live", "Auto-scrolls to the newest step, auto-opens the running task, fast refresh.")
+        + card("saver", "saver", "Token saver", "Stays quiet, reveals the whole prompt and its tasks once the turn finishes. No auto-summaries.")
+        + `</div>`
+        + swRow("Auto-open the live task", "Expands the running task so its current step shows.", "autoopen")
+        + `</div>`;
+    }
+    function renderStatsGroup() {
+      return `<div class="sgrp"><h3>Session stats</h3><p class="gdesc">Which cards show in the right-hand stats panel.</p>`
+        + swRow("Right now", "The live activity card at the top of the panel.", "stat_now")
+        + swRow("This session", "Duration, prompts, tasks, and total tokens.", "stat_session")
+        + swRow("Token breakdown", "Where your tokens went, by category.", "stat_tokens")
+        + swRow("Codey overhead", "What Codey's own narration and summaries cost.", "overhead")
+        + `</div>`;
+    }
+    // A preset is a bundle: choosing it seeds the individual toggles, which stay adjustable after.
+    // It also drives the existing genMode (summaries) so token-saver truly stops auto-generation.
+    function applyPreset(preset) {
+      setSetting("live", preset);
+      if (preset === "saver") {
+        // Token saver forces summaries to Manual and defers the AI timeline (see the saver flag
+        // on the snapshot fetch). Follow live only governs scrolling, so it leaves summaries alone.
+        setSetting("autoopen", "0"); setSetting("follow", "0");
+        followLive = false; genMode = "saver"; localStorage.setItem("codey-gen", "saver");
+      } else {
+        setSetting("autoopen", "1"); setSetting("follow", "1");
+        followLive = true;
+      }
+      if (lastSnap) renderSingle(lastSnap);
+    }
+    function renderNarrationGroup() {
+      // Reads the live depth/genMode (not a settings key) so it always matches the title-row control.
+      return `<div class="sgrp"><h3>Narration</h3>`
+        + `<p class="gdesc">How much Codey explains as Claude works, and whether it recaps each prompt.</p>`
+        + segRow("Default depth", "Simple is one line. Deep explains why. Teach teaches the concept.", "depth",
+            [["simple","Simple"],["deep","Deep"],["teach","Teach"]], curDepth())
+        + segRow("Summaries", "Auto generates a recap per prompt. Manual waits for a click.", "gen",
+            [["auto","Auto"],["saver","Manual"]], genMode || "auto")
+        + `</div>`;
+    }
+    function renderSessionsGroup() {
+      return `<div class="sgrp"><h3>Sessions</h3><p class="gdesc">How the sidebar lists your terminals.</p>`
+        + segRow("Default sort", "Recent groups by day. The others rank across all your sessions.", "sort",
+            [["recent","Recent"],["tokens","Most tokens"],["tasks","Most tasks"]])
+        + swRow("Confirm before delete", "Ask first when deleting a terminal.", "confirmdelete")
+        + `</div>`;
+    }
+    // Sort a session list per the chosen order. "recent" keeps the server's mtime-desc order.
+    function sortSessions(list) {
+      const arr = list.slice();
+      if (settings.sort === "tokens") return arr.sort((a, b) => (b.tokens || 0) - (a.tokens || 0));
+      if (settings.sort === "tasks") return arr.sort((a, b) => (b.taskCount || 0) - (a.taskCount || 0));
+      return arr;
+    }
+    const SORT_LABELS = { tokens: "Most tokens", tasks: "Most tasks" };
+    function renderAboutGroup() {
+      return `<div class="sgrp"><h3>About</h3>`
+        + `<p class="gdesc">Codey narrates a live Claude Code session in plain English and flags when it looks stuck.</p>`
+        + `<div class="srow"><div class="srmeta"><div class="rt">Reset all settings</div>`
+        + `<div class="rd">Restores every setting on this page to its default. Does not touch your bookmarks.</div></div>`
+        + `<button class="sresetbtn" id="reset-settings" type="button">Reset</button></div>`
+        + `</div>`;
+    }
+    function wireLiveControls(el) {
+      el.querySelectorAll(".spreset[data-preset]").forEach((p) => p.addEventListener("click", () => {
+        applyPreset(p.dataset.preset);
+        renderSettings();
+      }));
+    }
+    function wireAboutControls(el) {
+      const rb = el.querySelector("#reset-settings");
+      if (!rb) return;
+      rb.addEventListener("click", () => {
+        resetSettings();
+        // Narration lives in its own null-until-seeded vars; clear them too so reset is honest,
+        // then let the next render re-seed them from the open session's mode.
+        localStorage.removeItem("codey-depth"); localStorage.removeItem("codey-gen");
+        depth = null; genMode = null;
+        followLive = settings.follow === "1";
+        applyMode();
+        if (lastSnap) renderSingle(lastSnap);
+        refreshRail();
+        renderSettings();
+      });
+    }
+    function refreshRail() { if (lastSessions && lastSessions.length) renderRailList(lastSessions); }
 
     // ---- Explanations: generated why/how and per-prompt summaries ----
     const explCache = new Map();   // "scope|id|depth" -> generated text (survives the live refresh)
@@ -905,7 +1243,7 @@
     }
 
     // ---- Live NOW strip + Follow Live ----
-    let followLive = true;   // when live, keep the newest activity in view
+    let followLive = settings.follow === "1";   // persisted; token-saver turns it off
     let nowState = null;     // last /now payload, for re-rendering the strip on toggle
     let lastLiveGroupId = null; // the live prompt group last seen, so a new prompt re-engages follow
 
@@ -917,7 +1255,17 @@
       // turn), so trusting only /now made the strip vanish while the page still said "Working
       // now". Falling back to the snapshot keeps the strip and the page in agreement mid-turn.
       const live = (n && n.live) || (lastSnap && lastSnap.live);
-      if (!live || view !== "single") { strip.hidden = true; return; }
+      if (!live || view !== "single") { strip.hidden = true; strip.classList.remove("quiet"); return; }
+      // Token saver stays quiet: no live activity feed, just a calm free banner. The full timeline
+      // is revealed by the single AI pass once this prompt finishes.
+      if (settings.live === "saver") {
+        strip.hidden = false;
+        strip.classList.add("quiet");
+        strip.innerHTML = `<div class="nowtop"><span class="neye"><span class="ndot"></span>Working</span>`
+          + `<span class="nact think">Token saver is on. The full timeline appears when this prompt finishes.</span></div>`;
+        return;
+      }
+      strip.classList.remove("quiet");
       strip.hidden = false;
       n = n || {};
       // Name the exact step: the tool tag plus its literal target (the real command/file), so
@@ -941,6 +1289,8 @@
 
     function setFollow(on) {
       followLive = on;
+      settings.follow = on ? "1" : "0";
+      localStorage.setItem("codey-follow", settings.follow);
       renderNow(nowState);
       // Reflect the followed anchor right away without a full re-render.
       document.querySelectorAll(".grp.live").forEach((el) => el.classList.toggle("following", on));
@@ -1480,7 +1830,9 @@
         + `<div><div class="ovtok">${kfmt(t.tokens)}<small>tok</small></div>`
         + `<div class="ovcost">${approxCost(t.costUsd)}</div></div>`
         + `</div>`;
-      const overheadCard = ov.total.calls === 0
+      const overheadCard = settings.overhead !== "1"
+        ? ""
+        : ov.total.calls === 0
         ? `<div class="scard"><div class="tokhd"><span class="k">Codey overhead</span></div>`
           + `<div class="toksub">What Codey itself cost this session</div>`
           + `<div class="tokempty">Nothing yet. Codey narrates as Claude works.</div></div>`
@@ -1494,24 +1846,28 @@
           + ovRow("Total", ov.total, " ovtot")
           + `</div></div>`;
 
-      document.getElementById("summary").innerHTML =
-        `<div class="sidehd"><span class="t">Session stats</span>`
-        + `<button class="tog" id="stats-tog" type="button" aria-label="${expanded ? "Collapse" : "Expand"} stats" aria-expanded="${expanded}">${glyph}</button></div>`
-        + `<div class="statsbody">`
-        + `<div class="scard${nowLive ? " nowcard" : ""}" aria-live="polite"><div class="k">Right now</div>${nowCardInner}</div>`
-        + `<div class="scard"><div class="k">This session</div>`
+      // Each stats card can be hidden from the Stats settings group. Build then conditionally include.
+      const nowCard = `<div class="scard${nowLive ? " nowcard" : ""}" aria-live="polite"><div class="k">Right now</div>${nowCardInner}</div>`;
+      const sessionCard = `<div class="scard"><div class="k">This session</div>`
         + `<div class="pair"><span class="l">Total duration</span><span class="v num">${sessDur}</span></div>`
         + `<div class="pair"><span class="l">Prompts</span><span class="v num">${prompts}</span></div>`
         + `<div class="pair"><span class="l">Tasks</span><span class="v num">${total}</span></div>`
         + `<div class="pair"><span class="l">Total tokens</span><span class="v num">${fmt(bd.total)}</span></div>`
-        + `</div>`
-        + `<div class="scard tokcard"><div class="tokhd"><span class="k">Token breakdown</span>`
+        + `</div>`;
+      const tokCard = `<div class="scard tokcard"><div class="tokhd"><span class="k">Token breakdown</span>`
         + `<span class="toktot">${kfmt(bd.total)}<small>tok</small></span></div>`
         + `<div class="toksub">Where your tokens went</div>`
         + stackBar
         + `<div class="brk">${brkRows}</div>`
         + priciest
-        + `</div>`
+        + `</div>`;
+      document.getElementById("summary").innerHTML =
+        `<div class="sidehd"><span class="t">Session stats</span>`
+        + `<button class="tog" id="stats-tog" type="button" aria-label="${expanded ? "Collapse" : "Expand"} stats" aria-expanded="${expanded}">${glyph}</button></div>`
+        + `<div class="statsbody">`
+        + (settings.stat_now === "1" ? nowCard : "")
+        + (settings.stat_session === "1" ? sessionCard : "")
+        + (settings.stat_tokens === "1" ? tokCard : "")
         + overheadCard
         + `</div>`;
 
@@ -1548,8 +1904,30 @@
       }
       return `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
-        + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span>`
+        + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${s.tokens ? " &middot; " + kfmt(s.tokens) + " tok" : ""}${proj}</span>`
+        + `<span class="bm${s.saved ? " on" : ""}" data-bm role="button" aria-label="${s.saved ? "Remove bookmark" : "Bookmark"}" aria-pressed="${s.saved ? "true" : "false"}">${bmSvg()}</span>`
         + `</button>`;
+    }
+
+    // Toggle a session's bookmark: update the list optimistically, repaint, then persist server-side.
+    // The next /api/sessions poll re-syncs from disk, so a failed write self-corrects.
+    async function toggleBookmark(id) {
+      const item = (lastSessions || []).find((s) => s.id === id);
+      const next = !(item && item.saved);
+      bmPending.set(id, next);   // hold this through polls until the server confirms
+      if (item) item.saved = next;
+      renderRailList(lastSessions);
+      try {
+        await fetch("/api/session/" + encodeURIComponent(id) + "/save", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ saved: next }),
+        });
+      } catch {
+        // The write failed: drop the optimistic hold so the next poll reverts the star to reality.
+        bmPending.delete(id);
+        if (item) item.saved = !next;
+        renderRailList(lastSessions);
+      }
     }
 
     // True when a session's time falls inside the From/To date filter (either bound may be open).
@@ -1576,12 +1954,15 @@
       if (railWired) return;
       document.getElementById("rail").innerHTML =
         `<p class="rh">Sessions</p>`
-        + `<input class="railsearch" id="railsearch" type="search" placeholder="Search terminals" autocomplete="off" />`
+        + `<input class="railsearch" id="railsearch" type="search" placeholder="Search sessions" autocomplete="off" />`
         + `<details class="datefilter" id="datefilter"><summary id="datesummary">Filter by date</summary>`
         + `<div class="daterow">`
         + `<label class="dlab">From<input type="date" id="date-from" class="dinput" /></label>`
         + `<label class="dlab">To<input type="date" id="date-to" class="dinput" /></label></div>`
         + `<button class="dclear" id="date-clear" type="button">Clear dates</button></details>`
+        + `<div class="railfilters" id="railfilters">`
+        + `<span class="fchip" data-filter="all">All</span>`
+        + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span></div>`
         + `<div id="raillist"></div>`;
 
       const search = document.getElementById("railsearch");
@@ -1598,7 +1979,19 @@
         updateDateSummary(); renderRailList(lastSessions);
       });
       updateDateSummary();
+      document.getElementById("railfilters").addEventListener("click", (e) => {
+        const chip = e.target.closest(".fchip[data-filter]");
+        if (!chip) return;
+        savedFilter = chip.dataset.filter === "saved";
+        renderRailList(lastSessions);
+      });
       railWired = true;
+    }
+
+    // Reflect the active All / Saved chip. Called on every list render.
+    function updateRailFilters() {
+      document.querySelectorAll("#railfilters .fchip").forEach((c) =>
+        c.classList.toggle("on", (c.dataset.filter === "saved") === savedFilter));
     }
 
     function renderRail(sessions) {
@@ -1610,28 +2003,43 @@
     function renderRailList(sessions) {
       const list = document.getElementById("raillist");
       if (!list) return;
+      updateRailFilters();
       const q = railFilter.trim().toLowerCase();
       const shown = sessions.filter((s) =>
-        (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q)) && inDateRange(s));
-      // Group by day, preserving the most-recent-first order the server already sorted by.
-      const days = [];
-      const byDay = new Map();
-      for (const s of shown) {
-        const d = s.day || "Earlier";
-        if (!byDay.has(d)) { byDay.set(d, []); days.push(d); }
-        byDay.get(d).push(s);
-      }
-      const groups = days.map((d) => {
-        const rows = byDay.get(d);
-        return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
+        (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q))
+        && inDateRange(s) && (!savedFilter || s.saved));
+      let listHtml;
+      if (settings.sort === "recent") {
+        // Group by day, preserving the most-recent-first order the server already sorted by.
+        const days = [];
+        const byDay = new Map();
+        for (const s of shown) {
+          const d = s.day || "Earlier";
+          if (!byDay.has(d)) { byDay.set(d, []); days.push(d); }
+          byDay.get(d).push(s);
+        }
+        listHtml = days.map((d) => {
+          const rows = byDay.get(d);
+          return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
+            + rows.map(sessRowHtml).join("");
+        }).join("");
+      } else {
+        // Any other sort applies across every terminal, not just within a day: one flat ranked list.
+        const rows = sortSessions(shown);
+        listHtml = `<div class="dayhd">${esc(SORT_LABELS[settings.sort] || "Sorted")}<span class="dcount">${rows.length}</span></div>`
           + rows.map(sessRowHtml).join("");
-      }).join("");
-      const empty = (q || dateFrom || dateTo) ? "No terminals match." : "No terminals yet.";
-      list.innerHTML = shown.length ? groups : `<p class="smeta" style="padding-left:3px">${empty}</p>`;
+      }
+      const emptyHtml = savedFilter
+        ? `<div class="railempty"><span class="bmbig">${bmSvg()}</span><div class="et">No saved sessions yet</div>`
+          + `<div class="eh">Click the bookmark on a session to save it here.</div></div>`
+        : `<div class="railempty"><div class="et">${(q || dateFrom || dateTo) ? "No sessions match" : "No sessions yet"}</div></div>`;
+      list.innerHTML = shown.length ? listHtml : emptyHtml;
 
       list.querySelectorAll(".sess").forEach((el) => {
-        el.addEventListener("click", () => {
-          currentId = el.dataset.id; pinned = true; followLive = true;
+        el.addEventListener("click", (e) => {
+          // A click on the bookmark toggles it, never opens the session.
+          if (e.target.closest("[data-bm]")) { e.stopPropagation(); toggleBookmark(el.dataset.id); return; }
+          currentId = el.dataset.id; pinned = true; followLive = settings.follow === "1";
           open.clear(); closedByUser.clear(); tickSingle(); tickNow();
         });
       });
@@ -1664,7 +2072,8 @@
 
     async function deleteSession(id) {
       const s = lastSessions.find((x) => x.id === id);
-      if (!confirm("Delete " + (s ? s.name : "this terminal") + " from the timeline? This cannot be undone.")) return;
+      if (settings.confirmdelete === "1"
+          && !confirm("Delete " + (s ? s.name : "this terminal") + " from the timeline? This cannot be undone.")) return;
       try { await fetch("/api/session/" + encodeURIComponent(id), { method: "DELETE" }); } catch { /* refetch handles it */ }
       if (currentId === id) { currentId = null; pinned = false; }
       tickSingle();
@@ -1674,7 +2083,8 @@
       lastSnap = snap;
       liveNow = !!snap.live;
       if (depth === null) { depth = snap.seedDepth || "deep"; applyMode(); }
-      if (genMode === null) genMode = snap.genAuto ? "auto" : "saver";
+      // Summaries default to Manual so Codey never auto-spends on recaps until the user opts in.
+      if (genMode === null) genMode = "saver";
       seedEmbedded(snap);
       renderHeader(snap);
       renderControls(snap);
@@ -1686,7 +2096,7 @@
       // prompt's trailing step: a fresh group has no tasks yet, so nothing reads as "running now".
       const liveGroup = groups.find((g) => g.live);
       const liveChunks = liveGroup ? liveGroup.chunks : (groups.length ? [] : chunks);
-      liveOpenId = snap.live && liveChunks.length ? liveChunks[liveChunks.length - 1].id : null;
+      liveOpenId = (settings.autoopen === "1" && snap.live && liveChunks.length) ? liveChunks[liveChunks.length - 1].id : null;
       // A fresh prompt re-engages Follow Live: if the live group changed since the last render,
       // the user just sent a new prompt, so snap back to following its work even if they had
       // scrolled up to read the previous turn.
@@ -1792,6 +2202,7 @@
       let sessions = [];
       try { sessions = await (await fetch("/api/sessions")).json(); } catch { sessions = []; }
       if (view !== "single") return; // a view switch landed while this fetch was in flight
+      applyBmPending(sessions);      // keep a just-clicked bookmark from flickering under the poll
       lastSessions = sessions;
       if (!pinned && sessions[0]) currentId = sessions[0].id;
       const anyRunning = sessions.some((s) => s.running);
@@ -1802,7 +2213,9 @@
       document.getElementById("jumplive").hidden = !(pinned && anyRunning);
       if (!currentId) { document.getElementById("main").innerHTML = '<div class="empty">No sessions found.</div>'; return; }
       try {
-        const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId))).json();
+        // Token saver appends ?saver=1 so the server defers live AI segmentation off the hot path.
+        const saverQ = settings.live === "saver" ? "?saver=1" : "";
+        const snap = await (await fetch("/api/session/" + encodeURIComponent(currentId) + saverQ)).json();
         if (view !== "single") return;
         renderSingle(snap);
       } catch { /* keep last view on a transient error */ }
@@ -2113,7 +2526,8 @@
     function tick() { if (view === "single") return tickSingle(); return tickSplit(); }
     async function tickSplit() {
       try {
-        const live = await (await fetch("/api/live")).json();
+        // Token saver defers each pane's live AI segmentation too, matching the single view.
+        const live = await (await fetch("/api/live" + (settings.live === "saver" ? "?saver=1" : ""))).json();
         if (view !== "split") return; // a view switch landed while this fetch was in flight
         lastLive = live;
         renderSplit(lastLive);

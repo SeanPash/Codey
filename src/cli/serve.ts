@@ -3,12 +3,13 @@ import { dirname, join } from "node:path";
 import { rmSync } from "node:fs";
 import { createServer } from "../serve/server.js";
 import { buildIdFrom } from "../serve/build-id.js";
-import { loadSnapshot, loadLive, loadNow, runExplain } from "../serve/load-snapshot.js";
+import { loadSnapshot, loadLive, loadNow, runExplain, backfillTokens } from "../serve/load-snapshot.js";
 import { recordIntervention } from "../intervene/record.js";
 import { listSessions } from "./sessions.js";
 import { defaultRoot } from "../store/session-store.js";
 import { pruneEventless } from "../store/session-prune.js";
 import { writeCustomName } from "../store/session-name-store.js";
+import { writeSaved } from "../store/session-saved-store.js";
 import { dismiss, restore } from "../store/dismissed-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -31,25 +32,38 @@ export function runServe(opts: { session?: string; port: number }): void {
     // Never block serving due to a prune failure.
   }
 
+  // Backfill per-session token totals in the background so "Most tokens" sorting works for sessions
+  // the user has not opened yet. Fire-and-forget: it must never delay the server coming up.
+  setImmediate(() => { try { backfillTokens(defaultRoot()); } catch { /* best-effort */ } });
+
   const server = createServer({
     pagePath: join(publicDir(), "index.html"),
     fontsDir: join(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
-    getSnapshot: (id) => {
+    getSnapshot: (id, saver) => {
       if (!safeId(id)) throw new Error("invalid session id");
-      return loadSnapshot(id);
+      return loadSnapshot(id, undefined, saver);
     },
     getNow: (id) => {
       if (!safeId(id)) throw new Error("invalid session id");
       return loadNow(id);
     },
-    getLive: () => loadLive(),
+    getLive: (saver) => loadLive(undefined, saver),
     intervene: (id, action) => safeId(id) && recordIntervention(id, action),
     rename: (id, name) => {
       if (!safeId(id)) return false;
       try {
         writeCustomName(join(defaultRoot(), id), name);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    setSaved: (id, saved) => {
+      if (!safeId(id)) return false;
+      try {
+        writeSaved(join(defaultRoot(), id), saved);
         return true;
       } catch {
         return false;
