@@ -47,6 +47,24 @@
       --info:var(--ink2); --info-ink:var(--ink2);
       --structure:var(--muted); --structure-ink:var(--ink2);
     }
+    /* Light theme: same variable names, light values. Applied on explicit Light, or on
+       System when the OS prefers light. Live green stays the one saturated accent. */
+    :root[data-theme="light"] {
+      --bg:#f6f7f9; --surf:#ffffff; --surf-h:#eef1f5; --line:#dde2e9; --hair:#e7ebf0; --inset:#f0f2f6;
+      --ink:#1a1f27; --ink2:#39414d; --body:#5a6472; --muted:#818b99; --faint:#b7bfca;
+      --live:#12a877; --live-ink:#0c7d58; --live-dim:#8fd9bf; --live-deep:#d6f0e6;
+      --warn:#b9791a; --coral:#d1462f;
+      --sel:#2f6fb0; --sel-dim:#bcd4ec;
+    }
+    @media (prefers-color-scheme: light) {
+      :root[data-theme="system"] {
+        --bg:#f6f7f9; --surf:#ffffff; --surf-h:#eef1f5; --line:#dde2e9; --hair:#e7ebf0; --inset:#f0f2f6;
+        --ink:#1a1f27; --ink2:#39414d; --body:#5a6472; --muted:#818b99; --faint:#b7bfca;
+        --live:#12a877; --live-ink:#0c7d58; --live-dim:#8fd9bf; --live-deep:#d6f0e6;
+        --warn:#b9791a; --coral:#d1462f;
+        --sel:#2f6fb0; --sel-dim:#bcd4ec;
+      }
+    }
     body.split { --titlerow:0px; --head:52px; }
     * { box-sizing:border-box; }
     body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink);
