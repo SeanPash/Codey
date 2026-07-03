@@ -711,6 +711,40 @@
       .rail { display:none; }
       .rline .tag { display:none; }
     }
+
+    /* ---- Settings panel ---- */
+    .gearbtn{margin-left:auto;background:none;border:1px solid var(--line);color:var(--body);
+      width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1;}
+    .gearbtn:hover{color:var(--ink);background:var(--surf-h);}
+    .soverlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:grid;place-items:center;z-index:50;}
+    .soverlay[hidden]{display:none;}
+    .spanel{width:min(920px,92vw);height:min(620px,88vh);background:var(--surf);border:1px solid var(--line);
+      border-radius:14px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45);display:flex;flex-direction:column;}
+    .sphead{display:flex;align-items:center;gap:11px;padding:15px 18px;border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg,var(--surf-h),var(--surf));}
+    .sphead h2{font-size:15px;margin:0;font-weight:600;}
+    .sphead .gear{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--inset);border:1px solid var(--line);}
+    .sclose{margin-left:auto;background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;}
+    .sclose:hover{color:var(--ink);}
+    .spbody{display:grid;grid-template-columns:180px 1fr;flex:1;min-height:0;}
+    .spnav{border-right:1px solid var(--line);background:var(--inset);padding:12px 8px;display:flex;flex-direction:column;gap:2px;}
+    .spnav a{padding:8px 11px;border-radius:8px;color:var(--body);font-size:13px;cursor:pointer;}
+    .spnav a.on{background:var(--surf-h);color:var(--ink);}
+    .spnav a:hover{color:var(--ink);}
+    .spcontent{padding:20px 24px;overflow:auto;}
+    .sgrp>h3{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 4px;}
+    .sgrp>.gdesc{color:var(--body);font-size:12.5px;margin:0 0 14px;}
+    .srow{display:flex;align-items:center;gap:16px;padding:13px 0;border-top:1px solid var(--hair);}
+    .srow:first-of-type{border-top:none;}
+    .srmeta{flex:1;min-width:0;} .srmeta .rt{font-size:13.5px;color:var(--ink);font-weight:500;}
+    .srmeta .rd{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4;}
+    .sseg{display:inline-flex;background:var(--inset);border:1px solid var(--line);border-radius:8px;padding:2px;}
+    .sseg button{border:none;background:none;color:var(--body);font-size:12.5px;padding:5px 11px;border-radius:6px;cursor:pointer;font-family:inherit;}
+    .sseg button.on{background:var(--surf-h);color:var(--ink);}
+    .sw{width:40px;height:23px;border-radius:99px;background:var(--inset);border:1px solid var(--line);position:relative;cursor:pointer;flex-shrink:0;}
+    .sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:var(--muted);transition:.15s;}
+    .sw.on{background:var(--live-deep);border-color:var(--live);}
+    .sw.on::after{left:19px;background:var(--live);}
   </style>
 </head>
 <body data-mode="deep">
@@ -722,6 +756,7 @@
       <button id="tb-split" type="button">Active terminals</button>
     </div>
     <button id="jumplive" class="jumplive" type="button" hidden>Jump to live</button>
+    <button id="open-settings" class="gearbtn" type="button" title="Settings" aria-label="Settings">&#9881;</button>
   </div>
 
   <div class="titlerow" id="titlerow">
@@ -741,6 +776,23 @@
       <div id="main"></div>
     </main>
     <aside class="summary" id="summary"></aside>
+  </div>
+
+  <div id="settings-overlay" class="soverlay" hidden>
+    <div class="spanel" role="dialog" aria-label="Settings">
+      <div class="sphead"><span class="gear">&#9881;</span><h2>Settings</h2>
+        <button id="close-settings" class="sclose" type="button" aria-label="Close">&#10005;</button></div>
+      <div class="spbody">
+        <nav class="spnav" id="spnav">
+          <a data-grp="appearance" class="on">Appearance</a>
+          <a data-grp="live">Live &amp; tokens</a>
+          <a data-grp="narration">Narration</a>
+          <a data-grp="sessions">Sessions</a>
+          <a data-grp="about">About</a>
+        </nav>
+        <div class="spcontent" id="spcontent"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -826,6 +878,27 @@
       r.dataset.textsize = settings.textsize;
     }
     applySettings();
+
+    // ---- Settings panel open/close + group switching ----
+    let settingsGroup = "appearance";
+    function openSettings() { document.getElementById("settings-overlay").hidden = false; renderSettings(); }
+    function closeSettings() { document.getElementById("settings-overlay").hidden = true; }
+    document.getElementById("open-settings").addEventListener("click", openSettings);
+    document.getElementById("close-settings").addEventListener("click", closeSettings);
+    document.getElementById("settings-overlay").addEventListener("click", (e) => {
+      if (e.target.id === "settings-overlay") closeSettings();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !document.getElementById("settings-overlay").hidden) closeSettings();
+    });
+    document.getElementById("spnav").addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-grp]"); if (!a) return;
+      settingsGroup = a.dataset.grp;
+      document.querySelectorAll("#spnav a").forEach((n) => n.classList.toggle("on", n === a));
+      renderSettings();
+    });
+    // renderSettings is replaced with the real dispatcher in the next step. Stub for now:
+    function renderSettings() { document.getElementById("spcontent").textContent = settingsGroup; }
 
     // ---- Explanations: generated why/how and per-prompt summaries ----
     const explCache = new Map();   // "scope|id|depth" -> generated text (survives the live refresh)
