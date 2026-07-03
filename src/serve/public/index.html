@@ -150,7 +150,20 @@
     .dayhd .dcount { margin-left:auto; color:var(--muted); font-weight:600; font-size:9px;
       background:var(--surf); border:1px solid var(--line); border-radius:20px; padding:1px 7px; }
     .dayhd:first-of-type { margin-top:2px; }
-    .sess { position:relative; padding:8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
+    .sess { position:relative; padding:8px 30px 8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
+    /* bookmark ribbon on each session row: faint outline when unsaved, amber when saved */
+    .bm { position:absolute; top:50%; right:7px; transform:translateY(-50%); width:20px; height:20px; display:grid; place-items:center; cursor:pointer; border-radius:5px; }
+    .bm svg { width:14px; height:15px; display:block; }
+    .bm .bmp { fill:none; stroke:var(--faint); stroke-width:1.7; stroke-linejoin:round; }
+    .bm:hover { background:var(--surf-h); }
+    .bm:hover .bmp { stroke:var(--body); }
+    .bm.on .bmp { fill:var(--warn); stroke:var(--warn); }
+    /* the All / Saved filter chips above the list */
+    .railfilters { display:flex; gap:6px; margin:2px 2px 10px; }
+    .fchip { display:inline-flex; align-items:center; gap:6px; background:var(--inset); border:1px solid var(--line); color:var(--body); font-size:11.5px; padding:5px 11px; border-radius:99px; cursor:pointer; font-family:inherit; }
+    .fchip.on { background:var(--sel-dim); border-color:var(--sel); color:var(--ink); }
+    .fchip svg { width:12px; height:13px; }
+    .fchip .bmp { fill:var(--warn); stroke:var(--warn); stroke-width:1.4; stroke-linejoin:round; }
     .sess:hover { background:var(--surf-h); border-color:var(--hair); }
     /* Session color dots are quiet markers: desaturated so a column of them never reads as a
        rainbow. The live session overrides to a green pulse, and the active row brightens its dot. */
@@ -853,6 +866,9 @@
     let splitPinned = false;
     let lastSessions = [];         // last /api/sessions payload, for search re-render without refetch
     let railFilter = "";           // sidebar search text
+    let savedFilter = false;       // the All / Saved chip: show only bookmarked terminals
+    // The bookmark ribbon, drawn as inline SVG so it renders identically everywhere (no emoji).
+    const bmSvg = () => `<svg viewBox="0 0 24 24"><path class="bmp" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>`;
     let dateFrom = "";             // sidebar date filter, lower bound (YYYY-MM-DD, "" = open)
     let dateTo = "";               // sidebar date filter, upper bound (YYYY-MM-DD, "" = open)
     let railWired = false;         // the rail shell (search + date inputs) is built once, then reused
@@ -1806,7 +1822,23 @@
       return `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
         + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${proj}</span>`
+        + `<span class="bm${s.saved ? " on" : ""}" data-bm role="button" aria-label="${s.saved ? "Remove bookmark" : "Bookmark"}" aria-pressed="${s.saved ? "true" : "false"}">${bmSvg()}</span>`
         + `</button>`;
+    }
+
+    // Toggle a session's bookmark: update the list optimistically, repaint, then persist server-side.
+    // The next /api/sessions poll re-syncs from disk, so a failed write self-corrects.
+    async function toggleBookmark(id) {
+      const item = (lastSessions || []).find((s) => s.id === id);
+      const next = !(item && item.saved);
+      if (item) item.saved = next;
+      renderRailList(lastSessions);
+      try {
+        await fetch("/api/session/" + encodeURIComponent(id) + "/save", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ saved: next }),
+        });
+      } catch { /* the next poll re-reads the saved flag from disk */ }
     }
 
     // True when a session's time falls inside the From/To date filter (either bound may be open).
@@ -1839,6 +1871,9 @@
         + `<label class="dlab">From<input type="date" id="date-from" class="dinput" /></label>`
         + `<label class="dlab">To<input type="date" id="date-to" class="dinput" /></label></div>`
         + `<button class="dclear" id="date-clear" type="button">Clear dates</button></details>`
+        + `<div class="railfilters" id="railfilters">`
+        + `<span class="fchip" data-filter="all">All</span>`
+        + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span></div>`
         + `<div id="raillist"></div>`;
 
       const search = document.getElementById("railsearch");
@@ -1855,7 +1890,19 @@
         updateDateSummary(); renderRailList(lastSessions);
       });
       updateDateSummary();
+      document.getElementById("railfilters").addEventListener("click", (e) => {
+        const chip = e.target.closest(".fchip[data-filter]");
+        if (!chip) return;
+        savedFilter = chip.dataset.filter === "saved";
+        renderRailList(lastSessions);
+      });
       railWired = true;
+    }
+
+    // Reflect the active All / Saved chip. Called on every list render.
+    function updateRailFilters() {
+      document.querySelectorAll("#railfilters .fchip").forEach((c) =>
+        c.classList.toggle("on", (c.dataset.filter === "saved") === savedFilter));
     }
 
     function renderRail(sessions) {
@@ -1867,9 +1914,11 @@
     function renderRailList(sessions) {
       const list = document.getElementById("raillist");
       if (!list) return;
+      updateRailFilters();
       const q = railFilter.trim().toLowerCase();
       const shown = sessions.filter((s) =>
-        (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q)) && inDateRange(s));
+        (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q))
+        && inDateRange(s) && (!savedFilter || s.saved));
       // Group by day, preserving the most-recent-first order the server already sorted by.
       const days = [];
       const byDay = new Map();
@@ -1883,12 +1932,15 @@
         return `<div class="dayhd">${esc(d)}<span class="dcount">${rows.length}</span></div>`
           + rows.map(sessRowHtml).join("");
       }).join("");
-      const empty = (q || dateFrom || dateTo) ? "No terminals match." : "No terminals yet.";
+      const empty = (q || dateFrom || dateTo || savedFilter)
+        ? (savedFilter ? "No bookmarked terminals yet." : "No terminals match.") : "No terminals yet.";
       list.innerHTML = shown.length ? groups : `<p class="smeta" style="padding-left:3px">${empty}</p>`;
 
       list.querySelectorAll(".sess").forEach((el) => {
-        el.addEventListener("click", () => {
-          currentId = el.dataset.id; pinned = true; followLive = true;
+        el.addEventListener("click", (e) => {
+          // A click on the bookmark toggles it, never opens the session.
+          if (e.target.closest("[data-bm]")) { e.stopPropagation(); toggleBookmark(el.dataset.id); return; }
+          currentId = el.dataset.id; pinned = true; followLive = settings.follow === "1";
           open.clear(); closedByUser.clear(); tickSingle(); tickNow();
         });
       });
