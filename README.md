@@ -2,7 +2,7 @@
 
 # Codey
 
-### See what Claude is doing, and why.
+### Stores every Claude Code session, breaks down every step, and explains any of it whenever you want.
 
 I made a plugin for Claude Code that stores all your previous sessions and lays them out as a timeline, with a breakdown of every step Claude takes during a prompt and explanations whenever you want them. While you work it can also follow along and narrate what Claude is doing, live, right in your terminal.
 
@@ -16,9 +16,9 @@ I made a plugin for Claude Code that stores all your previous sessions and lays 
 
 ## What it does
 
-You send Claude off on a task and the terminal goes quiet. Behind that silence it might fire thirty tool calls, and from the outside they all look the same. Is it making progress? Stuck on the same dead end? Quietly burning tokens on the wrong file? You can't really tell, so you either babysit raw logs or walk away and hope.
+When you give Claude a task, it fires off a wall of lines: tool calls, edits, commands, all scrolling past faster than you can read them. It gets hard to actually follow what Claude is doing.
 
-Codey is my attempt to close that gap. It reads the tool-call stream Claude Code already produces and turns it into something you can actually follow, either as a visual timeline in your browser or as live narration in the terminal. You stop guessing and start watching.
+Codey is my fix for that. It breaks down every step Claude takes, live, so you can follow the run as it happens instead of squinting at the raw output. And whenever a step makes you curious, you can ask for an explanation of it, only when you want one, so you stay cheap by default and dig in exactly where it matters.
 
 ## Install
 
