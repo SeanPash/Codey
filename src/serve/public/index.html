@@ -880,6 +880,17 @@
     let lastSessions = [];         // last /api/sessions payload, for search re-render without refetch
     let railFilter = "";           // sidebar search text
     let savedFilter = false;       // the All / Saved chip: show only bookmarked terminals
+    // Bookmarks the user just toggled, held until a poll shows the server agreeing. Without this the
+    // next /api/sessions poll (still reading the pre-POST value) would clobber the optimistic state
+    // and the star would flicker off, then back on a second later.
+    const bmPending = new Map();   // id -> desired saved bool
+    function applyBmPending(sessions) {
+      for (const s of sessions) {
+        if (!bmPending.has(s.id)) continue;
+        if (s.saved === bmPending.get(s.id)) bmPending.delete(s.id); // server caught up
+        else s.saved = bmPending.get(s.id);                          // hold the optimistic value
+      }
+    }
     // The bookmark ribbon, drawn as inline SVG so it renders identically everywhere (no emoji).
     const bmSvg = () => `<svg viewBox="0 0 24 24"><path class="bmp" d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z"/></svg>`;
     let dateFrom = "";             // sidebar date filter, lower bound (YYYY-MM-DD, "" = open)
@@ -1902,6 +1913,7 @@
     async function toggleBookmark(id) {
       const item = (lastSessions || []).find((s) => s.id === id);
       const next = !(item && item.saved);
+      bmPending.set(id, next);   // hold this through polls until the server confirms
       if (item) item.saved = next;
       renderRailList(lastSessions);
       try {
@@ -1909,7 +1921,12 @@
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ saved: next }),
         });
-      } catch { /* the next poll re-reads the saved flag from disk */ }
+      } catch {
+        // The write failed: drop the optimistic hold so the next poll reverts the star to reality.
+        bmPending.delete(id);
+        if (item) item.saved = !next;
+        renderRailList(lastSessions);
+      }
     }
 
     // True when a session's time falls inside the From/To date filter (either bound may be open).
@@ -2184,6 +2201,7 @@
       let sessions = [];
       try { sessions = await (await fetch("/api/sessions")).json(); } catch { sessions = []; }
       if (view !== "single") return; // a view switch landed while this fetch was in flight
+      applyBmPending(sessions);      // keep a just-clicked bookmark from flickering under the poll
       lastSessions = sessions;
       if (!pinned && sessions[0]) currentId = sessions[0].id;
       const anyRunning = sessions.some((s) => s.running);
