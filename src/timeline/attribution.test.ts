@@ -140,6 +140,27 @@ describe("actionSubtitle", () => {
     expect(actionSubtitle("Edit", { file_path: "C:/Codey/src/timeline/costs.ts" })).toContain("timeline");
   });
 
+  it("explains what feature area a read is inspecting and why", () => {
+    const sub = actionSubtitle("Read", { file_path: "C:/Codey/src/serve/public/index.html" });
+    expect(sub).toMatch(/browser timeline/i);
+    expect(sub).toMatch(/render/i);
+    expect(sub).not.toMatch(/see what it does|to verify its behavior|follow how it works/i);
+  });
+
+  it("connects searches to existing behavior that a change may need to reuse", () => {
+    const sub = actionSubtitle("Grep", { pattern: "bookmark|star" });
+    expect(sub).toMatch(/bookmark and star/i);
+    expect(sub).toMatch(/existing/i);
+    expect(sub).not.toMatch(/to follow how it works|for the relevant code/i);
+  });
+
+  it("names the behavior a targeted test command is checking", () => {
+    const sub = actionSubtitle("Bash", { command: "npm test src/timeline/segment.test.ts" });
+    expect(sub).toMatch(/timeline segmentation/i);
+    expect(sub).toMatch(/tests/i);
+    expect(sub).not.toMatch(/check the work|verify its behavior/i);
+  });
+
   it("phrases a no-subject search without the banned 'for the code' tail", () => {
     const sub = actionSubtitle("Grep", { pattern: "\\bfoo\\b.*\\[bar\\]" });
     expect(hasBannedPhrase(sub)).toBe(false);

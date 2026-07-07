@@ -150,7 +150,7 @@
     .dayhd .dcount { margin-left:auto; color:var(--muted); font-weight:600; font-size:9px;
       background:var(--surf); border:1px solid var(--line); border-radius:20px; padding:1px 7px; }
     .dayhd:first-of-type { margin-top:2px; }
-    .sess { position:relative; padding:8px 30px 8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
+    .sess { position:relative; padding:8px 64px 8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
     /* bookmark ribbon on each session row: faint outline when unsaved, amber when saved */
     .bm { position:absolute; top:50%; right:7px; transform:translateY(-50%); width:20px; height:20px; display:grid; place-items:center; cursor:pointer; border-radius:5px; }
     .bm svg { width:14px; height:15px; display:block; }
@@ -165,6 +165,27 @@
     .fchip.on { background:var(--sel-dim); border-color:var(--sel); color:var(--ink); }
     .fchip svg { width:12px; height:13px; }
     .fchip .bmp { fill:var(--warn); stroke:var(--warn); stroke-width:1.4; stroke-linejoin:round; }
+    .groupbox { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:9px 0 10px; margin:0 0 10px; }
+    .ghd { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 3px 7px; }
+    .ghd .t { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700; }
+    .gcreate { width:22px; height:22px; border-radius:6px; border:1px solid var(--line); background:var(--inset); color:var(--body); cursor:pointer; font:inherit; line-height:1; }
+    .gcreate:hover { color:var(--ink); background:var(--surf-h); }
+    .gitem { display:flex; align-items:center; gap:6px; width:100%; border:1px solid transparent; background:transparent; color:var(--body); border-radius:7px; padding:5px 6px; font:inherit; font-size:11.5px; cursor:pointer; text-align:left; }
+    .gitem:hover { background:var(--surf-h); border-color:var(--hair); color:var(--ink2); }
+    .gitem.on { background:var(--sel-dim); border-color:var(--sel-dim); color:var(--ink); }
+    .gitem .gn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gitem .gc { color:var(--muted); font-size:10px; }
+    .gitem .ga { border:none; background:transparent; color:var(--muted); font:inherit; font-size:12px; padding:1px 3px; border-radius:4px; cursor:pointer; }
+    .gitem .ga:hover { color:var(--ink); background:var(--surf-h); }
+    .gempty { font-size:11px; color:var(--muted); padding:5px 6px 1px; line-height:1.35; }
+    .spills { display:flex; flex-wrap:wrap; gap:4px; padding:5px 20px 0 15px; }
+    .sp { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9.5px; color:var(--body); background:var(--inset); border:1px solid var(--line); border-radius:99px; padding:1px 6px; }
+    .gact { position:absolute; right:31px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:10px; border:1px solid var(--line); border-radius:6px; padding:2px 6px; background:var(--inset); }
+    .gact:hover { color:var(--ink); background:var(--surf-h); }
+    .geditor { margin:0 0 6px 10px; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surf); }
+    .geditor .gt { font-size:10px; color:var(--muted); margin-bottom:6px; }
+    .gcheck { display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--body); padding:4px 2px; }
+    .gcheck input { accent-color:var(--sel); }
     .railempty { text-align:center; padding:30px 16px; }
     .railempty .bmbig svg { width:26px; height:28px; margin:0 auto 11px; display:block; }
     .railempty .bmbig .bmp { fill:none; stroke:var(--faint); stroke-width:1.4; stroke-linejoin:round; }
@@ -890,8 +911,11 @@
     let splitPage = 1;
     let splitPinned = false;
     let lastSessions = [];         // last /api/sessions payload, for search re-render without refetch
+    let lastGroups = [];           // user-created session groups, fetched beside sessions
     let railFilter = "";           // sidebar search text
     let savedFilter = false;       // the All / Saved chip: show only bookmarked terminals
+    let activeGroupId = null;       // selected user group filter, or null for all sessions
+    let groupEditorId = null;       // session id with the inline Add to group picker open
     // Bookmarks the user just toggled, held until a poll shows the server agreeing. Without this the
     // next /api/sessions poll (still reading the pre-POST value) would clobber the optimistic state
     // and the star would flicker off, then back on a second later.
@@ -1553,9 +1577,9 @@
 
       const raw = [];
       if (rawShown) {
-        if (l.thoughtFirst) raw.push(`<div class="rd"><span class="rk">first</span><span class="rv">Claude paused to think before this step.</span></div>`);
+        if (l.thoughtFirst && l.why) raw.push(`<div class="rd"><span class="rk">planning note</span><span class="rv">${esc(l.why)}</span></div>`);
         if (l.raw) raw.push(`<div class="rd"><span class="rk">ran</span><code>${esc(l.raw)}</code></div>`);
-        if (l.why) raw.push(`<div class="rd"><span class="rk">Claude's note</span><span class="rv">${esc(l.why)}</span></div>`);
+        if (l.why && !l.thoughtFirst) raw.push(`<div class="rd"><span class="rk">Claude's note</span><span class="rv">${esc(l.why)}</span></div>`);
         if (l.status === "fail" && l.errorText) raw.push(`<div class="rd err"><span class="rk">error</span><code>${esc(l.errorText)}</code></div>`);
       }
       const rawBox = raw.length ? `<div class="rawbox">${raw.join("")}</div>` : "";
@@ -1976,15 +2000,33 @@
       const active = s.id === currentId ? " active" : "";
       const live = s.running ? " live" : "";
       const proj = s.project ? ` &middot; ${esc(s.project)}` : "";
+      const pills = (s.groups || []).length
+        ? `<span class="spills">${s.groups.map((g) => `<span class="sp">${esc(g.name)}</span>`).join("")}</span>`
+        : "";
       if (s.id === renamingId) {
         return `<div class="sessrename" data-id="${esc(s.id)}">`
           + `<input class="rename-in" type="text" value="${esc(s.name)}" aria-label="New name" /></div>`;
       }
-      return `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
+      const row = `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
         + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${s.tokens ? " &middot; " + kfmt(s.tokens) + " tok" : ""}${proj}</span>`
+        + pills
+        + `<span class="gact" data-groups role="button" aria-label="Add to group">Groups</span>`
         + `<span class="bm${s.saved ? " on" : ""}" data-bm role="button" aria-label="${s.saved ? "Remove bookmark" : "Bookmark"}" aria-pressed="${s.saved ? "true" : "false"}">${bmSvg()}</span>`
         + `</button>`;
+      return row + (groupEditorId === s.id ? groupEditorHtml(s) : "");
+    }
+
+    function groupEditorHtml(s) {
+      if (!lastGroups.length) {
+        return `<div class="geditor" data-ge="${esc(s.id)}"><div class="gt">Create a group first, then add this session to it.</div>`
+          + `<button class="gcreate" data-create-group type="button" aria-label="Create group">+</button></div>`;
+      }
+      const checks = lastGroups.map((g) => {
+        const on = (s.groups || []).some((sg) => sg.id === g.id);
+        return `<label class="gcheck"><input type="checkbox" data-gcheck="${esc(g.id)}" data-session="${esc(s.id)}" ${on ? "checked" : ""}>${esc(g.name)}</label>`;
+      }).join("");
+      return `<div class="geditor" data-ge="${esc(s.id)}"><div class="gt">Add to group</div>${checks}</div>`;
     }
 
     // Toggle a session's bookmark: update the list optimistically, repaint, then persist server-side.
@@ -2004,6 +2046,85 @@
         // The write failed: drop the optimistic hold so the next poll reverts the star to reality.
         bmPending.delete(id);
         if (item) item.saved = !next;
+        renderRailList(lastSessions);
+      }
+    }
+
+    function groupCounts() {
+      const counts = new Map();
+      for (const s of lastSessions || []) {
+        for (const g of s.groups || []) counts.set(g.id, (counts.get(g.id) || 0) + 1);
+      }
+      return counts;
+    }
+
+    function renderGroupsSection() {
+      const el = document.getElementById("grouplist");
+      if (!el) return;
+      const counts = groupCounts();
+      const rows = lastGroups.map((g) =>
+        `<button class="gitem${activeGroupId === g.id ? " on" : ""}" type="button" data-group-id="${esc(g.id)}">`
+        + `<span class="gn">${esc(g.name)}</span><span class="gc">${counts.get(g.id) || 0}</span>`
+        + `<span class="ga" data-grename="${esc(g.id)}" role="button" aria-label="Rename group">Rename</span>`
+        + `<span class="ga" data-gdelete="${esc(g.id)}" role="button" aria-label="Delete group">&times;</span></button>`).join("");
+      el.innerHTML = `<button class="gitem${activeGroupId === null ? " on" : ""}" type="button" data-group-id=""><span class="gn">All sessions</span><span class="gc">${lastSessions.length}</span></button>`
+        + (lastGroups.length ? rows : `<div class="gempty">No groups yet. Create one to collect related sessions.</div>`);
+    }
+
+    async function createSessionGroup() {
+      const name = prompt("Group name");
+      if (!name || !name.trim()) return;
+      try {
+        const group = await (await fetch("/api/groups", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
+        })).json();
+        if (group && group.id) {
+          lastGroups.push(group);
+          activeGroupId = group.id;
+          renderRailList(lastSessions);
+        }
+      } catch { /* next poll will reconcile */ }
+    }
+
+    async function renameSessionGroup(id) {
+      const group = lastGroups.find((g) => g.id === id);
+      const name = prompt("Rename group", group ? group.name : "");
+      if (!name || !name.trim()) return;
+      try {
+        await fetch("/api/group/" + encodeURIComponent(id) + "/name", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
+        });
+        if (group) group.name = name.trim();
+        for (const s of lastSessions) for (const g of s.groups || []) if (g.id === id) g.name = name.trim();
+        renderRailList(lastSessions);
+      } catch { /* next poll will reconcile */ }
+    }
+
+    async function deleteSessionGroup(id) {
+      const group = lastGroups.find((g) => g.id === id);
+      if (!confirm("Delete group " + (group ? group.name : "this group") + "? Sessions will stay in the timeline.")) return;
+      try { await fetch("/api/group/" + encodeURIComponent(id), { method: "DELETE" }); } catch { /* refetch handles it */ }
+      lastGroups = lastGroups.filter((g) => g.id !== id);
+      for (const s of lastSessions) s.groups = (s.groups || []).filter((g) => g.id !== id);
+      if (activeGroupId === id) activeGroupId = null;
+      renderRailList(lastSessions);
+    }
+
+    async function setSessionGroup(sessionId, groupId, on) {
+      const item = lastSessions.find((s) => s.id === sessionId);
+      const group = lastGroups.find((g) => g.id === groupId);
+      if (!item || !group) return;
+      const before = (item.groups || []).slice();
+      item.groups = on
+        ? [...before.filter((g) => g.id !== groupId), { id: group.id, name: group.name }]
+        : before.filter((g) => g.id !== groupId);
+      renderRailList(lastSessions);
+      try {
+        await fetch("/api/group/" + encodeURIComponent(groupId) + "/session/" + encodeURIComponent(sessionId), {
+          method: on ? "POST" : "DELETE",
+        });
+      } catch {
+        item.groups = before;
         renderRailList(lastSessions);
       }
     }
@@ -2041,6 +2162,7 @@
         + `<div class="railfilters" id="railfilters">`
         + `<span class="fchip" data-filter="all">All</span>`
         + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span></div>`
+        + `<div class="groupbox"><div class="ghd"><span class="t">Groups</span><button class="gcreate" id="group-create" type="button" aria-label="Create group">+</button></div><div id="grouplist"></div></div>`
         + `<div id="raillist"></div>`;
 
       const search = document.getElementById("railsearch");
@@ -2063,6 +2185,18 @@
         savedFilter = chip.dataset.filter === "saved";
         renderRailList(lastSessions);
       });
+      document.getElementById("group-create").addEventListener("click", createSessionGroup);
+      document.getElementById("grouplist").addEventListener("click", (e) => {
+        const del = e.target.closest("[data-gdelete]");
+        if (del) { e.stopPropagation(); deleteSessionGroup(del.dataset.gdelete); return; }
+        const ren = e.target.closest("[data-grename]");
+        if (ren) { e.stopPropagation(); renameSessionGroup(ren.dataset.grename); return; }
+        const row = e.target.closest("[data-group-id]");
+        if (!row) return;
+        activeGroupId = row.dataset.groupId || null;
+        groupEditorId = null;
+        renderRailList(lastSessions);
+      });
       railWired = true;
     }
 
@@ -2082,10 +2216,12 @@
       const list = document.getElementById("raillist");
       if (!list) return;
       updateRailFilters();
+      renderGroupsSection();
       const q = railFilter.trim().toLowerCase();
       const shown = sessions.filter((s) =>
         (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q))
-        && inDateRange(s) && (!savedFilter || s.saved));
+        && inDateRange(s) && (!savedFilter || s.saved)
+        && (!activeGroupId || (s.groups || []).some((g) => g.id === activeGroupId)));
       // The terminal you are viewing always pins to the very top, whatever the sort, so it never
       // scrolls out of reach under Most tokens or Most tasks. It is pulled out of the grouped and
       // ranked lists below so it is never listed twice. A current session hidden by the search,
@@ -2118,6 +2254,8 @@
       const emptyHtml = savedFilter
         ? `<div class="railempty"><span class="bmbig">${bmSvg()}</span><div class="et">No saved sessions yet</div>`
           + `<div class="eh">Click the bookmark on a session to save it here.</div></div>`
+        : activeGroupId
+        ? `<div class="railempty"><div class="et">No sessions in this group</div><div class="eh">Use the Groups button on a session to add it here.</div></div>`
         : `<div class="railempty"><div class="et">${(q || dateFrom || dateTo) ? "No sessions match" : "No sessions yet"}</div></div>`;
       list.innerHTML = shown.length ? listHtml : emptyHtml;
 
@@ -2125,10 +2263,21 @@
         el.addEventListener("click", (e) => {
           // A click on the bookmark toggles it, never opens the session.
           if (e.target.closest("[data-bm]")) { e.stopPropagation(); toggleBookmark(el.dataset.id); return; }
+          if (e.target.closest("[data-groups]")) {
+            e.stopPropagation();
+            groupEditorId = groupEditorId === el.dataset.id ? null : el.dataset.id;
+            renderRailList(lastSessions);
+            return;
+          }
           currentId = el.dataset.id; pinned = true; followLive = settings.follow === "1";
           open.clear(); closedByUser.clear(); tickSingle(); tickNow();
         });
       });
+
+      list.querySelectorAll("[data-create-group]").forEach((btn) => btn.addEventListener("click", createSessionGroup));
+      list.querySelectorAll("[data-gcheck]").forEach((box) => box.addEventListener("change", (e) => {
+        setSessionGroup(box.dataset.session, box.dataset.gcheck, e.target.checked);
+      }));
 
       const input = list.querySelector(".rename-in");
       if (input) {
@@ -2290,10 +2439,16 @@
     // ---- polling ----
     async function tickSingle() {
       let sessions = [];
-      try { sessions = await (await fetch("/api/sessions")).json(); } catch { sessions = []; }
+      let groups = lastGroups;
+      try {
+        const [sr, gr] = await Promise.all([fetch("/api/sessions"), fetch("/api/groups")]);
+        sessions = await sr.json();
+        groups = await gr.json();
+      } catch { sessions = []; }
       if (view !== "single") return; // a view switch landed while this fetch was in flight
       applyBmPending(sessions);      // keep a just-clicked bookmark from flickering under the poll
       lastSessions = sessions;
+      lastGroups = Array.isArray(groups) ? groups : [];
       if (!pinned && sessions[0]) currentId = sessions[0].id;
       const anyRunning = sessions.some((s) => s.running);
       const liveCount = sessions.filter((s) => s.running).length;

@@ -77,6 +77,56 @@ export function phraseSearch(literal: string): string | null {
   return words.join(" ").toLowerCase();
 }
 
+function stemName(subject: string): string {
+  const base = subject.split(/[\\/]/).pop() || subject;
+  return base
+    .replace(/\.(test|spec)\.[jt]sx?$/i, "")
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/[-_]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+const FEATURE_WORDS: Record<string, string> = {
+  attribution: "timeline attribution",
+  banned: "caption quality guards",
+  caption: "caption wording",
+  chunks: "work chunk grouping",
+  compose: "status line composition",
+  grouping: "timeline grouping",
+  labels: "timeline labels",
+  prompt: "prompt handling",
+  render: "rendering behavior",
+  segment: "timeline segmentation",
+  snapshot: "timeline snapshot data",
+  subject: "caption subject wording",
+  transcript: "session transcript parsing",
+  view: "status line display",
+};
+
+// The feature area a file or search is probably about, phrased from names Codey already has.
+// This stays deterministic and honest: it never claims file contents, it just turns
+// `src/timeline/segment.test.ts` into "timeline segmentation" instead of "it".
+export function featureArea(subject: string, area?: string): string {
+  const lowArea = (area ?? "").toLowerCase();
+  const stem = stemName(subject);
+  if ((stem === "index" || subject.toLowerCase() === "index.html") && (lowArea === "public" || lowArea === "serve")) {
+    return "browser timeline rendering";
+  }
+  if (lowArea === "serve" || lowArea === "public") return "browser timeline rendering";
+  if (lowArea === "timeline" && stem === "segment") return "timeline segmentation";
+  if (lowArea === "timeline" && stem === "grouping") return "timeline grouping";
+  if (lowArea === "caption" && (stem === "subject" || stem === "caption" || stem === "reasoning")) {
+    return "caption wording";
+  }
+  if (lowArea && FEATURE_WORDS[stem]) {
+    const mapped = FEATURE_WORDS[stem];
+    return mapped.includes(lowArea) ? mapped : `${lowArea} ${mapped}`;
+  }
+  if (lowArea) return `${lowArea} ${stem || "behavior"}`.trim();
+  return FEATURE_WORDS[stem] ?? `${stem || "target"} behavior`;
+}
+
 // The collapsed-card headline: a short purpose label (verb + subject), 4 to 7 words. It is
 // deterministic and stable on purpose, so titles do not shift around as explanations load.
 export function purposeTitle(tool: string, stage: Stage, subject: string, count: number): string {
@@ -118,21 +168,22 @@ export function purposeTitle(tool: string, stage: Stage, subject: string, count:
 // works"): when there is nothing specific to say, it still names the file and a real purpose.
 export function purposeSentence(tool: string, stage: Stage, subject: string, count: number, area?: string): string {
   const many = count > 1;
-  // "the statusline code", or just "it" when we cannot place the file in a folder.
-  const place = area ? `the ${area} code` : "it";
+  const feature = featureArea(subject, area);
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
       if (many) return adds ? `Adding new files, starting with ${subject}.` : `Updating ${subject} and the files alongside it.`;
       if (adds) return `Creating ${subject}.`;
-      return area ? `Editing ${subject} to change how ${place} behaves.` : `Editing ${subject} to change what it does.`;
+      return `Editing ${subject} to update ${feature}.`;
     }
     case "inspecting":
       if (many) return `Reading ${subject} and the files alongside it to see how they work together.`;
       if (tool === "Grep" || tool === "Glob") {
-        return subject === "the code" ? "Searching the project for the relevant code." : `Searching the project for ${subject}.`;
+        return subject === "the code"
+          ? "Searching the project for matching code paths before changing related behavior."
+          : `Searching the project for ${subject} to find existing ${subject} behavior before changing related code.`;
       }
-      return area ? `Reading ${subject} to see what ${place} does.` : `Reading ${subject} to see what it does.`;
+      return `Reading ${subject} to inspect ${feature} before changing related behavior.`;
     case "testing":
       return `Running ${subject} to check it passes.`;
     case "debugging":

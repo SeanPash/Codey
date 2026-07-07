@@ -2,7 +2,7 @@ import type { Mode } from "../types.js";
 import { stripDashes } from "../util/text.js";
 import type { WorkChunk } from "./chunks.js";
 import type { Stage } from "./stage.js";
-import { humanFile, phrasePattern, phraseSearch, purposeTitle, joinNames } from "./subject.js";
+import { featureArea, humanFile, phrasePattern, phraseSearch, purposeTitle, joinNames } from "./subject.js";
 import { describeShellIntent } from "./shell.js";
 import { inferPurpose, type PurposeEvidence } from "./purpose.js";
 import { stripEllipsis, looksLikeEvidenceDump, tidySubject } from "./sanitize.js";
@@ -115,8 +115,8 @@ function describe(chunk: WorkChunk): Described {
         return {
           title: chunk.targets.length ? `Searching ${humanFile(chunk.targets[0])}` : "Searching the project",
           simple: `Claude is searching ${where} for ${searches}.`,
-          deep: `Claude is searching ${where} for ${searches} to land on the right section before editing it.`,
-          teach: `Claude is searching ${where} for ${searches} to land on the right section before editing it. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
+          deep: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code.`,
+          teach: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
         };
       }
       if (chunk.tool === "Grep" || chunk.tool === "Glob") {
@@ -128,11 +128,12 @@ function describe(chunk: WorkChunk): Described {
         };
       }
       if (single) {
+        const feature = featureArea(names);
         return {
           title,
           simple: `Claude is reading ${names}.`,
-          deep: `Claude is reading ${names} to see what it does before changing it.`,
-          teach: `Claude is reading ${names} to see what it does before changing it. Reading the existing code first is how you avoid breaking something you did not know was there.`,
+          deep: `Claude is reading ${names} to inspect ${feature} before changing related behavior.`,
+          teach: `Claude is reading ${names} to inspect ${feature} before changing related behavior. Reading the existing code first is how you avoid breaking something you did not know was there.`,
         };
       }
       return {
