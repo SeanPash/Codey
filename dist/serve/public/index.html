@@ -159,14 +159,14 @@
     .bm:not(.on):hover .bmp { stroke:var(--body); }
     .bm.on .bmp { fill:var(--warn); stroke:var(--warn); }
     .bm.on:hover { box-shadow:0 0 0 1px var(--warn); }
-    .viewbox { border-top:1px solid var(--line); padding:9px 0 10px; margin:0; }
+    .viewbox { padding:0 0 10px; margin:0; }
     .sectionhd { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 3px 7px; }
     .sectionhd .t { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700; }
     /* automatic Views are separate from user-created Groups */
-    .railfilters { display:flex; flex-direction:column; gap:3px; margin:0 0 1px; }
-    .fchip { display:flex; align-items:center; gap:7px; background:transparent; border:1px solid transparent; color:var(--body); font-size:11.5px; padding:5px 6px; border-radius:7px; cursor:pointer; font-family:inherit; }
+    .railfilters { display:flex; gap:6px; margin:2px 2px 10px; flex-wrap:wrap; }
+    .fchip { display:inline-flex; align-items:center; gap:6px; background:var(--inset); border:1px solid var(--line); color:var(--body); font-size:11.5px; border-radius:99px; padding:5px 11px; cursor:pointer; font-family:inherit; }
     .fchip:hover { background:var(--surf-h); border-color:var(--hair); color:var(--ink2); }
-    .fchip.on { background:var(--sel-dim); border-color:var(--sel-dim); color:var(--ink); }
+    .fchip.on { background:var(--sel-dim); border-color:var(--sel); color:var(--ink); }
     .fchip svg { width:12px; height:13px; }
     .fchip .bmp { fill:var(--warn); stroke:var(--warn); stroke-width:1.4; stroke-linejoin:round; }
     .ghd { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 3px 7px; }
@@ -2108,16 +2108,18 @@
       const name = prompt("Group name");
       if (!name || !name.trim()) return;
       try {
-        const group = await (await fetch("/api/groups", {
+        const res = await fetch("/api/groups", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
-        })).json();
+        });
+        if (!res.ok) throw new Error("group create failed");
+        const group = await res.json();
         if (group && group.id) {
           lastGroups.push(group);
           await setSessionGroup(session.id, group.id, true);
           groupPickerSessionId = session.id;
           renderRailList(lastSessions);
         }
-      } catch { /* next poll will reconcile */ }
+      } catch { renderRailList(lastSessions); }
     }
 
     // Toggle a session's bookmark: update the list optimistically, repaint, then persist server-side.
@@ -2208,9 +2210,11 @@
       const name = prompt("Group name");
       if (!name || !name.trim()) return;
       try {
-        const group = await (await fetch("/api/groups", {
+        const res = await fetch("/api/groups", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
-        })).json();
+        });
+        if (!res.ok) throw new Error("group create failed");
+        const group = await res.json();
         if (group && group.id) {
           lastGroups.push(group);
           selectedGroupId = group.id;
@@ -2218,7 +2222,7 @@
           closeGroupPicker();
           renderRailList(lastSessions);
         }
-      } catch { /* next poll will reconcile */ }
+      } catch { renderRailList(lastSessions); }
     }
 
     async function renameSessionGroup(id) {
@@ -2226,23 +2230,27 @@
       const name = prompt("Rename group", group ? group.name : "");
       if (!name || !name.trim()) return;
       try {
-        await fetch("/api/group/" + encodeURIComponent(id) + "/name", {
+        const res = await fetch("/api/group/" + encodeURIComponent(id) + "/name", {
           method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
         });
+        if (!res.ok) throw new Error("group rename failed");
         if (group) group.name = name.trim();
         for (const s of lastSessions) for (const g of s.groups || []) if (g.id === id) g.name = name.trim();
         renderRailList(lastSessions);
-      } catch { /* next poll will reconcile */ }
+      } catch { renderRailList(lastSessions); }
     }
 
     async function deleteSessionGroup(id) {
       const group = lastGroups.find((g) => g.id === id);
       if (!confirm("Delete group " + (group ? group.name : "this group") + "? Sessions will stay in the timeline.")) return;
-      try { await fetch("/api/group/" + encodeURIComponent(id), { method: "DELETE" }); } catch { /* refetch handles it */ }
-      lastGroups = lastGroups.filter((g) => g.id !== id);
-      for (const s of lastSessions) s.groups = (s.groups || []).filter((g) => g.id !== id);
-      if (selectedGroupId === id) selectedGroupId = null;
-      renderRailList(lastSessions);
+      try {
+        const res = await fetch("/api/group/" + encodeURIComponent(id), { method: "DELETE" });
+        if (!res.ok) throw new Error("group delete failed");
+        lastGroups = lastGroups.filter((g) => g.id !== id);
+        for (const s of lastSessions) s.groups = (s.groups || []).filter((g) => g.id !== id);
+        if (selectedGroupId === id) selectedGroupId = null;
+        renderRailList(lastSessions);
+      } catch { renderRailList(lastSessions); }
     }
 
     async function setSessionGroup(sessionId, groupId, on) {
@@ -2255,9 +2263,10 @@
         : before.filter((g) => g.id !== groupId);
       renderRailList(lastSessions);
       try {
-        await fetch("/api/group/" + encodeURIComponent(groupId) + "/session/" + encodeURIComponent(sessionId), {
+        const res = await fetch("/api/group/" + encodeURIComponent(groupId) + "/session/" + encodeURIComponent(sessionId), {
           method: on ? "POST" : "DELETE",
         });
+        if (!res.ok) throw new Error("group write failed");
       } catch {
         item.groups = before;
         renderRailList(lastSessions);
@@ -2298,11 +2307,10 @@
         + `<label class="dlab">From<input type="date" id="date-from" class="dinput" /></label>`
         + `<label class="dlab">To<input type="date" id="date-to" class="dinput" /></label></div>`
         + `<button class="dclear" id="date-clear" type="button">Clear dates</button></details>`
-        + `<div class="viewbox"><div class="sectionhd"><span class="t">Views</span></div>`
-        + `<div class="railfilters" id="railfilters">`
-        + `<span class="fchip" data-filter="all">All sessions</span>`
-        + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span>`
-        + `<span class="fchip" data-filter="groups">Groups</span></div></div>`
+        + `<div class="viewbox"><div class="railfilters" id="railfilters">`
+        + `<button class="fchip" data-filter="all" type="button">All</button>`
+        + `<button class="fchip" data-filter="saved" type="button">${bmSvg()}Saved</button>`
+        + `<button class="fchip" data-filter="groups" type="button">Groups</button></div></div>`
         + `<div id="raillist"></div><div id="gpopover" class="gpopover" hidden></div>`;
 
       const search = document.getElementById("railsearch");

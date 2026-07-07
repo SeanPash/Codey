@@ -7,10 +7,16 @@ const page = readFileSync(join(process.cwd(), "src", "serve", "public", "index.h
 describe("timeline public page session rail", () => {
   it("keeps All, Saved, and Groups as top-level rail modes", () => {
     expect(page).toContain('let railMode = "all"');
-    expect(page).toContain('data-filter="all">All sessions');
+    expect(page).toContain('data-filter="all" type="button">All');
     expect(page).toContain('data-filter="saved"');
     expect(page).toContain('data-filter="groups"');
     expect(page).not.toContain('<div class="groupbox"');
+  });
+  it("renders top-level rail modes as oval pills", () => {
+    expect(page).toMatch(/\.railfilters\s*\{[^}]*display:flex[^}]*gap:6px[^}]*margin:2px 2px 10px/s);
+    expect(page).not.toMatch(/\.railfilters\s*\{[^}]*flex-direction:column/s);
+    expect(page).toMatch(/\.fchip\s*\{[^}]*display:inline-flex[^}]*background:var\(--inset\)[^}]*border:1px solid var\(--line\)[^}]*border-radius:99px[^}]*padding:5px 11px/s);
+    expect(page).toMatch(/\.fchip\.on\s*\{[^}]*background:var\(--sel-dim\)[^}]*border-color:var\(--sel\)/s);
   });
 
   it("does not filter the normal session list by a selected group", () => {
@@ -29,5 +35,12 @@ describe("timeline public page session rail", () => {
     expect(page).toContain("async function removeSessionFromGroup(sessionId, groupId)");
     expect(page).toContain('method: "DELETE"');
     expect(page).toContain("data-gremove");
+  });
+
+  it("rolls back group UI changes when persistence fails", () => {
+    expect(page).toContain('if (!res.ok) throw new Error("group write failed")');
+    expect(page).toContain('if (!res.ok) throw new Error("group delete failed")');
+    expect(page).toContain('if (!res.ok) throw new Error("group rename failed")');
+    expect(page).toContain('if (!res.ok) throw new Error("group create failed")');
   });
 });
