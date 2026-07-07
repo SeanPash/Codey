@@ -867,7 +867,7 @@
     <span class="sproj" id="sproj"></span>
     <h1 class="stitle disp" id="sname">Codey</h1>
     <span class="titleacts">
-      <button class="tact" id="group-current" type="button" title="Add this terminal to a group" aria-label="Add this terminal to a group"><span class="tg">&#128193;</span> <span class="glbl">Groups</span></button>
+      <button class="tact" id="group-current" type="button" title="Add this terminal to a group" aria-label="Add this terminal to a group"><span class="glbl">Groups</span></button>
       <button class="tact" id="rename-current" type="button" title="Rename this terminal" aria-label="Rename this terminal"><span class="tg">&#9998;</span> Rename</button>
       <button class="tact del" id="delete-current" type="button" title="Delete this terminal" aria-label="Delete this terminal"><span class="tg">&#128465;</span> Delete</button>
     </span>
@@ -882,6 +882,10 @@
     </main>
     <aside class="summary" id="summary"></aside>
   </div>
+
+  <!-- Group picker popover lives at the body level (not inside .rail) so its z-index
+       is not trapped in the sticky rail's stacking context and it paints over content. -->
+  <div id="gpopover" class="gpopover" hidden></div>
 
   <div id="settings-overlay" class="soverlay" hidden>
     <div class="spanel" role="dialog" aria-label="Settings">
@@ -2350,7 +2354,7 @@
         + `<button class="fchip" data-filter="all" type="button">All</button>`
         + `<button class="fchip" data-filter="saved" type="button">${bmSvg()}Saved</button>`
         + `<button class="fchip" data-filter="groups" type="button">Groups</button></div></div>`
-        + `<div id="raillist"></div><div id="gpopover" class="gpopover" hidden></div>`;
+        + `<div id="raillist"></div>`;
 
       const search = document.getElementById("railsearch");
       search.value = railFilter;
