@@ -169,21 +169,26 @@
     .fchip.on { background:var(--sel-dim); border-color:var(--sel-dim); color:var(--ink); }
     .fchip svg { width:12px; height:13px; }
     .fchip .bmp { fill:var(--warn); stroke:var(--warn); stroke-width:1.4; stroke-linejoin:round; }
-    .groupbox { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:9px 0 10px; margin:0 0 10px; }
     .ghd { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 3px 7px; }
     .ghd .t { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700; }
     .gcreate { width:22px; height:22px; border-radius:6px; border:1px solid var(--line); background:var(--inset); color:var(--body); cursor:pointer; font:inherit; line-height:1; }
     .gcreate:hover { color:var(--ink); background:var(--surf-h); }
-    .gitem { display:flex; align-items:center; gap:6px; width:100%; border:1px solid transparent; background:transparent; color:var(--body); border-radius:7px; padding:5px 6px; font:inherit; font-size:11.5px; cursor:pointer; text-align:left; }
+    .gpanel { border-top:1px solid var(--line); padding:9px 0 0; }
+    .gitem { display:grid; grid-template-columns:minmax(0,1fr) 34px 28px 28px; align-items:center; gap:4px; width:100%; border:1px solid transparent; background:transparent; color:var(--body); border-radius:7px; padding:5px 6px; font:inherit; font-size:11.5px; cursor:pointer; text-align:left; }
     .gitem:hover { background:var(--surf-h); border-color:var(--hair); color:var(--ink2); }
     .gitem.on { background:var(--sel-dim); border-color:var(--sel-dim); color:var(--ink); }
-    .gitem .gn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .gitem .gc { color:var(--muted); font-size:10px; }
-    .gitem .gactions { opacity:0; display:flex; gap:2px; transition:opacity var(--t-hover); }
-    .gitem:hover .gactions, .gitem:focus-within .gactions { opacity:1; }
-    .gitem .ga { border:none; background:transparent; color:var(--muted); font:inherit; font-size:13px; line-height:1; width:20px; height:20px; padding:0; border-radius:5px; cursor:pointer; }
+    .gitem .gn { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gitem .gc { color:var(--muted); font-size:10px; text-align:center; }
+    .gitem .ga { border:none; background:transparent; color:var(--muted); font:inherit; font-size:13px; line-height:1; width:22px; height:22px; padding:0; border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
     .gitem .ga:hover { color:var(--ink); background:var(--surf-h); }
     .gempty { font-size:11px; color:var(--muted); padding:5px 6px 1px; line-height:1.35; }
+    .gmembers { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+    .gmemberhd { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700; padding:0 3px 7px; }
+    .gmitem { display:grid; grid-template-columns:minmax(0,1fr) 28px; align-items:center; gap:4px; width:100%; border:1px solid transparent; background:transparent; color:var(--body); border-radius:7px; padding:6px; font:inherit; font-size:11.5px; cursor:pointer; text-align:left; }
+    .gmitem:hover { background:var(--surf-h); border-color:var(--hair); color:var(--ink2); }
+    .gmitem .gn { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gmitem .ga { border:none; background:transparent; color:var(--muted); font:inherit; font-size:13px; line-height:1; width:22px; height:22px; padding:0; border-radius:5px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .gmitem .ga:hover { color:var(--ink); background:var(--surf-h); }
     .sgrow { display:flex; align-items:center; gap:4px; padding:6px 4px 0 15px; min-height:19px; }
     .sgroups { display:inline-flex; align-items:center; gap:4px; max-width:100%; color:var(--muted); font-size:10px; border-radius:6px; padding:1px 2px; cursor:pointer; }
     .sgroups:hover { color:var(--ink); background:var(--surf-h); }
@@ -928,8 +933,8 @@
     let lastSessions = [];         // last /api/sessions payload, for search re-render without refetch
     let lastGroups = [];           // user-created session groups, fetched beside sessions
     let railFilter = "";           // sidebar search text
-    let savedFilter = false;       // the All / Saved chip: show only bookmarked terminals
-    let activeGroupId = null;       // selected user group filter, or null for all sessions
+    let railMode = "all";          // "all" | "saved" | "groups"
+    let selectedGroupId = null;     // selected group inside Groups mode
     let groupPickerSessionId = null;// session id with the compact group picker open
     let groupPickerQuery = "";      // search text inside the group picker
     // Bookmarks the user just toggled, held until a poll shows the server agreeing. Without this the
@@ -2144,16 +2149,59 @@
       return counts;
     }
 
-    function renderGroupsSection() {
-      const el = document.getElementById("grouplist");
-      if (!el) return;
+    function groupMembersHtml(group) {
+      const members = (lastSessions || []).filter((s) => (s.groups || []).some((g) => g.id === group.id));
+      const rows = members.map((s) =>
+        `<button class="gmitem" type="button" data-member-id="${esc(s.id)}">`
+        + `<span class="gn">${esc(s.name)}</span>`
+        + `<span class="ga" data-gremove="${esc(group.id)}" data-session-id="${esc(s.id)}" role="button" aria-label="Remove from group">&times;</span></button>`
+      ).join("");
+      return `<div class="gmembers"><div class="gmemberhd">${esc(group.name)} sessions</div>`
+        + (members.length ? rows : `<div class="gempty">This group has no sessions yet. Use + Add group on a session to add it here.</div>`)
+        + `</div>`;
+    }
+
+    function renderGroupsMode(list) {
       const counts = groupCounts();
+      if (selectedGroupId && !lastGroups.some((g) => g.id === selectedGroupId)) selectedGroupId = null;
+      const selected = selectedGroupId ? lastGroups.find((g) => g.id === selectedGroupId) : null;
       const rows = lastGroups.map((g) =>
-        `<button class="gitem${activeGroupId === g.id ? " on" : ""}" type="button" data-group-id="${esc(g.id)}">`
+        `<button class="gitem${selectedGroupId === g.id ? " on" : ""}" type="button" data-group-id="${esc(g.id)}">`
         + `<span class="gn">${esc(g.name)}</span><span class="gc">${counts.get(g.id) || 0}</span>`
-        + `<span class="gactions"><span class="ga" data-grename="${esc(g.id)}" role="button" aria-label="Rename group">✎</span>`
-        + `<span class="ga" data-gdelete="${esc(g.id)}" role="button" aria-label="Delete group">&times;</span></span></button>`).join("");
-      el.innerHTML = lastGroups.length ? rows : `<div class="gempty">No groups yet. Create one to collect related sessions.</div>`;
+        + `<span class="ga" data-grename="${esc(g.id)}" role="button" aria-label="Rename group">&#9998;</span>`
+        + `<span class="ga" data-gdelete="${esc(g.id)}" role="button" aria-label="Delete group">&times;</span></button>`).join("");
+      list.innerHTML = `<div class="gpanel"><div class="ghd"><span class="t">Groups</span>`
+        + `<button class="gcreate" id="group-create" type="button" aria-label="Create group">+</button></div>`
+        + `<div id="grouplist">${lastGroups.length ? rows : `<div class="gempty">No groups yet. Create one to collect related sessions.</div>`}</div>`
+        + (selected ? groupMembersHtml(selected) : `<div class="gempty">Select a group to manage its sessions.</div>`)
+        + `</div>`;
+      wireGroupsMode(list);
+    }
+
+    function wireGroupsMode(list) {
+      const create = list.querySelector("#group-create");
+      if (create) create.addEventListener("click", createSessionGroup);
+      const groups = list.querySelector("#grouplist");
+      if (groups) groups.addEventListener("click", (e) => {
+        const del = e.target.closest("[data-gdelete]");
+        if (del) { e.stopPropagation(); deleteSessionGroup(del.dataset.gdelete); return; }
+        const ren = e.target.closest("[data-grename]");
+        if (ren) { e.stopPropagation(); renameSessionGroup(ren.dataset.grename); return; }
+        const row = e.target.closest("[data-group-id]");
+        if (!row) return;
+        selectedGroupId = row.dataset.groupId || null;
+        closeGroupPicker();
+        renderRailList(lastSessions);
+      });
+      list.querySelectorAll(".gmitem").forEach((el) => {
+        el.addEventListener("click", (e) => {
+          const rem = e.target.closest("[data-gremove]");
+          if (rem) { e.preventDefault(); e.stopPropagation(); removeSessionFromGroup(rem.dataset.sessionId, rem.dataset.gremove); return; }
+          currentId = el.dataset.memberId; pinned = true; followLive = settings.follow === "1";
+          railMode = "all";
+          open.clear(); closedByUser.clear(); renderRailList(lastSessions); tickSingle(); tickNow();
+        });
+      });
     }
 
     async function createSessionGroup() {
@@ -2165,8 +2213,8 @@
         })).json();
         if (group && group.id) {
           lastGroups.push(group);
-          activeGroupId = group.id;
-          savedFilter = false;
+          selectedGroupId = group.id;
+          railMode = "groups";
           closeGroupPicker();
           renderRailList(lastSessions);
         }
@@ -2193,7 +2241,7 @@
       try { await fetch("/api/group/" + encodeURIComponent(id), { method: "DELETE" }); } catch { /* refetch handles it */ }
       lastGroups = lastGroups.filter((g) => g.id !== id);
       for (const s of lastSessions) s.groups = (s.groups || []).filter((g) => g.id !== id);
-      if (activeGroupId === id) activeGroupId = null;
+      if (selectedGroupId === id) selectedGroupId = null;
       renderRailList(lastSessions);
     }
 
@@ -2214,6 +2262,10 @@
         item.groups = before;
         renderRailList(lastSessions);
       }
+    }
+
+    async function removeSessionFromGroup(sessionId, groupId) {
+      await setSessionGroup(sessionId, groupId, false);
     }
 
     // True when a session's time falls inside the From/To date filter (either bound may be open).
@@ -2249,8 +2301,8 @@
         + `<div class="viewbox"><div class="sectionhd"><span class="t">Views</span></div>`
         + `<div class="railfilters" id="railfilters">`
         + `<span class="fchip" data-filter="all">All sessions</span>`
-        + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span></div></div>`
-        + `<div class="groupbox"><div class="ghd"><span class="t">Groups</span><button class="gcreate" id="group-create" type="button" aria-label="Create group">+</button></div><div id="grouplist"></div></div>`
+        + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span>`
+        + `<span class="fchip" data-filter="groups">Groups</span></div></div>`
         + `<div id="raillist"></div><div id="gpopover" class="gpopover" hidden></div>`;
 
       const search = document.getElementById("railsearch");
@@ -2270,21 +2322,7 @@
       document.getElementById("railfilters").addEventListener("click", (e) => {
         const chip = e.target.closest(".fchip[data-filter]");
         if (!chip) return;
-        savedFilter = chip.dataset.filter === "saved";
-        activeGroupId = null;
-        closeGroupPicker();
-        renderRailList(lastSessions);
-      });
-      document.getElementById("group-create").addEventListener("click", createSessionGroup);
-      document.getElementById("grouplist").addEventListener("click", (e) => {
-        const del = e.target.closest("[data-gdelete]");
-        if (del) { e.stopPropagation(); deleteSessionGroup(del.dataset.gdelete); return; }
-        const ren = e.target.closest("[data-grename]");
-        if (ren) { e.stopPropagation(); renameSessionGroup(ren.dataset.grename); return; }
-        const row = e.target.closest("[data-group-id]");
-        if (!row) return;
-        activeGroupId = row.dataset.groupId || null;
-        savedFilter = false;
+        railMode = chip.dataset.filter || "all";
         closeGroupPicker();
         renderRailList(lastSessions);
       });
@@ -2320,11 +2358,10 @@
       railWired = true;
     }
 
-    // Reflect the active All / Saved chip. Called on every list render.
+    // Reflect the active All / Saved / Groups chip. Called on every list render.
     function updateRailFilters() {
       document.querySelectorAll("#railfilters .fchip").forEach((c) => {
-        const on = !activeGroupId && ((c.dataset.filter === "saved") === savedFilter);
-        c.classList.toggle("on", on);
+        c.classList.toggle("on", c.dataset.filter === railMode);
       });
     }
 
@@ -2338,12 +2375,14 @@
       const list = document.getElementById("raillist");
       if (!list) return;
       updateRailFilters();
-      renderGroupsSection();
+      if (railMode === "groups") {
+        renderGroupsMode(list);
+        return;
+      }
       const q = railFilter.trim().toLowerCase();
       const shown = sessions.filter((s) =>
         (!q || (s.name + " " + (s.project || "")).toLowerCase().includes(q))
-        && inDateRange(s) && (!savedFilter || s.saved)
-        && (!activeGroupId || (s.groups || []).some((g) => g.id === activeGroupId)));
+        && inDateRange(s) && (railMode !== "saved" || s.saved));
       // The terminal you are viewing always pins to the very top, whatever the sort, so it never
       // scrolls out of reach under Most tokens or Most tasks. It is pulled out of the grouped and
       // ranked lists below so it is never listed twice. A current session hidden by the search,
@@ -2373,11 +2412,9 @@
           + rows.map(sessRowHtml).join("");
       }
       listHtml = pinnedHtml + listHtml;
-      const emptyHtml = savedFilter
+      const emptyHtml = railMode === "saved"
         ? `<div class="railempty"><span class="bmbig">${bmSvg()}</span><div class="et">No saved sessions yet</div>`
           + `<div class="eh">Click the bookmark on a session to save it here.</div></div>`
-        : activeGroupId
-        ? `<div class="railempty"><div class="et">No sessions in this group</div><div class="eh">Use + Add group on a session to add it here.</div></div>`
         : `<div class="railempty"><div class="et">${(q || dateFrom || dateTo) ? "No sessions match" : "No sessions yet"}</div></div>`;
       list.innerHTML = shown.length ? listHtml : emptyHtml;
 
