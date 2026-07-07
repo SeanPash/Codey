@@ -44,3 +44,39 @@ describe("timeline public page session rail", () => {
     expect(page).toContain('if (!res.ok) throw new Error("group create failed")');
   });
 });
+
+describe("timeline group assignment affordances", () => {
+  it("offers a Groups button in the title row that opens the picker for the current terminal", () => {
+    expect(page).toContain('id="group-current"');
+    // sits alongside Rename/Delete in the title actions
+    expect(page).toMatch(/id="group-current"[\s\S]*id="rename-current"[\s\S]*id="delete-current"/);
+    expect(page).toContain('openGroupPicker(currentId, document.getElementById("group-current"), true)');
+  });
+
+  it("keeps the title Groups button anchored to itself and in sync with membership", () => {
+    expect(page).toContain("let groupPickerFromTitle = false");
+    expect(page).toContain('if (groupPickerFromTitle) return document.getElementById("group-current")');
+    expect(page).toContain("function updateGroupButton()");
+    // outside-click never closes the picker while interacting with the title button
+    expect(page).toContain('e.target.closest("#group-current")');
+    // lit when the terminal belongs to at least one group
+    expect(page).toMatch(/\.tact\.on\s*\{[^}]*border-color:var\(--sel\)[^}]*background:var\(--sel-dim\)/s);
+  });
+
+  it("makes the sidebar Add-to-group control an obvious dashed chip", () => {
+    expect(page).toContain('<span class="gplus" aria-hidden="true">+</span>Add to group');
+    expect(page).toMatch(/\.sgroups\.add\s*\{[^}]*border:1px dashed var\(--line\)[^}]*border-radius:99px/s);
+    expect(page).toMatch(/\.sgroups\.add:hover\s*\{[^}]*border-color:var\(--sel\)/s);
+  });
+
+  it("signals a session can join more than one group without clutter", () => {
+    // trailing "+" chip after existing group pills
+    expect(page).toContain('<span class="gpadd" aria-hidden="true">+</span>');
+    expect(page).toMatch(/\.gpadd\s*\{[^}]*border:1px dashed var\(--line\)/s);
+    // picker reads as a multi-select list: plural header + hint + real checkboxes
+    expect(page).toContain(">Add to groups<");
+    expect(page).toContain("Pick any number — a session can be in several.");
+    expect(page).toContain('class="gcheck${on ? " on" : ""}"');
+    expect(page).toMatch(/\.gpoprow \.gcheck\s*\{[^}]*border:1\.5px solid var\(--line\)/s);
+  });
+});
