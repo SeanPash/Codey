@@ -10,6 +10,7 @@ import { readCustomName } from "../store/session-name-store.js";
 import { readSaved } from "../store/session-saved-store.js";
 import { readTokens } from "../store/session-tokens-store.js";
 import { readStatus } from "../statusline/state.js";
+import { readGroupsForSessions, type SessionGroupRef } from "../store/session-group-store.js";
 
 // The mtime of a session's events.jsonl, or null if it has none. This is the real
 // activity signal: the capture hook appends to it on every tool call. We can't use the
@@ -54,6 +55,7 @@ export interface SessionListItem {
   acted: boolean;          // has captured at least one tool call (false = prompted, no work yet)
   live: boolean;           // alias of running, kept for existing callers
   saved: boolean;          // user bookmarked this terminal (durable, server-side)
+  groups: SessionGroupRef[]; // user-created groups this session belongs to; separate from saved
   tokens: number;          // persisted work-token total, for the "Most tokens" sort (0 if never opened)
   day: string;             // "Today", "Yesterday", or a locale date string
 }
@@ -121,6 +123,7 @@ export function dayBucket(mtime: number, now: number): string {
 
 export function listSessions(root: string = defaultRoot(), now: number = Date.now()): SessionListItem[] {
   if (!existsSync(root)) return [];
+  const groupsBySession = readGroupsForSessions(root);
   return readdirSync(root)
     .filter((name) => statSync(join(root, name)).isDirectory())
     .map((id) => {
@@ -168,6 +171,7 @@ export function listSessions(root: string = defaultRoot(), now: number = Date.no
         acted: evMtime != null,
         live: running,
         saved: readSaved(dir),
+        groups: groupsBySession.get(id) ?? [],
         tokens: readTokens(dir),
         day: dayBucket(mtime, now),
         // carried only for the filter below; not part of the public shape

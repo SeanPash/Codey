@@ -3515,6 +3515,45 @@ function phraseSearch(literal) {
   }
   return words.join(" ").toLowerCase();
 }
+function stemName(subject) {
+  const base = subject.split(/[\\/]/).pop() || subject;
+  return base.replace(/\.(test|spec)\.[jt]sx?$/i, "").replace(/\.[a-z0-9]+$/i, "").replace(/[-_]+/g, " ").trim().toLowerCase();
+}
+var FEATURE_WORDS = {
+  attribution: "timeline attribution",
+  banned: "caption quality guards",
+  caption: "caption wording",
+  chunks: "work chunk grouping",
+  compose: "status line composition",
+  grouping: "timeline grouping",
+  labels: "timeline labels",
+  prompt: "prompt handling",
+  render: "rendering behavior",
+  segment: "timeline segmentation",
+  snapshot: "timeline snapshot data",
+  subject: "caption subject wording",
+  transcript: "session transcript parsing",
+  view: "status line display"
+};
+function featureArea(subject, area) {
+  const lowArea = (area ?? "").toLowerCase();
+  const stem2 = stemName(subject);
+  if ((stem2 === "index" || subject.toLowerCase() === "index.html") && (lowArea === "public" || lowArea === "serve")) {
+    return "browser timeline rendering";
+  }
+  if (lowArea === "serve" || lowArea === "public") return "browser timeline rendering";
+  if (lowArea === "timeline" && stem2 === "segment") return "timeline segmentation";
+  if (lowArea === "timeline" && stem2 === "grouping") return "timeline grouping";
+  if (lowArea === "caption" && (stem2 === "subject" || stem2 === "caption" || stem2 === "reasoning")) {
+    return "caption wording";
+  }
+  if (lowArea && FEATURE_WORDS[stem2]) {
+    const mapped = FEATURE_WORDS[stem2];
+    return mapped.includes(lowArea) ? mapped : `${lowArea} ${mapped}`;
+  }
+  if (lowArea) return `${lowArea} ${stem2 || "behavior"}`.trim();
+  return FEATURE_WORDS[stem2] ?? `${stem2 || "target"} behavior`;
+}
 function purposeTitle(tool, stage, subject, count) {
   const many = count > 1;
   switch (stage) {
@@ -3545,20 +3584,20 @@ function purposeTitle(tool, stage, subject, count) {
 }
 function purposeSentence(tool, stage, subject, count, area) {
   const many = count > 1;
-  const place = area ? `the ${area} code` : "it";
+  const feature = featureArea(subject, area);
   switch (stage) {
     case "editing": {
       const adds = tool === "Write" || tool === "NotebookEdit";
       if (many) return adds ? `Adding new files, starting with ${subject}.` : `Updating ${subject} and the files alongside it.`;
       if (adds) return `Creating ${subject}.`;
-      return area ? `Editing ${subject} to change how ${place} behaves.` : `Editing ${subject} to change what it does.`;
+      return `Editing ${subject} to update ${feature}.`;
     }
     case "inspecting":
       if (many) return `Reading ${subject} and the files alongside it to see how they work together.`;
       if (tool === "Grep" || tool === "Glob") {
-        return subject === "the code" ? "Searching the project for the relevant code." : `Searching the project for ${subject}.`;
+        return subject === "the code" ? "Searching the project for matching code paths before changing related behavior." : `Searching the project for ${subject} to find existing ${subject} behavior before changing related code.`;
       }
-      return area ? `Reading ${subject} to see what ${place} does.` : `Reading ${subject} to see what it does.`;
+      return `Reading ${subject} to inspect ${feature} before changing related behavior.`;
     case "testing":
       return `Running ${subject} to check it passes.`;
     case "debugging":
@@ -3870,6 +3909,21 @@ function firstWord2(cmd) {
 function rest(cmd) {
   return cmd.replace(/^\s*\S+\s*/, "");
 }
+function targetedTestIntent(cmd) {
+  const m = /(?:^|\s)([^\s"'()]+\.(?:test|spec)\.[jt]sx?)(?=$|\s)/i.exec(cmd);
+  if (!m) return null;
+  const file7 = m[1];
+  const parts = file7.split(/[\\/]/).filter(Boolean);
+  const area = parts.length >= 2 ? parts[parts.length - 2] : void 0;
+  const feature = featureArea(parts[parts.length - 1] ?? file7, area);
+  return intent(
+    `the ${feature} tests`,
+    `Running ${feature} tests`,
+    `Claude is running the ${feature} tests to confirm ${feature} still behaves correctly.`,
+    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes.`,
+    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes. A targeted test focuses on one slice of the project, so a failure points close to the code that changed.`
+  );
+}
 var TEMP_HINT = /\b(tmp|temp|scratch|demo|sample|example|fixture)s?\b/i;
 var GIT_READ = /* @__PURE__ */ new Set(["status", "diff", "log", "show", "branch", "remote", "describe", "rev-parse"]);
 function commandIntent(cmd) {
@@ -3882,6 +3936,8 @@ function commandIntent(cmd) {
     "Claude is running the tests to confirm the latest changes pass and nothing else broke.",
     "Claude is running the tests to confirm the latest changes pass and nothing else broke. A test is a small program that exercises the real code, so a regression shows up immediately instead of in front of a user."
   );
+  const targeted = targetedTestIntent(cmd);
+  if (targeted) return targeted;
   if (/\b(vitest|jest|mocha|pytest|phpunit)\b/.test(cmd)) return TEST;
   if (word === "npm" || word === "pnpm" || word === "yarn" || word === "npx") {
     if (/\btest\b/.test(tail)) return TEST;
@@ -4678,8 +4734,8 @@ function describe(chunk) {
         return {
           title: chunk.targets.length ? `Searching ${humanFile(chunk.targets[0])}` : "Searching the project",
           simple: `Claude is searching ${where} for ${searches}.`,
-          deep: `Claude is searching ${where} for ${searches} to land on the right section before editing it.`,
-          teach: `Claude is searching ${where} for ${searches} to land on the right section before editing it. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
+          deep: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code.`,
+          teach: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
         };
       }
       if (chunk.tool === "Grep" || chunk.tool === "Glob") {
@@ -4691,11 +4747,12 @@ function describe(chunk) {
         };
       }
       if (single) {
+        const feature = featureArea(names);
         return {
           title,
           simple: `Claude is reading ${names}.`,
-          deep: `Claude is reading ${names} to see what it does before changing it.`,
-          teach: `Claude is reading ${names} to see what it does before changing it. Reading the existing code first is how you avoid breaking something you did not know was there.`
+          deep: `Claude is reading ${names} to inspect ${feature} before changing related behavior.`,
+          teach: `Claude is reading ${names} to inspect ${feature} before changing related behavior. Reading the existing code first is how you avoid breaking something you did not know was there.`
         };
       }
       return {
@@ -5087,8 +5144,8 @@ function runNarrate(sessionId, mode) {
 }
 
 // src/cli/statusline.ts
-import { join as join15 } from "node:path";
-import { existsSync as existsSync17, readFileSync as readFileSync16 } from "node:fs";
+import { join as join16 } from "node:path";
+import { existsSync as existsSync18, readFileSync as readFileSync17 } from "node:fs";
 
 // src/statusline/read-time.ts
 var PER_WORD_MS = 350;
@@ -5465,8 +5522,8 @@ function renderStatus(view, _width = WRAP) {
 }
 
 // src/cli/sessions.ts
-import { readdirSync, statSync, existsSync as existsSync15 } from "node:fs";
-import { join as join13 } from "node:path";
+import { readdirSync, statSync, existsSync as existsSync16 } from "node:fs";
+import { join as join14 } from "node:path";
 
 // src/timeline/segment-cache.ts
 import { writeFileSync as writeFileSync4, readFileSync as readFileSync10, existsSync as existsSync10, mkdirSync as mkdirSync4 } from "node:fs";
@@ -5758,18 +5815,141 @@ function writeTokens(dir, tokens) {
   writeFileSync7(join12(dir, TOKENS_FILE), JSON.stringify({ tokens }));
 }
 
+// src/store/session-group-store.ts
+import { existsSync as existsSync15, mkdirSync as mkdirSync8, readFileSync as readFileSync15, writeFileSync as writeFileSync8 } from "node:fs";
+import { join as join13 } from "node:path";
+import { randomUUID as randomUUID2 } from "node:crypto";
+var GROUPS_FILE = "session-groups.json";
+function statePath(root) {
+  return join13(root, GROUPS_FILE);
+}
+function emptyState() {
+  return { groups: [], members: [] };
+}
+function cleanName(name) {
+  const trimmed = name.trim().replace(/\s+/g, " ");
+  return trimmed ? trimmed : null;
+}
+function readState(root) {
+  const file7 = statePath(root);
+  if (!existsSync15(file7)) return emptyState();
+  try {
+    const parsed = JSON.parse(readFileSync15(file7, "utf8"));
+    const groups = Array.isArray(parsed.groups) ? parsed.groups.filter((g) => !!g && typeof g.id === "string" && typeof g.name === "string" && typeof g.createdAt === "number" && typeof g.updatedAt === "number") : [];
+    const groupIds = new Set(groups.map((g) => g.id));
+    const seen = /* @__PURE__ */ new Set();
+    const members = Array.isArray(parsed.members) ? parsed.members.filter((m) => {
+      if (!m || typeof m.groupId !== "string" || typeof m.sessionId !== "string" || typeof m.addedAt !== "number") return false;
+      if (!groupIds.has(m.groupId)) return false;
+      const key2 = `${m.groupId}\0${m.sessionId}`;
+      if (seen.has(key2)) return false;
+      seen.add(key2);
+      return true;
+    }) : [];
+    return { groups, members };
+  } catch {
+    return emptyState();
+  }
+}
+function writeState(root, state) {
+  mkdirSync8(root, { recursive: true });
+  writeFileSync8(statePath(root), JSON.stringify(state, null, 2));
+}
+function toRef(g) {
+  return { id: g.id, name: g.name };
+}
+function listGroups(root) {
+  return readState(root).groups.slice().sort((a, b) => a.createdAt - b.createdAt);
+}
+function createGroup(root, name, now = Date.now()) {
+  const cleaned = cleanName(name);
+  if (!cleaned) return null;
+  const state = readState(root);
+  const group = { id: randomUUID2(), name: cleaned, createdAt: now, updatedAt: now };
+  state.groups.push(group);
+  writeState(root, state);
+  return group;
+}
+function renameGroup(root, groupId, name, now = Date.now()) {
+  const cleaned = cleanName(name);
+  if (!cleaned) return false;
+  const state = readState(root);
+  const group = state.groups.find((g) => g.id === groupId);
+  if (!group) return false;
+  group.name = cleaned;
+  group.updatedAt = now;
+  writeState(root, state);
+  return true;
+}
+function deleteGroup(root, groupId) {
+  const state = readState(root);
+  const nextGroups = state.groups.filter((g) => g.id !== groupId);
+  if (nextGroups.length === state.groups.length) return false;
+  state.groups = nextGroups;
+  state.members = state.members.filter((m) => m.groupId !== groupId);
+  writeState(root, state);
+  return true;
+}
+function addSessionToGroup(root, groupId, sessionId, now = Date.now()) {
+  const sid = sessionId.trim();
+  if (!sid) return false;
+  const state = readState(root);
+  if (!state.groups.some((g) => g.id === groupId)) return false;
+  if (!state.members.some((m) => m.groupId === groupId && m.sessionId === sid)) {
+    state.members.push({ groupId, sessionId: sid, addedAt: now });
+    writeState(root, state);
+  }
+  return true;
+}
+function removeSessionFromGroup(root, groupId, sessionId) {
+  const state = readState(root);
+  const next = state.members.filter((m) => !(m.groupId === groupId && m.sessionId === sessionId));
+  if (next.length === state.members.length) return false;
+  state.members = next;
+  writeState(root, state);
+  return true;
+}
+function removeSessionFromAllGroups(root, sessionId) {
+  const state = readState(root);
+  const next = state.members.filter((m) => m.sessionId !== sessionId);
+  if (next.length === state.members.length) return;
+  state.members = next;
+  writeState(root, state);
+}
+function listSessionIdsInGroup(root, groupId) {
+  return readState(root).members.filter((m) => m.groupId === groupId).sort((a, b) => a.addedAt - b.addedAt).map((m) => m.sessionId);
+}
+function readGroupsForSessions(root) {
+  const state = readState(root);
+  const byId = new Map(state.groups.map((g) => [g.id, g]));
+  const out = /* @__PURE__ */ new Map();
+  for (const member of state.members) {
+    const group = byId.get(member.groupId);
+    if (!group) continue;
+    const list = out.get(member.sessionId) ?? [];
+    list.push(toRef(group));
+    out.set(member.sessionId, list);
+  }
+  for (const refs of out.values()) refs.sort((a, b) => {
+    const ga = byId.get(a.id);
+    const gb = byId.get(b.id);
+    return (ga?.createdAt ?? 0) - (gb?.createdAt ?? 0);
+  });
+  return out;
+}
+
 // src/cli/sessions.ts
 function eventsMtime(sessionDir) {
-  const p = join13(sessionDir, "events.jsonl");
-  return existsSync15(p) ? statSync(p).mtimeMs : null;
+  const p = join14(sessionDir, "events.jsonl");
+  return existsSync16(p) ? statSync(p).mtimeMs : null;
 }
 function latestSessionId(root = defaultRoot()) {
-  if (!existsSync15(root)) return null;
+  if (!existsSync16(root)) return null;
   const names = readdirSync(root);
   if (names.length === 0) return null;
-  const active = names.map((name) => ({ name, mtime: eventsMtime(join13(root, name)) })).filter((s) => s.mtime !== null).sort((a, b) => b.mtime - a.mtime);
+  const active = names.map((name) => ({ name, mtime: eventsMtime(join14(root, name)) })).filter((s) => s.mtime !== null).sort((a, b) => b.mtime - a.mtime);
   if (active.length > 0) return active[0].name;
-  return names.map((name) => ({ name, mtime: statSync(join13(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
+  return names.map((name) => ({ name, mtime: statSync(join14(root, name)).mtimeMs })).sort((a, b) => b.mtime - a.mtime)[0].name;
 }
 var RUNNING_WINDOW_MS = 15e3;
 var OPEN_WINDOW_MS = 10 * 6e4;
@@ -5792,9 +5972,10 @@ function dayBucket(mtime, now) {
   return d.toLocaleDateString();
 }
 function listSessions(root = defaultRoot(), now = Date.now()) {
-  if (!existsSync15(root)) return [];
-  return readdirSync(root).filter((name) => statSync(join13(root, name)).isDirectory()).map((id) => {
-    const dir = join13(root, id);
+  if (!existsSync16(root)) return [];
+  const groupsBySession = readGroupsForSessions(root);
+  return readdirSync(root).filter((name) => statSync(join14(root, name)).isDirectory()).map((id) => {
+    const dir = join14(root, id);
     const evMtime = eventsMtime(dir);
     const cache = readCache(id, root);
     const prompts = readPrompts(dir);
@@ -5829,6 +6010,7 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
       acted: evMtime != null,
       live: running,
       saved: readSaved(dir),
+      groups: groupsBySession.get(id) ?? [],
       tokens: readTokens(dir),
       day: dayBucket(mtime, now),
       // carried only for the filter below; not part of the public shape
@@ -5839,38 +6021,38 @@ function listSessions(root = defaultRoot(), now = Date.now()) {
 }
 
 // src/statusline/active-mode.ts
-import { readFileSync as readFileSync15, writeFileSync as writeFileSync8, existsSync as existsSync16, rmSync as rmSync4, mkdirSync as mkdirSync8, readdirSync as readdirSync2 } from "node:fs";
-import { join as join14 } from "node:path";
+import { readFileSync as readFileSync16, writeFileSync as writeFileSync9, existsSync as existsSync17, rmSync as rmSync4, mkdirSync as mkdirSync9, readdirSync as readdirSync2 } from "node:fs";
+import { join as join15 } from "node:path";
 function modeFile(sessionDir) {
-  return join14(sessionDir, "mode");
+  return join15(sessionDir, "mode");
 }
 function writeSessionMode(mode, sessionDir) {
-  mkdirSync8(sessionDir, { recursive: true });
-  writeFileSync8(modeFile(sessionDir), mode);
+  mkdirSync9(sessionDir, { recursive: true });
+  writeFileSync9(modeFile(sessionDir), mode);
 }
 function clearSessionMode(sessionDir) {
   rmSync4(modeFile(sessionDir), { force: true });
 }
 function readSessionMode(sessionDir) {
   const p = modeFile(sessionDir);
-  if (!existsSync16(p)) return null;
-  const raw = readFileSync15(p, "utf8").trim();
+  if (!existsSync17(p)) return null;
+  const raw = readFileSync16(p, "utf8").trim();
   return raw === "simple" || raw === "deep" || raw === "teach" ? raw : null;
 }
 function anyActiveSession(root) {
-  if (!existsSync16(root)) return false;
+  if (!existsSync17(root)) return false;
   for (const name of readdirSync2(root)) {
-    if (existsSync16(modeFile(join14(root, name)))) return true;
+    if (existsSync17(modeFile(join15(root, name)))) return true;
   }
   return false;
 }
 
 // src/cli/statusline.ts
 function readEvents(dir) {
-  const p = join15(dir, "events.jsonl");
-  if (!existsSync17(p)) return [];
+  const p = join16(dir, "events.jsonl");
+  if (!existsSync18(p)) return [];
   const out = [];
-  for (const line of readFileSync16(p, "utf8").split("\n")) {
+  for (const line of readFileSync17(p, "utf8").split("\n")) {
     if (!line.trim()) continue;
     try {
       out.push(JSON.parse(line));
@@ -5880,7 +6062,7 @@ function readEvents(dir) {
   return out;
 }
 function statusLineFor(dir, now = Date.now(), mode) {
-  if (!existsSync17(dir)) return "";
+  if (!existsSync18(dir)) return "";
   const snap = readStatus(dir) ?? { mode: "simple", action: null, why: null, warning: null, updatedAt: 0 };
   const turnStart = snap.promptAt ?? Number.NEGATIVE_INFINITY;
   const overhead = summarizeSpend(readSpend(dir).filter((e) => e.ts >= turnStart));
@@ -5912,7 +6094,7 @@ function renderOffWarning(w) {
 }
 function lineForSession(session, root, now) {
   if (!session) return "";
-  const dir = join15(root, session);
+  const dir = join16(root, session);
   const mode = readSessionMode(dir);
   if (!mode) {
     const w = activeWarning(readEvents(dir), now);
@@ -5936,13 +6118,13 @@ function runStatusLine() {
 
 // src/cli/serve.ts
 import { fileURLToPath } from "node:url";
-import { dirname as dirname2, join as join22 } from "node:path";
+import { dirname as dirname2, join as join23 } from "node:path";
 import { rmSync as rmSync7 } from "node:fs";
 
 // src/serve/server.ts
 import { createServer as createHttpServer } from "node:http";
-import { readFileSync as readFileSync17 } from "node:fs";
-import { join as join16 } from "node:path";
+import { readFileSync as readFileSync18 } from "node:fs";
+import { join as join17 } from "node:path";
 function decodeId(raw) {
   try {
     return decodeURIComponent(raw);
@@ -5957,6 +6139,7 @@ function resolveRoute(method, url) {
     if (path === "/" || path === "/index.html") return { type: "page" };
     if (path === "/health") return { type: "health" };
     if (path === "/api/sessions") return { type: "sessions" };
+    if (path === "/api/groups") return { type: "groups" };
     if (path === "/api/live") return { type: "live", saver: /[?&]saver=1(?:&|$)/.test(url) };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
@@ -5964,6 +6147,11 @@ function resolveRoute(method, url) {
     if (mnow) {
       const id = decodeId(mnow[1]);
       return id == null ? { type: "notfound" } : { type: "now", id };
+    }
+    const mgs = /^\/api\/group\/([^/]+)\/sessions$/.exec(path);
+    if (mgs) {
+      const id = decodeId(mgs[1]);
+      return id == null ? { type: "notfound" } : { type: "groupSessions", id };
     }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
     if (m) {
@@ -5974,6 +6162,18 @@ function resolveRoute(method, url) {
     }
   }
   if (method === "POST") {
+    if (path === "/api/groups") return { type: "createGroup" };
+    const mgn = /^\/api\/group\/([^/]+)\/name$/.exec(path);
+    if (mgn) {
+      const id = decodeId(mgn[1]);
+      return id == null ? { type: "notfound" } : { type: "renameGroup", id };
+    }
+    const mgadd = /^\/api\/group\/([^/]+)\/session\/([^/]+)$/.exec(path);
+    if (mgadd) {
+      const id = decodeId(mgadd[1]);
+      const sessionId = decodeId(mgadd[2]);
+      return id == null || sessionId == null ? { type: "notfound" } : { type: "addSessionToGroup", id, sessionId };
+    }
     const mi = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
     if (mi) {
       const id = decodeId(mi[1]);
@@ -6006,6 +6206,17 @@ function resolveRoute(method, url) {
     }
   }
   if (method === "DELETE") {
+    const mgrem = /^\/api\/group\/([^/]+)\/session\/([^/]+)$/.exec(path);
+    if (mgrem) {
+      const id = decodeId(mgrem[1]);
+      const sessionId = decodeId(mgrem[2]);
+      return id == null || sessionId == null ? { type: "notfound" } : { type: "removeSessionFromGroup", id, sessionId };
+    }
+    const mg = /^\/api\/group\/([^/]+)$/.exec(path);
+    if (mg) {
+      const id = decodeId(mg[1]);
+      return id == null ? { type: "notfound" } : { type: "deleteGroup", id };
+    }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
     if (m) {
       const id = decodeId(m[1]);
@@ -6032,11 +6243,15 @@ function createServer(deps) {
     try {
       if (route.type === "page") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-        res.end(readFileSync17(deps.pagePath, "utf8"));
+        res.end(readFileSync18(deps.pagePath, "utf8"));
       } else if (route.type === "health") {
         sendJson(res, 200, { build: deps.buildId });
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
+      } else if (route.type === "groups") {
+        sendJson(res, 200, deps.listGroups());
+      } else if (route.type === "groupSessions") {
+        sendJson(res, 200, deps.listGroupSessions(route.id));
       } else if (route.type === "session") {
         sendJson(res, 200, deps.getSnapshot(route.id, route.saver, route.rich));
       } else if (route.type === "now") {
@@ -6046,7 +6261,7 @@ function createServer(deps) {
       } else if (route.type === "font") {
         const ct = route.file.endsWith(".woff2") ? "font/woff2" : "font/woff";
         res.writeHead(200, { "content-type": ct, "cache-control": "max-age=86400" });
-        res.end(readFileSync17(join16(deps.fontsDir, route.file)));
+        res.end(readFileSync18(join17(deps.fontsDir, route.file)));
       } else if (route.type === "intervene") {
         void readBody(req).then((body) => {
           let action = "";
@@ -6098,6 +6313,37 @@ function createServer(deps) {
       } else if (route.type === "delete") {
         const ok = deps.remove(route.id);
         sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "createGroup") {
+        void readBody(req).then((body) => {
+          let name = "";
+          try {
+            name = String(JSON.parse(body || "{}").name ?? "");
+          } catch {
+            name = "";
+          }
+          const group = deps.createGroup(name);
+          sendJson(res, group ? 200 : 400, group ?? { ok: false });
+        });
+      } else if (route.type === "renameGroup") {
+        void readBody(req).then((body) => {
+          let name = "";
+          try {
+            name = String(JSON.parse(body || "{}").name ?? "");
+          } catch {
+            name = "";
+          }
+          const ok = deps.renameGroup(route.id, name);
+          sendJson(res, ok ? 200 : 400, { ok });
+        });
+      } else if (route.type === "deleteGroup") {
+        const ok = deps.deleteGroup(route.id);
+        sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "addSessionToGroup") {
+        const ok = deps.addSessionToGroup(route.id, route.sessionId);
+        sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "removeSessionFromGroup") {
+        const ok = deps.removeSessionFromGroup(route.id, route.sessionId);
+        sendJson(res, ok ? 200 : 400, { ok });
       } else if (route.type === "dismiss") {
         const ok = deps.dismiss(route.id);
         sendJson(res, ok ? 200 : 400, { ok });
@@ -6124,8 +6370,8 @@ function buildIdFrom(entryPath) {
 }
 
 // src/serve/load-snapshot.ts
-import { statSync as statSync2, readdirSync as readdirSync3, existsSync as existsSync20 } from "node:fs";
-import { join as join19 } from "node:path";
+import { statSync as statSync2, readdirSync as readdirSync3, existsSync as existsSync21 } from "node:fs";
+import { join as join20 } from "node:path";
 
 // src/caption/reasoning.ts
 function sentences(text) {
@@ -6423,7 +6669,8 @@ function groupThinking(lines) {
     }
     if (run.length) {
       const runTokens = run.reduce((sum, r) => sum + r.tokens, 0);
-      out.push({ ...l, tokens: l.tokens + runTokens, thoughtFirst: true });
+      const decision = [...run].reverse().find((r) => r.explainable !== false && r.why)?.why ?? null;
+      out.push({ ...l, tokens: l.tokens + runTokens, thoughtFirst: true, why: l.why ?? decision });
       run = [];
       continue;
     }
@@ -6828,10 +7075,10 @@ function buildSummaryPrompt(promptText, tasks, depth, rich = true) {
 }
 
 // src/timeline/explain-cache.ts
-import { readFileSync as readFileSync18, writeFileSync as writeFileSync9, existsSync as existsSync18, mkdirSync as mkdirSync9 } from "node:fs";
-import { join as join17 } from "node:path";
+import { readFileSync as readFileSync19, writeFileSync as writeFileSync10, existsSync as existsSync19, mkdirSync as mkdirSync10 } from "node:fs";
+import { join as join18 } from "node:path";
 function cachePath2(sessionId, root) {
-  return join17(root, sessionId, "explanations.json");
+  return join18(root, sessionId, "explanations.json");
 }
 function idPrefix(scope, id) {
   return `${scope}:${id}:`;
@@ -6841,9 +7088,9 @@ function key(scope, id, contentHash, depth) {
 }
 function read(sessionId, root) {
   const p = cachePath2(sessionId, root);
-  if (!existsSync18(p)) return {};
+  if (!existsSync19(p)) return {};
   try {
-    const o = JSON.parse(readFileSync18(p, "utf8"));
+    const o = JSON.parse(readFileSync19(p, "utf8"));
     return o && typeof o === "object" ? o : {};
   } catch {
     return {};
@@ -6862,8 +7109,8 @@ function writeExplanation(sessionId, scope, id, contentHash, depth, text, root =
     if (k.startsWith(prefix) && !k.startsWith(`${prefix}${contentHash}:`) && k !== live) delete store[k];
   }
   store[live] = stripDashes(text);
-  mkdirSync9(join17(root, sessionId), { recursive: true });
-  writeFileSync9(cachePath2(sessionId, root), JSON.stringify(store));
+  mkdirSync10(join18(root, sessionId), { recursive: true });
+  writeFileSync10(cachePath2(sessionId, root), JSON.stringify(store));
 }
 
 // src/util/hash.ts
@@ -7052,17 +7299,17 @@ function buildNowView(allEvents, status, now, turnStart = Number.NEGATIVE_INFINI
 }
 
 // src/store/dismissed-store.ts
-import { writeFileSync as writeFileSync10, readFileSync as readFileSync19, existsSync as existsSync19, mkdirSync as mkdirSync10 } from "node:fs";
-import { join as join18 } from "node:path";
+import { writeFileSync as writeFileSync11, readFileSync as readFileSync20, existsSync as existsSync20, mkdirSync as mkdirSync11 } from "node:fs";
+import { join as join19 } from "node:path";
 var FILE = "dismissed.json";
 function file6(root) {
-  return join18(root, FILE);
+  return join19(root, FILE);
 }
 function readDismissed(root) {
   const p = file6(root);
-  if (!existsSync19(p)) return /* @__PURE__ */ new Set();
+  if (!existsSync20(p)) return /* @__PURE__ */ new Set();
   try {
-    const parsed = JSON.parse(readFileSync19(p, "utf8"));
+    const parsed = JSON.parse(readFileSync20(p, "utf8"));
     if (!Array.isArray(parsed)) return /* @__PURE__ */ new Set();
     return new Set(parsed.filter((x) => typeof x === "string"));
   } catch {
@@ -7070,8 +7317,8 @@ function readDismissed(root) {
   }
 }
 function write(root, ids) {
-  mkdirSync10(root, { recursive: true });
-  writeFileSync10(file6(root), JSON.stringify([...ids], null, 2));
+  mkdirSync11(root, { recursive: true });
+  writeFileSync11(file6(root), JSON.stringify([...ids], null, 2));
 }
 function dismiss(root, id) {
   const ids = readDismissed(root);
@@ -7089,7 +7336,7 @@ function restore(root, id) {
 function isRunning(dir, now, cancelledAt = 0) {
   let evMtime = 0;
   try {
-    evMtime = statSync2(join19(dir, "events.jsonl")).mtimeMs;
+    evMtime = statSync2(join20(dir, "events.jsonl")).mtimeMs;
   } catch {
     evMtime = 0;
   }
@@ -7115,10 +7362,10 @@ function backfillTokens(root = defaultRoot()) {
   }
   for (const id of ids) {
     try {
-      const dir = join19(root, id);
+      const dir = join20(root, id);
       if (!statSync2(dir).isDirectory()) continue;
-      if (!existsSync20(join19(dir, "events.jsonl"))) continue;
-      if (existsSync20(join19(dir, "tokens.json"))) continue;
+      if (!existsSync21(join20(dir, "events.jsonl"))) continue;
+      if (existsSync21(join20(dir, "tokens.json"))) continue;
       loadSnapshot(id, root);
     } catch {
     }
@@ -7209,7 +7456,7 @@ async function runExplain(sessionId, body, root = defaultRoot()) {
   return explain(
     snap,
     { sessionId, scope: b.scope, id: b.id, depth: b.depth, rich },
-    { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join19(root, sessionId) }
+    { narrate: (prompt) => runClaudeMetered(prompt), root, sessionDir: join20(root, sessionId) }
   );
 }
 function loadLive(root = defaultRoot(), saver = false) {
@@ -7257,14 +7504,14 @@ function loadLive(root = defaultRoot(), saver = false) {
 }
 
 // src/intervene/file-io.ts
-import { writeFileSync as writeFileSync11, readFileSync as readFileSync20, existsSync as existsSync21, rmSync as rmSync5, mkdirSync as mkdirSync11 } from "node:fs";
-import { join as join20 } from "node:path";
+import { writeFileSync as writeFileSync12, readFileSync as readFileSync21, existsSync as existsSync22, rmSync as rmSync5, mkdirSync as mkdirSync12 } from "node:fs";
+import { join as join21 } from "node:path";
 function interventionPath(sessionId, root = defaultRoot()) {
-  return join20(root, sessionId, "intervene.json");
+  return join21(root, sessionId, "intervene.json");
 }
 function writeInterventionFile(sessionId, file7, root = defaultRoot()) {
-  mkdirSync11(join20(root, sessionId), { recursive: true });
-  writeFileSync11(interventionPath(sessionId, root), JSON.stringify(file7));
+  mkdirSync12(join21(root, sessionId), { recursive: true });
+  writeFileSync12(interventionPath(sessionId, root), JSON.stringify(file7));
 }
 
 // src/intervene/record.ts
@@ -7287,8 +7534,8 @@ function recordIntervention(sessionId, action, root = defaultRoot()) {
 }
 
 // src/store/session-prune.ts
-import { readdirSync as readdirSync4, statSync as statSync3, existsSync as existsSync22, rmSync as rmSync6 } from "node:fs";
-import { join as join21 } from "node:path";
+import { readdirSync as readdirSync4, statSync as statSync3, existsSync as existsSync23, rmSync as rmSync6 } from "node:fs";
+import { join as join22 } from "node:path";
 function newestMtime(dir) {
   let newest = statSync3(dir).mtimeMs;
   let entries;
@@ -7299,7 +7546,7 @@ function newestMtime(dir) {
   }
   for (const name of entries) {
     try {
-      const ms = statSync3(join21(dir, name)).mtimeMs;
+      const ms = statSync3(join22(dir, name)).mtimeMs;
       if (ms > newest) newest = ms;
     } catch {
     }
@@ -7307,7 +7554,7 @@ function newestMtime(dir) {
   return newest;
 }
 function pruneEventless(root, now, maxAgeMs) {
-  if (!existsSync22(root)) return [];
+  if (!existsSync23(root)) return [];
   let entries;
   try {
     entries = readdirSync4(root);
@@ -7316,10 +7563,10 @@ function pruneEventless(root, now, maxAgeMs) {
   }
   const removed = [];
   for (const name of entries) {
-    const dir = join21(root, name);
+    const dir = join22(root, name);
     try {
       if (!statSync3(dir).isDirectory()) continue;
-      if (existsSync22(join21(dir, "events.jsonl"))) continue;
+      if (existsSync23(join22(dir, "events.jsonl"))) continue;
       const age = now - newestMtime(dir);
       if (age < maxAgeMs) continue;
       rmSync6(dir, { recursive: true, force: true });
@@ -7333,7 +7580,7 @@ function pruneEventless(root, now, maxAgeMs) {
 // src/cli/serve.ts
 var here = dirname2(fileURLToPath(import.meta.url));
 function publicDir() {
-  return join22(here, "..", "serve", "public");
+  return join23(here, "..", "serve", "public");
 }
 function safeId2(id) {
   return !!id && !id.includes("/") && !id.includes("\\") && !id.includes("..");
@@ -7350,10 +7597,20 @@ function runServe(opts) {
     }
   });
   const server = createServer({
-    pagePath: join22(publicDir(), "index.html"),
-    fontsDir: join22(publicDir(), "fonts"),
+    pagePath: join23(publicDir(), "index.html"),
+    fontsDir: join23(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
+    listGroups: () => listGroups(defaultRoot()),
+    createGroup: (name) => createGroup(defaultRoot(), name),
+    renameGroup: (id, name) => renameGroup(defaultRoot(), id, name),
+    deleteGroup: (id) => deleteGroup(defaultRoot(), id),
+    addSessionToGroup: (groupId, sessionId) => safeId2(sessionId) && addSessionToGroup(defaultRoot(), groupId, sessionId),
+    removeSessionFromGroup: (groupId, sessionId) => safeId2(sessionId) && removeSessionFromGroup(defaultRoot(), groupId, sessionId),
+    listGroupSessions: (groupId) => {
+      const ids = new Set(listSessionIdsInGroup(defaultRoot(), groupId));
+      return listSessions().filter((s) => ids.has(s.id));
+    },
     getSnapshot: (id, saver, rich) => {
       if (!safeId2(id)) throw new Error("invalid session id");
       return loadSnapshot(id, void 0, saver, rich);
@@ -7367,7 +7624,7 @@ function runServe(opts) {
     rename: (id, name) => {
       if (!safeId2(id)) return false;
       try {
-        writeCustomName(join22(defaultRoot(), id), name);
+        writeCustomName(join23(defaultRoot(), id), name);
         return true;
       } catch {
         return false;
@@ -7376,7 +7633,7 @@ function runServe(opts) {
     setSaved: (id, saved) => {
       if (!safeId2(id)) return false;
       try {
-        writeSaved(join22(defaultRoot(), id), saved);
+        writeSaved(join23(defaultRoot(), id), saved);
         return true;
       } catch {
         return false;
@@ -7385,7 +7642,8 @@ function runServe(opts) {
     remove: (id) => {
       if (!safeId2(id)) return false;
       try {
-        rmSync7(join22(defaultRoot(), id), { recursive: true, force: true });
+        removeSessionFromAllGroups(defaultRoot(), id);
+        rmSync7(join23(defaultRoot(), id), { recursive: true, force: true });
         return true;
       } catch {
         return false;
@@ -7426,8 +7684,8 @@ function runServe(opts) {
 }
 
 // src/cli/feed.ts
-import { existsSync as existsSync23, watchFile as watchFile3 } from "node:fs";
-import { join as join23 } from "node:path";
+import { existsSync as existsSync24, watchFile as watchFile3 } from "node:fs";
+import { join as join24 } from "node:path";
 
 // src/feed/render.ts
 var RESET3 = "\x1B[0m";
@@ -7525,15 +7783,15 @@ function promptTimes(chunks) {
 // src/cli/feed.ts
 function runFeed(sessionId) {
   const store = new SessionStore(sessionId);
-  const narrationPath = join23(store.dir, "narration.jsonl");
-  const promptsPath = join23(store.dir, "prompts.jsonl");
+  const narrationPath = join24(store.dir, "narration.jsonl");
+  const promptsPath = join24(store.dir, "prompts.jsonl");
   let cursor = { printedChunks: /* @__PURE__ */ new Set(), turnsHeadered: /* @__PURE__ */ new Set() };
   const build = () => {
     const mode = readSessionMode(store.dir) ?? "simple";
     return feedChunks(store.readAll(), readPrompts(store.dir), readWhys(store.dir), mode);
   };
   const flush = () => {
-    if (!existsSync23(store.path)) return;
+    if (!existsSync24(store.path)) return;
     const r = advanceFeed(build(), cursor);
     cursor = r.cursor;
     if (r.text) process.stdout.write(r.text + "\n");
@@ -7546,9 +7804,9 @@ function runFeed(sessionId) {
 }
 
 // src/cli/toggle.ts
-import { readFileSync as readFileSync21, writeFileSync as writeFileSync12, existsSync as existsSync24, mkdirSync as mkdirSync12, rmSync as rmSync8, openSync } from "node:fs";
+import { readFileSync as readFileSync22, writeFileSync as writeFileSync13, existsSync as existsSync25, mkdirSync as mkdirSync13, rmSync as rmSync8, openSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { join as join24, dirname as dirname3 } from "node:path";
+import { join as join25, dirname as dirname3 } from "node:path";
 import { homedir as homedir2 } from "node:os";
 function withStatusLine(s, command2) {
   return { ...s, statusLine: { type: "command", command: command2 } };
@@ -7559,21 +7817,21 @@ function withoutStatusLine(s) {
   return next;
 }
 function settingsPath() {
-  return join24(homedir2(), ".claude", "settings.json");
+  return join25(homedir2(), ".claude", "settings.json");
 }
 function readSettings() {
   const p = settingsPath();
-  if (!existsSync24(p)) return {};
+  if (!existsSync25(p)) return {};
   try {
-    return JSON.parse(readFileSync21(p, "utf8"));
+    return JSON.parse(readFileSync22(p, "utf8"));
   } catch {
     return {};
   }
 }
 function writeSettings(s) {
   const p = settingsPath();
-  mkdirSync12(dirname3(p), { recursive: true });
-  writeFileSync12(p, JSON.stringify(s, null, 2));
+  mkdirSync13(dirname3(p), { recursive: true });
+  writeFileSync13(p, JSON.stringify(s, null, 2));
 }
 function statusLineCommand(self) {
   return `node "${self}" statusline`;
@@ -7583,11 +7841,11 @@ function ensureStatusLine(self) {
   if (!s.statusLine) writeSettings(withStatusLine(s, statusLineCommand(self)));
 }
 function pidPath(sessionDir) {
-  return join24(sessionDir, "narrator.pid");
+  return join25(sessionDir, "narrator.pid");
 }
 function stopNarrator(path, kill = (pid) => process.kill(pid)) {
-  if (!existsSync24(path)) return;
-  const pid = Number(readFileSync21(path, "utf8").trim());
+  if (!existsSync25(path)) return;
+  const pid = Number(readFileSync22(path, "utf8").trim());
   if (pid > 0) {
     try {
       kill(pid);
@@ -7598,23 +7856,23 @@ function stopNarrator(path, kill = (pid) => process.kill(pid)) {
 }
 function turnOn(mode, session) {
   const self = process.argv[1];
-  const dir = join24(defaultRoot(), session);
-  mkdirSync12(dir, { recursive: true });
+  const dir = join25(defaultRoot(), session);
+  mkdirSync13(dir, { recursive: true });
   stopNarrator(pidPath(dir));
   writeSessionMode(mode, dir);
   patchStatus(dir, { mode, why: null, action: null, warning: null, doneAt: null });
   writeSettings(withStatusLine(readSettings(), statusLineCommand(self)));
-  const logFd = openSync(join24(dir, "narrator.log"), "a");
+  const logFd = openSync(join25(dir, "narrator.log"), "a");
   const child = spawn(process.execPath, [self, "narrate", "--mode", mode, "--session", session], {
     detached: true,
     stdio: ["ignore", logFd, logFd],
     windowsHide: true
   });
   child.unref();
-  writeFileSync12(pidPath(dir), String(child.pid ?? ""));
+  writeFileSync13(pidPath(dir), String(child.pid ?? ""));
 }
 function turnOff(session) {
-  const dir = join24(defaultRoot(), session);
+  const dir = join25(defaultRoot(), session);
   stopNarrator(pidPath(dir));
   clearBudget(dir);
   clearSessionMode(dir);
@@ -7625,8 +7883,8 @@ function turnOff(session) {
 import { spawn as spawn2 } from "node:child_process";
 import { connect } from "node:net";
 import { get as httpGet } from "node:http";
-import { readFileSync as readFileSync22, writeFileSync as writeFileSync13, existsSync as existsSync25 } from "node:fs";
-import { join as join25 } from "node:path";
+import { readFileSync as readFileSync23, writeFileSync as writeFileSync14, existsSync as existsSync26 } from "node:fs";
+import { join as join26 } from "node:path";
 var DEFAULT_PORT = 4317;
 function timelineDecision(lock, currentBuild, probe) {
   if (!lock) return { action: "spawn", port: DEFAULT_PORT };
@@ -7636,13 +7894,13 @@ function timelineDecision(lock, currentBuild, probe) {
   return { action: "replace", port: lock.port, pid: lock.pid };
 }
 function lockPath(root) {
-  return join25(root, "serve.lock");
+  return join26(root, "serve.lock");
 }
 function readLock(root) {
   const p = lockPath(root);
-  if (!existsSync25(p)) return null;
+  if (!existsSync26(p)) return null;
   try {
-    const o = JSON.parse(readFileSync22(p, "utf8"));
+    const o = JSON.parse(readFileSync23(p, "utf8"));
     if (typeof o.port === "number" && typeof o.pid === "number") {
       return { port: o.port, pid: o.pid, build: typeof o.build === "string" ? o.build : "" };
     }
@@ -7745,19 +8003,19 @@ async function runTimeline() {
     console.error(`A different timeline build is serving port ${port}. Close it and try again.`);
     process.exit(1);
   }
-  writeFileSync13(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
+  writeFileSync14(lockPath(root), JSON.stringify({ port, pid: child.pid ?? 0, build: currentBuild }));
   if (ready) console.log(`Codey timeline at http://localhost:${port}`);
   else console.log(`Codey timeline starting at http://localhost:${port} (give it a moment to open).`);
 }
 
 // src/cli/index.ts
-import { join as join26 } from "node:path";
+import { join as join27 } from "node:path";
 function parseMode(m) {
   return ["simple", "deep", "teach"].includes(m) ? m : "simple";
 }
 function resolveWatchMode(opt, session) {
   if (opt) return parseMode(opt);
-  const snap = readStatus(join26(defaultRoot(), session));
+  const snap = readStatus(join27(defaultRoot(), session));
   return snap?.mode ?? "simple";
 }
 var program2 = new Command();

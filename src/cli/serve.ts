@@ -11,6 +11,16 @@ import { pruneEventless } from "../store/session-prune.js";
 import { writeCustomName } from "../store/session-name-store.js";
 import { writeSaved } from "../store/session-saved-store.js";
 import { dismiss, restore } from "../store/dismissed-store.js";
+import {
+  addSessionToGroup,
+  createGroup,
+  deleteGroup,
+  listGroups,
+  listSessionIdsInGroup,
+  removeSessionFromAllGroups,
+  removeSessionFromGroup,
+  renameGroup,
+} from "../store/session-group-store.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // dist/cli/serve.js and dist/serve/public/index.html after build; src mirrors the layout.
@@ -41,6 +51,16 @@ export function runServe(opts: { session?: string; port: number }): void {
     fontsDir: join(publicDir(), "fonts"),
     buildId: buildIdFrom(fileURLToPath(import.meta.url)),
     listSessions: () => listSessions(),
+    listGroups: () => listGroups(defaultRoot()),
+    createGroup: (name) => createGroup(defaultRoot(), name),
+    renameGroup: (id, name) => renameGroup(defaultRoot(), id, name),
+    deleteGroup: (id) => deleteGroup(defaultRoot(), id),
+    addSessionToGroup: (groupId, sessionId) => safeId(sessionId) && addSessionToGroup(defaultRoot(), groupId, sessionId),
+    removeSessionFromGroup: (groupId, sessionId) => safeId(sessionId) && removeSessionFromGroup(defaultRoot(), groupId, sessionId),
+    listGroupSessions: (groupId) => {
+      const ids = new Set(listSessionIdsInGroup(defaultRoot(), groupId));
+      return listSessions().filter((s) => ids.has(s.id));
+    },
     getSnapshot: (id, saver, rich) => {
       if (!safeId(id)) throw new Error("invalid session id");
       return loadSnapshot(id, undefined, saver, rich);
@@ -72,6 +92,7 @@ export function runServe(opts: { session?: string; port: number }): void {
     remove: (id) => {
       if (!safeId(id)) return false;
       try {
+        removeSessionFromAllGroups(defaultRoot(), id);
         rmSync(join(defaultRoot(), id), { recursive: true, force: true });
         return true;
       } catch {

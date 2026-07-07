@@ -29,7 +29,8 @@ export function groupThinking(lines: ReceiptLine[]): ReceiptLine[] {
     if (l.status === "none") { run.push(l); continue; }
     if (run.length) {
       const runTokens = run.reduce((sum, r) => sum + r.tokens, 0);
-      out.push({ ...l, tokens: l.tokens + runTokens, thoughtFirst: true });
+      const decision = [...run].reverse().find((r) => r.explainable !== false && r.why)?.why ?? null;
+      out.push({ ...l, tokens: l.tokens + runTokens, thoughtFirst: true, why: l.why ?? decision });
       run = [];
       continue;
     }

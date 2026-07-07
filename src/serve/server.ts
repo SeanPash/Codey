@@ -3,11 +3,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SessionSnapshot, LiveSnapshot } from "../types.js";
 import type { SessionListItem } from "../cli/sessions.js";
+import type { SessionGroup } from "../store/session-group-store.js";
 
 export type RouteResult =
   | { type: "page" }
   | { type: "health" }
   | { type: "sessions" }
+  | { type: "groups" }
+  | { type: "createGroup" }
+  | { type: "renameGroup"; id: string }
+  | { type: "deleteGroup"; id: string }
+  | { type: "groupSessions"; id: string }
+  | { type: "addSessionToGroup"; id: string; sessionId: string }
+  | { type: "removeSessionFromGroup"; id: string; sessionId: string }
   | { type: "session"; id: string; saver: boolean; rich: boolean }
   | { type: "now"; id: string }
   | { type: "intervene"; id: string }
@@ -39,11 +47,14 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (path === "/" || path === "/index.html") return { type: "page" };
     if (path === "/health") return { type: "health" };
     if (path === "/api/sessions") return { type: "sessions" };
+    if (path === "/api/groups") return { type: "groups" };
     if (path === "/api/live") return { type: "live", saver: /[?&]saver=1(?:&|$)/.test(url) };
     const fm = /^\/fonts\/([A-Za-z0-9_-]+\.woff2?)$/.exec(path);
     if (fm && !fm[1].includes("..")) return { type: "font", file: fm[1] };
     const mnow = /^\/api\/session\/([^/]+)\/now$/.exec(path);
     if (mnow) { const id = decodeId(mnow[1]); return id == null ? { type: "notfound" } : { type: "now", id }; }
+    const mgs = /^\/api\/group\/([^/]+)\/sessions$/.exec(path);
+    if (mgs) { const id = decodeId(mgs[1]); return id == null ? { type: "notfound" } : { type: "groupSessions", id }; }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
     if (m) {
       const id = decodeId(m[1]);
@@ -56,6 +67,15 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     }
   }
   if (method === "POST") {
+    if (path === "/api/groups") return { type: "createGroup" };
+    const mgn = /^\/api\/group\/([^/]+)\/name$/.exec(path);
+    if (mgn) { const id = decodeId(mgn[1]); return id == null ? { type: "notfound" } : { type: "renameGroup", id }; }
+    const mgadd = /^\/api\/group\/([^/]+)\/session\/([^/]+)$/.exec(path);
+    if (mgadd) {
+      const id = decodeId(mgadd[1]);
+      const sessionId = decodeId(mgadd[2]);
+      return id == null || sessionId == null ? { type: "notfound" } : { type: "addSessionToGroup", id, sessionId };
+    }
     const mi = /^\/api\/session\/([^/]+)\/intervene$/.exec(path);
     if (mi) { const id = decodeId(mi[1]); return id == null ? { type: "notfound" } : { type: "intervene", id }; }
     const mn = /^\/api\/session\/([^/]+)\/name$/.exec(path);
@@ -70,6 +90,14 @@ export function resolveRoute(method: string | undefined, url: string | undefined
     if (mr) { const id = decodeId(mr[1]); return id == null ? { type: "notfound" } : { type: "restore", id }; }
   }
   if (method === "DELETE") {
+    const mgrem = /^\/api\/group\/([^/]+)\/session\/([^/]+)$/.exec(path);
+    if (mgrem) {
+      const id = decodeId(mgrem[1]);
+      const sessionId = decodeId(mgrem[2]);
+      return id == null || sessionId == null ? { type: "notfound" } : { type: "removeSessionFromGroup", id, sessionId };
+    }
+    const mg = /^\/api\/group\/([^/]+)$/.exec(path);
+    if (mg) { const id = decodeId(mg[1]); return id == null ? { type: "notfound" } : { type: "deleteGroup", id }; }
     const m = /^\/api\/session\/([^/]+)$/.exec(path);
     if (m) { const id = decodeId(m[1]); return id == null ? { type: "notfound" } : { type: "delete", id }; }
   }
@@ -86,6 +114,13 @@ export interface ServerDeps {
   fontsDir: string;
   buildId: string;          // identity the launcher checks to detect a stale server
   listSessions: () => SessionListItem[];
+  listGroups: () => SessionGroup[];
+  createGroup: (name: string) => SessionGroup | null;
+  renameGroup: (id: string, name: string) => boolean;
+  deleteGroup: (id: string) => boolean;
+  addSessionToGroup: (groupId: string, sessionId: string) => boolean;
+  removeSessionFromGroup: (groupId: string, sessionId: string) => boolean;
+  listGroupSessions: (groupId: string) => SessionListItem[];
   getSnapshot: (id: string, saver: boolean, rich: boolean) => SessionSnapshot;
   getNow: (id: string) => unknown;
   getLive: (saver: boolean) => LiveSnapshot;
@@ -121,6 +156,10 @@ export function createServer(deps: ServerDeps): Server {
         sendJson(res, 200, { build: deps.buildId });
       } else if (route.type === "sessions") {
         sendJson(res, 200, deps.listSessions());
+      } else if (route.type === "groups") {
+        sendJson(res, 200, deps.listGroups());
+      } else if (route.type === "groupSessions") {
+        sendJson(res, 200, deps.listGroupSessions(route.id));
       } else if (route.type === "session") {
         sendJson(res, 200, deps.getSnapshot(route.id, route.saver, route.rich));
       } else if (route.type === "now") {
@@ -165,6 +204,29 @@ export function createServer(deps: ServerDeps): Server {
         });
       } else if (route.type === "delete") {
         const ok = deps.remove(route.id);
+        sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "createGroup") {
+        void readBody(req).then((body) => {
+          let name = "";
+          try { name = String((JSON.parse(body || "{}") as { name?: unknown }).name ?? ""); } catch { name = ""; }
+          const group = deps.createGroup(name);
+          sendJson(res, group ? 200 : 400, group ?? { ok: false });
+        });
+      } else if (route.type === "renameGroup") {
+        void readBody(req).then((body) => {
+          let name = "";
+          try { name = String((JSON.parse(body || "{}") as { name?: unknown }).name ?? ""); } catch { name = ""; }
+          const ok = deps.renameGroup(route.id, name);
+          sendJson(res, ok ? 200 : 400, { ok });
+        });
+      } else if (route.type === "deleteGroup") {
+        const ok = deps.deleteGroup(route.id);
+        sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "addSessionToGroup") {
+        const ok = deps.addSessionToGroup(route.id, route.sessionId);
+        sendJson(res, ok ? 200 : 400, { ok });
+      } else if (route.type === "removeSessionFromGroup") {
+        const ok = deps.removeSessionFromGroup(route.id, route.sessionId);
         sendJson(res, ok ? 200 : 400, { ok });
       } else if (route.type === "dismiss") {
         const ok = deps.dismiss(route.id);

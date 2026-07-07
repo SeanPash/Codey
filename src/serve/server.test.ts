@@ -11,6 +11,19 @@ describe("resolveRoute", () => {
     expect(resolveRoute("GET", "/api/sessions")).toEqual({ type: "sessions" });
   });
 
+  it("routes session groups collection endpoints", () => {
+    expect(resolveRoute("GET", "/api/groups")).toEqual({ type: "groups" });
+    expect(resolveRoute("POST", "/api/groups")).toEqual({ type: "createGroup" });
+  });
+
+  it("routes session group mutation endpoints", () => {
+    expect(resolveRoute("POST", "/api/group/g1/name")).toEqual({ type: "renameGroup", id: "g1" });
+    expect(resolveRoute("DELETE", "/api/group/g1")).toEqual({ type: "deleteGroup", id: "g1" });
+    expect(resolveRoute("GET", "/api/group/g1/sessions")).toEqual({ type: "groupSessions", id: "g1" });
+    expect(resolveRoute("POST", "/api/group/g1/session/s1")).toEqual({ type: "addSessionToGroup", id: "g1", sessionId: "s1" });
+    expect(resolveRoute("DELETE", "/api/group/g1/session/s1")).toEqual({ type: "removeSessionFromGroup", id: "g1", sessionId: "s1" });
+  });
+
   it("routes a session snapshot and decodes the id", () => {
     expect(resolveRoute("GET", "/api/session/abc?t=1")).toEqual({ type: "session", id: "abc", saver: false, rich: true });
   });

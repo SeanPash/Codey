@@ -34,6 +34,15 @@ describe("groupThinking", () => {
     expect(out[0].thoughtFirst).toBe(true);
   });
 
+  it("preserves specific planning text for raw details when the action has no own why", () => {
+    const out = groupThinking([
+      line({ tokens: 5, ts: 10, why: "I should compare a join table with group_id before editing session groups." }),
+      line({ label: "Reading groups.ts", tool: "Read", tokens: 3, status: "ok", ts: 20, why: null }),
+    ]);
+    expect(out[0].why).toMatch(/join table with group_id/i);
+    expect(out[0].thoughtFirst).toBe(true);
+  });
+
   it("keeps a trailing thinking run as a non-explainable, non-banned planning marker", () => {
     const out = groupThinking([line({ tokens: 7 }), line({ tokens: 3 })]);
     expect(out).toHaveLength(1);

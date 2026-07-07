@@ -1,4 +1,5 @@
 import { clampWords, tidySubject } from "./sanitize.js";
+import { featureArea } from "./subject.js";
 
 // Shell intent: turn a raw command into a human purpose, not a tool category. Codey should
 // say what Claude is trying to accomplish ("checking the installed plugin config"), never
@@ -46,6 +47,22 @@ function rest(cmd: string): string {
   return cmd.replace(/^\s*\S+\s*/, "");
 }
 
+function targetedTestIntent(cmd: string): ShellIntent | null {
+  const m = /(?:^|\s)([^\s"'()]+\.(?:test|spec)\.[jt]sx?)(?=$|\s)/i.exec(cmd);
+  if (!m) return null;
+  const file = m[1];
+  const parts = file.split(/[\\/]/).filter(Boolean);
+  const area = parts.length >= 2 ? parts[parts.length - 2] : undefined;
+  const feature = featureArea(parts[parts.length - 1] ?? file, area);
+  return intent(
+    `the ${feature} tests`,
+    `Running ${feature} tests`,
+    `Claude is running the ${feature} tests to confirm ${feature} still behaves correctly.`,
+    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes.`,
+    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes. A targeted test focuses on one slice of the project, so a failure points close to the code that changed.`,
+  );
+}
+
 // Paths that read as throwaway scratch work, so we can say "temporary files" / "demo files".
 const TEMP_HINT = /\b(tmp|temp|scratch|demo|sample|example|fixture)s?\b/i;
 
@@ -62,6 +79,8 @@ function commandIntent(cmd: string): ShellIntent | null {
   const TEST = intent("the tests", "Running the tests", "Claude is running the tests to check the work.",
     "Claude is running the tests to confirm the latest changes pass and nothing else broke.",
     "Claude is running the tests to confirm the latest changes pass and nothing else broke. A test is a small program that exercises the real code, so a regression shows up immediately instead of in front of a user.");
+  const targeted = targetedTestIntent(cmd);
+  if (targeted) return targeted;
   if (/\b(vitest|jest|mocha|pytest|phpunit)\b/.test(cmd)) return TEST;
   if (word === "npm" || word === "pnpm" || word === "yarn" || word === "npx") {
     if (/\btest\b/.test(tail)) return TEST;
