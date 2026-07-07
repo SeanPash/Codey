@@ -61,11 +61,11 @@ function timelinePagePurpose(ev: PurposeEvidence): Purpose | null {
   return {
     title: "Checking the live timeline",
     simple:
-      "Claude is comparing the served timeline page with the source file to find why the token labels are missing.",
+      "Comparing the served timeline page with the source file to find why the token labels are missing.",
     deep:
-      "Claude is comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or a build that was never refreshed.",
+      "Comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or a build that was never refreshed.",
     teach:
-      "Claude is comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or an old build. A browser can keep old code loaded even after the server is fixed, so a page can look broken while the source is already correct.",
+      "Comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or an old build. A browser can keep old code loaded even after the server is fixed, so a page can look broken while the source is already correct.",
   };
 }
 
@@ -86,11 +86,11 @@ function sessionStoragePurpose(ev: PurposeEvidence): Purpose | null {
   return {
     title: "Checking session storage",
     simple:
-      "Claude is checking the local session storage, the JSONL file where Codey records each tool call, to see whether this prompt's events were captured.",
+      "Checking the local session storage, the JSONL file where Codey records each tool call, to see whether this prompt's events were captured.",
     deep:
-      "Claude is reading the session's events and narration log to confirm whether the data is being written. A missing prompt would point at capture, a present one at rendering or live polling.",
+      "Reading the session's events and narration log to see whether the data is being written. A missing prompt would point at capture, a present one at rendering or live polling.",
     teach:
-      "Claude is reading the session's events and narration log to confirm whether the data is being written. A missing prompt would point at capture, a present one at rendering. Codey stores each session as a JSONL file, one event per line, which is the shared record the status line and timeline both read from.",
+      "Reading the session's events and narration log to see whether the data is being written. A missing prompt would point at capture, a present one at rendering. Codey stores each session as a JSONL file, one event per line, which is the shared record the status line and timeline both read from.",
   };
 }
 
@@ -107,11 +107,11 @@ function narrationOutputPurpose(ev: PurposeEvidence): Purpose | null {
   return {
     title: "Checking live narration",
     simple:
-      "Claude is running Codey's feed to read the live narration output and see what the watcher actually prints.",
+      "Running Codey's feed to read the live narration output and see what the watcher actually prints.",
     deep:
-      "Claude is running Codey's feed against the current session to read the narration it produces, confirming whether the captions update as new tool calls arrive.",
+      "Running Codey's feed against the current session to read the narration it produces and check whether captions update as new tool calls arrive.",
     teach:
-      "Claude is running Codey's feed against the current session to read the narration it produces, confirming whether the captions update as new tool calls arrive. The feed replays the same captions the status line shows, so running it is how you see the narration without watching the status bar live.",
+      "Running Codey's feed against the current session to read the narration it produces and check whether captions update as new tool calls arrive. The feed replays the same captions the status line shows, so running it is how you see the narration without watching the status bar live.",
   };
 }
 

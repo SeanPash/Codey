@@ -21,7 +21,7 @@ describe("naiveSegment", () => {
   it("names a chunk in plain English instead of 'Working'", () => {
     const chunks = naiveSegment([ev({ tool: "Read", input: { file_path: "a.ts" }, timestamp: 1000 })]);
     expect(chunks[0].name).not.toBe("Working");
-    expect(chunks[0].narration).toMatch(/Claude is/);
+    expect(chunks[0].narration).toMatch(/a\.ts/);
   });
 
   it("narrates a collapsed card with the deeper grounded sentence, naming real files", () => {
@@ -32,8 +32,8 @@ describe("naiveSegment", () => {
     ]);
     expect(chunks[0].narration).toMatch(/compose\.ts/);
     expect(chunks[0].narration).toMatch(/render\.ts/);
-    // Deep wording carries the relationship, not just "Claude is reading ...".
-    expect(chunks[0].narration).toMatch(/to trace how they work together/);
+    // Deep wording carries the relationship, not just "Reading files".
+    expect(chunks[0].narration).toMatch(/shared code path/);
     expect(chunks[0].narration).not.toMatch(/several files|see how the pieces fit together|map how they connect/i);
   });
 

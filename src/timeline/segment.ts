@@ -23,7 +23,7 @@ export function naiveSegment(events: ToolEvent[]): RawChunk[] {
   });
   // chunkEvents starts at the first pre event; the timeline expects the first task to cover
   // everything from index 0, so anchor it there.
-  if (chunks.length === 0) return [{ startIndex: 0, name: "Getting started", narration: "Claude is getting started." }];
+  if (chunks.length === 0) return [{ startIndex: 0, name: "Getting started", narration: "Starting the request." }];
   chunks[0] = { ...chunks[0], startIndex: 0 };
   return chunks;
 }

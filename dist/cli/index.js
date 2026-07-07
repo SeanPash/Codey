@@ -3538,7 +3538,7 @@ var FEATURE_WORDS = {
 function featureArea(subject, area) {
   const lowArea = (area ?? "").toLowerCase();
   const stem2 = stemName(subject);
-  if ((stem2 === "index" || subject.toLowerCase() === "index.html") && (lowArea === "public" || lowArea === "serve")) {
+  if (stem2 === "index" || subject.toLowerCase() === "index.html") {
     return "browser timeline rendering";
   }
   if (lowArea === "serve" || lowArea === "public") return "browser timeline rendering";
@@ -3551,8 +3551,8 @@ function featureArea(subject, area) {
     const mapped = FEATURE_WORDS[stem2];
     return mapped.includes(lowArea) ? mapped : `${lowArea} ${mapped}`;
   }
-  if (lowArea) return `${lowArea} ${stem2 || "behavior"}`.trim();
-  return FEATURE_WORDS[stem2] ?? `${stem2 || "target"} behavior`;
+  if (lowArea) return `${lowArea} ${stem2 || "implementation"}`.trim();
+  return FEATURE_WORDS[stem2] ?? `${stem2 || "target"} implementation`;
 }
 function purposeTitle(tool, stage, subject, count) {
   const many = count > 1;
@@ -3593,11 +3593,11 @@ function purposeSentence(tool, stage, subject, count, area) {
       return `Editing ${subject} to update ${feature}.`;
     }
     case "inspecting":
-      if (many) return `Reading ${subject} and the files alongside it to see how they work together.`;
+      if (many) return `Reading ${subject} and the files alongside it to map the shared code path.`;
       if (tool === "Grep" || tool === "Glob") {
-        return subject === "the code" ? "Searching the project for matching code paths before changing related behavior." : `Searching the project for ${subject} to find existing ${subject} behavior before changing related code.`;
+        return subject === "the code" ? "Searching the project for matching code paths." : `Searching the project for ${subject} to find the existing files that configure or reference ${subject}.`;
       }
-      return `Reading ${subject} to inspect ${feature} before changing related behavior.`;
+      return `Reading ${subject} to locate the ${feature} code path.`;
     case "testing":
       return `Running ${subject} to check it passes.`;
     case "debugging":
@@ -3895,13 +3895,20 @@ function stem(sentence) {
   return sentence.replace(/\.\s*$/, "");
 }
 function defaultDeep(sentence, subject) {
-  return `${stem(sentence)} to confirm ${subject} is in the state the next step needs.`;
+  return `${stem(sentence)} so the command output shows the current ${subject}.`;
 }
-var DEFAULT_CONCEPT = "A shell command runs a program in the project, so Claude can inspect or change things the editor itself cannot.";
+var DEFAULT_CONCEPT = "A shell command runs a program in the project, so Codey can inspect or change things the editor itself cannot.";
+function actionFirst(text) {
+  const trimmed = text.trim();
+  const m = /^Claude is ([a-z])(.+)$/i.exec(trimmed);
+  if (!m) return trimmed;
+  return m[1].toUpperCase() + m[2];
+}
 function intent(subject, title, sentence, deep, teach) {
-  const d = deep ?? defaultDeep(sentence, subject);
+  const s = actionFirst(sentence);
+  const d = actionFirst(deep ?? defaultDeep(s, subject));
   const t = teach ?? `${d} ${DEFAULT_CONCEPT}`;
-  return { subject, title, sentence, deep: d, teach: t };
+  return { subject, title, sentence: s, deep: d, teach: actionFirst(t) };
 }
 function firstWord2(cmd) {
   return (cmd.trim().split(/\s+/)[0] || "").split(/[\\/]/).pop() || "";
@@ -3919,9 +3926,9 @@ function targetedTestIntent(cmd) {
   return intent(
     `the ${feature} tests`,
     `Running ${feature} tests`,
-    `Claude is running the ${feature} tests to confirm ${feature} still behaves correctly.`,
-    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes.`,
-    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes. A targeted test focuses on one slice of the project, so a failure points close to the code that changed.`
+    `Claude is running the ${feature} tests to check ${feature} with the targeted test file.`,
+    `Claude is running the ${feature} tests to check ${feature} with the targeted test file after the latest changes.`,
+    `Claude is running the ${feature} tests to check ${feature} with the targeted test file after the latest changes. A targeted test focuses on one slice of the project, so a failure points close to the code that changed.`
   );
 }
 var TEMP_HINT = /\b(tmp|temp|scratch|demo|sample|example|fixture)s?\b/i;
@@ -4116,13 +4123,16 @@ function descriptionIntent(desc) {
     const verb = GERUND[m[1].toLowerCase()] ?? gerundize(m[1]);
     const Verb = verb.charAt(0).toUpperCase() + verb.slice(1);
     const tail = m[2].trim();
-    const sentence = tail ? `Claude is ${verb} ${tail}.` : `Claude is ${verb} something.`;
+    let sentence = tail ? `${Verb} ${tail}.` : `${Verb} something.`;
     const title2 = tail ? `${Verb} ${clampWords(nounStart(tail), 4)}` : `${Verb} this step`;
+    if (sentence.toLowerCase().replace(/[.\s]+$/, "") === title2.toLowerCase().replace(/[.\s]+$/, "")) {
+      sentence = tail ? `${Verb} ${tail} with the command output.` : `${Verb} something with the command output.`;
+    }
     const subject = tidySubject(nounStart(tail), 4) || "the result";
-    const deep = `${stem(sentence)} to confirm the result before moving on.`;
+    const deep = `${stem(sentence)} so the command output can guide the next action.`;
     return intent(subject, title2, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
   }
-  const fallback = `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
+  const fallback = `Working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
   const title = clampWords(clean.charAt(0).toUpperCase() + clean.slice(1), 5);
   return intent(tidySubject(nounStart(clean)) || clean, title, fallback);
 }
@@ -4637,9 +4647,9 @@ function timelinePagePurpose(ev) {
   if (!hasComparison(h)) return null;
   return {
     title: "Checking the live timeline",
-    simple: "Claude is comparing the served timeline page with the source file to find why the token labels are missing.",
-    deep: "Claude is comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or a build that was never refreshed.",
-    teach: "Claude is comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or an old build. A browser can keep old code loaded even after the server is fixed, so a page can look broken while the source is already correct."
+    simple: "Comparing the served timeline page with the source file to find why the token labels are missing.",
+    deep: "Comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or a build that was never refreshed.",
+    teach: "Comparing the served timeline page with the source file to find why the token labels are missing. This separates a real markup bug from stale browser code or an old build. A browser can keep old code loaded even after the server is fixed, so a page can look broken while the source is already correct."
   };
 }
 var SESSION_STORE = [
@@ -4656,9 +4666,9 @@ function sessionStoragePurpose(ev) {
   if (!any(h, SESSION_STORE)) return null;
   return {
     title: "Checking session storage",
-    simple: "Claude is checking the local session storage, the JSONL file where Codey records each tool call, to see whether this prompt's events were captured.",
-    deep: "Claude is reading the session's events and narration log to confirm whether the data is being written. A missing prompt would point at capture, a present one at rendering or live polling.",
-    teach: "Claude is reading the session's events and narration log to confirm whether the data is being written. A missing prompt would point at capture, a present one at rendering. Codey stores each session as a JSONL file, one event per line, which is the shared record the status line and timeline both read from."
+    simple: "Checking the local session storage, the JSONL file where Codey records each tool call, to see whether this prompt's events were captured.",
+    deep: "Reading the session's events and narration log to see whether the data is being written. A missing prompt would point at capture, a present one at rendering or live polling.",
+    teach: "Reading the session's events and narration log to see whether the data is being written. A missing prompt would point at capture, a present one at rendering. Codey stores each session as a JSONL file, one event per line, which is the shared record the status line and timeline both read from."
   };
 }
 var NARRATION_OUTPUT = [
@@ -4671,9 +4681,9 @@ function narrationOutputPurpose(ev) {
   if (!any(cmd, NARRATION_OUTPUT)) return null;
   return {
     title: "Checking live narration",
-    simple: "Claude is running Codey's feed to read the live narration output and see what the watcher actually prints.",
-    deep: "Claude is running Codey's feed against the current session to read the narration it produces, confirming whether the captions update as new tool calls arrive.",
-    teach: "Claude is running Codey's feed against the current session to read the narration it produces, confirming whether the captions update as new tool calls arrive. The feed replays the same captions the status line shows, so running it is how you see the narration without watching the status bar live."
+    simple: "Running Codey's feed to read the live narration output and see what the watcher actually prints.",
+    deep: "Running Codey's feed against the current session to read the narration it produces and check whether captions update as new tool calls arrive.",
+    teach: "Running Codey's feed against the current session to read the narration it produces and check whether captions update as new tool calls arrive. The feed replays the same captions the status line shows, so running it is how you see the narration without watching the status bar live."
   };
 }
 var RECOGNIZERS = [timelinePagePurpose, sessionStoragePurpose, narrationOutputPurpose];
@@ -4733,33 +4743,33 @@ function describe(chunk) {
         const where = chunk.targets.length ? namedTargets(chunk) : "the project";
         return {
           title: chunk.targets.length ? `Searching ${humanFile(chunk.targets[0])}` : "Searching the project",
-          simple: `Claude is searching ${where} for ${searches}.`,
-          deep: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code.`,
-          teach: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
+          simple: `Searching ${where} for ${searches}.`,
+          deep: `Searching ${where} for ${searches} to find the files and call sites that use those names.`,
+          teach: `Searching ${where} for ${searches} to find the files and call sites that use those names. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
         };
       }
       if (chunk.tool === "Grep" || chunk.tool === "Glob") {
         return {
           title,
-          simple: `Claude is searching ${subject === "the code" ? "the project" : `the project for ${subject}`}.`,
-          deep: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used.`,
-          teach: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
+          simple: `Searching ${subject === "the code" ? "the project" : `the project for ${subject}`}.`,
+          deep: `Searching the project to find the files that match ${subject === "the code" ? "the current pattern" : subject}.`,
+          teach: `Searching the project to find the files that match ${subject === "the code" ? "the current pattern" : subject}. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`
         };
       }
       if (single) {
         const feature = featureArea(names);
         return {
           title,
-          simple: `Claude is reading ${names}.`,
-          deep: `Claude is reading ${names} to inspect ${feature} before changing related behavior.`,
-          teach: `Claude is reading ${names} to inspect ${feature} before changing related behavior. Reading the existing code first is how you avoid breaking something you did not know was there.`
+          simple: `Reading ${names}.`,
+          deep: `Reading ${names} to locate the ${feature} code path.`,
+          teach: `Reading ${names} to locate the ${feature} code path. Reading the existing code first is how you avoid breaking something you did not know was there.`
         };
       }
       return {
         title,
-        simple: `Claude is reading ${names}.`,
-        deep: `Claude is reading ${names} to trace how they work together before editing them.`,
-        teach: `Claude is reading ${names} to trace how they work together before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`
+        simple: `Reading ${names}.`,
+        deep: `Reading ${names} to trace the shared code path before editing it.`,
+        teach: `Reading ${names} to trace the shared code path before editing it. Reading the existing code first is how you avoid breaking something you did not know was there.`
       };
     }
     case "editing": {
@@ -4772,99 +4782,99 @@ function describe(chunk) {
           if (sym) {
             return {
               title,
-              simple: `Claude is creating ${names}, starting with ${sym}.`,
-              deep: `Claude is creating ${names} and writing ${sym} into it.`,
-              teach: `Claude is creating ${names} and writing ${sym} into it. A new file does nothing until something imports or runs it.`
+              simple: `Creating ${names}, starting with ${sym}.`,
+              deep: `Creating ${names} and writing ${sym} into it.`,
+              teach: `Creating ${names} and writing ${sym} into it. A new file does nothing until something imports or runs it.`
             };
           }
           return {
             title,
-            simple: `Claude is creating ${names}.`,
-            deep: `Claude is creating ${names} and writing its initial contents.`,
-            teach: `Claude is creating ${names} and writing its initial contents. A new file does nothing until something imports or runs it.`
+            simple: `Creating ${names}.`,
+            deep: `Creating ${names} and writing its initial contents.`,
+            teach: `Creating ${names} and writing its initial contents. A new file does nothing until something imports or runs it.`
           };
         }
         if (sym && mod) {
           return {
             title,
-            simple: `Claude is adding a ${sym} test to the ${mod} tests.`,
-            deep: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}.`,
-            teach: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}. A test is a small program that checks the real code, so a problem with ${sym} shows up right away.`
+            simple: `Adding a ${sym} test to the ${mod} tests.`,
+            deep: `Adding a ${sym} test so the ${mod} module verifies ${sym}.`,
+            teach: `Adding a ${sym} test so the ${mod} module verifies ${sym}. A test is a small program that checks the real code, so a problem with ${sym} shows up right away.`
           };
         }
         if (sym) {
           return {
             title,
-            simple: `Claude is updating ${sym} in ${names}.`,
-            deep: `Claude is updating ${sym} in ${names} to change how it behaves.`,
-            teach: `Claude is updating ${sym} in ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`
+            simple: `Updating ${sym} in ${names}.`,
+            deep: `Updating ${sym} in ${names} to change how it behaves.`,
+            teach: `Updating ${sym} in ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`
           };
         }
         return {
           title,
-          simple: `Claude is updating ${names}.`,
-          deep: `Claude is updating ${names} to change how it behaves.`,
-          teach: `Claude is updating ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`
+          simple: `Updating ${names}.`,
+          deep: `Updating ${names} to change how it behaves.`,
+          teach: `Updating ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`
         };
       }
       if (adds) {
         return {
           title,
-          simple: `Claude is creating ${names}.`,
-          deep: `Claude is creating ${names} as a set of new files for one piece of work.`,
-          teach: `Claude is creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`
+          simple: `Creating ${names}.`,
+          deep: `Creating ${names} as a set of new files for one piece of work.`,
+          teach: `Creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`
         };
       }
       if (syms) {
         return {
           title,
-          simple: `Claude is updating ${names} around ${syms}.`,
-          deep: `Claude is updating ${names} together so ${syms} stay consistent.`,
-          teach: `Claude is updating ${names} together so ${syms} stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`
+          simple: `Updating ${names} around ${syms}.`,
+          deep: `Updating ${names} together so ${syms} stay consistent.`,
+          teach: `Updating ${names} together so ${syms} stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`
         };
       }
       return {
         title,
-        simple: `Claude is updating ${names}.`,
-        deep: `Claude is updating ${names} together so they stay consistent.`,
-        teach: `Claude is updating ${names} together so they stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`
+        simple: `Updating ${names}.`,
+        deep: `Updating ${names} together so they stay consistent.`,
+        teach: `Updating ${names} together so they stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`
       };
     }
     case "testing":
       return {
         title,
-        simple: `Claude is running ${subject} to check its work.`,
-        deep: `Claude is running ${subject} to confirm the changes work and nothing else broke.`,
-        teach: `Claude is running ${subject} to confirm the changes work and nothing else broke. Tests are small programs that check the real code behaves as expected, so a problem shows up right away.`
+        simple: `Running ${subject} to check the changed code.`,
+        deep: `Running ${subject} to confirm the changed code passes its checks.`,
+        teach: `Running ${subject} to confirm the changed code passes its checks. Tests are small programs that check the real code behaves as expected, so a problem shows up right away.`
       };
     case "debugging":
       return {
         title,
-        simple: "Claude hit an error and is working out what went wrong.",
-        deep: "Claude is debugging, reading the error from a failed action and trying a different approach.",
-        teach: "Claude is debugging, reading the error from a failed action and trying a different approach. Debugging is the loop of reading an error, guessing the cause, and testing a fix until it holds."
+        simple: "Reading the failed action and narrowing down what went wrong.",
+        deep: "Debugging by reading the error from a failed action and trying a different approach.",
+        teach: "Debugging by reading the error from a failed action and trying a different approach. Debugging is the loop of reading an error, guessing the cause, and testing a fix until it holds."
       };
     case "planning":
       return {
         title,
-        simple: "Claude is thinking through what to do next.",
-        deep: "Claude is planning its next step before changing any files.",
-        teach: "Claude is planning its next step before changing any files. Thinking the work through first keeps the changes deliberate instead of guesswork."
+        simple: "Planning the next recorded action.",
+        deep: "Planning the next recorded action from the current task state.",
+        teach: "Planning the next recorded action from the current task state. A short planning beat keeps the next edit or command tied to the task instead of guesswork."
       };
     case "summarizing":
       return {
         title,
-        simple: "Claude is wrapping up and pulling together what it did.",
-        deep: "Claude is summarizing the work so the result is easy to follow.",
-        teach: "Claude is summarizing the work so the result is easy to follow. A clear recap is what turns a pile of edits into something a person can review."
+        simple: "Wrapping up and pulling together the changed files and checks.",
+        deep: "Summarizing the changed files and verification so the result is reviewable.",
+        teach: "Summarizing the changed files and verification so the result is reviewable. A clear recap is what turns a pile of edits into something a person can review."
       };
     case "waiting":
     default:
       return {
         title,
-        simple: "Claude is getting started.",
-        deep: "Claude is getting started on your request.",
-        teach: "Claude is getting started on your request."
+        simple: "Starting the request.",
+        deep: "Starting the request and waiting for the first recorded action.",
+        teach: "Starting the request and waiting for the first recorded action."
       };
   }
 }
@@ -5316,6 +5326,19 @@ var BANNED_PHRASES = [
   // A status line once collapsed two git reads into "git state and git state"; never again.
   /git state and git state/i,
   /\bbefore changing anything\b/i,
+  /\bbefore making changes\b/i,
+  /\bbefore changing related code\b/i,
+  /\bbefore changing related behavior\b/i,
+  /\brelated code\b/i,
+  /\brelated behavior\b/i,
+  /\bto verify behavior\b/i,
+  /\bverify its behavior\b/i,
+  /\bverified behavior\b/i,
+  /\bto understand the implementation\b/i,
+  /\bfor context\b/i,
+  /\bconfirming work is complete\b/i,
+  /\bchecking the result\b/i,
+  /\bconfirm the result\b/i,
   /\bchanging specific lines\b/i,
   /\bchanging files in place\b/i,
   /\bfind the part it needs\b/i,
@@ -5536,7 +5559,7 @@ function naiveSegment(events) {
     const caption = buildCaption(c, "deep");
     return { startIndex: c.startIndex, name: caption.title, narration: caption.deep ?? caption.simple };
   });
-  if (chunks.length === 0) return [{ startIndex: 0, name: "Getting started", narration: "Claude is getting started." }];
+  if (chunks.length === 0) return [{ startIndex: 0, name: "Getting started", narration: "Starting the request." }];
   chunks[0] = { ...chunks[0], startIndex: 0 };
   return chunks;
 }
@@ -6514,10 +6537,10 @@ function decisionText(text) {
   return /[.!?…]$/.test(clamped) ? clamped : clamped + ".";
 }
 function thinkingSubtitle(text) {
-  return decisionText(text) ?? "Claude weighed the next step before continuing.";
+  return decisionText(text) ?? "Waiting for the next recorded action.";
 }
 function describeAction(tool, input, text) {
-  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
+  if (!tool || tool === "thinking") return decisionText(text) ? "Using the planning note" : "Planning the next action";
   const file7 = fileFrom(input);
   switch (tool) {
     case "Write":
@@ -6547,7 +6570,7 @@ function actionSubject(tool, input) {
   return humanFile(shortTarget(actionLabel(tool, input).target)) || "the code";
 }
 function actionTitle(tool, input, text) {
-  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
+  if (!tool || tool === "thinking") return decisionText(text) ? "Using the planning note" : "Planning the next action";
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd, descFrom(input)).title;

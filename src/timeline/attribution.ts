@@ -92,14 +92,14 @@ export function decisionText(text: string | null | undefined): string | null {
 // The decision sentence for a thinking row's subtitle: Claude's own words when they say something,
 // otherwise an honest, non-banned marker that this was a planning beat.
 function thinkingSubtitle(text: string | null | undefined): string {
-  return decisionText(text) ?? "Claude weighed the next step before continuing.";
+  return decisionText(text) ?? "Waiting for the next recorded action.";
 }
 
 // Plain-English label for one action. Stays short and readable: the full command or path
 // lives in `raw` (shown when the row expands), never crammed into the label. A thinking turn is
 // labelled by the planning beat it is, never with the old "thinking it through" filler.
 export function describeAction(tool: string | null, input: unknown, text?: string | null): string {
-  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
+  if (!tool || tool === "thinking") return decisionText(text) ? "Using the planning note" : "Planning the next action";
   const file = fileFrom(input);
   switch (tool) {
     case "Write": return file ? `Writing ${file}` : "Writing a file";
@@ -131,7 +131,7 @@ function actionSubject(tool: string, input: unknown): string {
 // The collapsed-card headline for one action: a stable purpose label, never the raw tool. A
 // thinking row is titled by the planning beat, so a viewer reads a purpose rather than "thinking".
 export function actionTitle(tool: string | null, input: unknown, text?: string | null): string {
-  if (!tool || tool === "thinking") return decisionText(text) ? "Deciding the next step" : "Planning the next step";
+  if (!tool || tool === "thinking") return decisionText(text) ? "Using the planning note" : "Planning the next action";
   if (tool === "Bash" || tool === "PowerShell") {
     const cmd = fullCommand(input);
     if (cmd) return describeShellIntent(cmd, descFrom(input)).title;

@@ -26,14 +26,14 @@ const NO_DASH = /[—–]/;
 describe("buildCaption", () => {
   it("turns a shell test chunk into a plain-English sentence, not a command", () => {
     const c = buildCaption(chunk({ stage: "testing", tool: "Bash", targets: ["the tests"] }), "simple");
-    expect(c.simple).toMatch(/Claude is running the tests/);
+    expect(c.simple).toMatch(/Running the tests/);
     expect(c.simple).not.toMatch(/npm|npx|vitest/);
   });
 
   it("uses the shell command's real purpose for a single shell action", () => {
     const c = buildCaption(chunk({ stage: "inspecting", tool: "Bash", count: 1, raw: "git status", targets: ["the local changes"] }), "deep");
     expect(c.title).toBe("Checking local changes");
-    expect(c.simple).toBe("Claude is checking the local changes in the repository.");
+    expect(c.simple).toBe("Checking the local changes in the repository.");
     expect(c.deep).not.toMatch(/before changing anything/);
   });
 
@@ -62,6 +62,7 @@ describe("buildCaption", () => {
     expect(c.deep).toMatch(/token breakdown/i);
     expect(hasBannedPhrase(c.simple)).toBe(false);
     expect(hasBannedPhrase(c.deep!)).toBe(false);
+    expect(c.deep).not.toMatch(/related code|existing behavior/i);
   });
 
   it("names a search even when no file is read yet", () => {
@@ -127,6 +128,7 @@ describe("buildCaption", () => {
     expect(c.deep).toMatch(/index\.html/);
     expect(hasBannedPhrase(c.deep!)).toBe(false);
     expect(hasBannedPhrase(c.teach!)).toBe(false);
+    expect(c.deep).not.toMatch(/related behavior|before changing/i);
   });
 
   it("gives deep mode more context than simple mode for a multi-file read", () => {

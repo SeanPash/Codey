@@ -23,7 +23,7 @@ function isGeneric(text: string): boolean {
 function expectMeaningful(intent: { title: string; sentence: string; subject: string; deep: string; teach: string }) {
   expect(isGeneric(intent.title)).toBe(false);
   expect(isGeneric(intent.sentence)).toBe(false);
-  expect(intent.sentence.startsWith("Claude is ")).toBe(true);
+  expect(intent.sentence.startsWith("Claude is ")).toBe(false);
   expect(intent.deep).not.toBe(intent.sentence);
   expect(intent.deep.length).toBeGreaterThan(intent.sentence.length);
   expect(intent.teach.length).toBeGreaterThan(intent.deep.length);
@@ -88,7 +88,7 @@ describe("describeShellIntent: Claude's own description wins when present", () =
       "node dist/cli/index.js status",
       "Show which Codey plugin copy is currently running",
     );
-    expect(intent.sentence.startsWith("Claude is ")).toBe(true);
+    expect(intent.sentence.startsWith("Claude is ")).toBe(false);
     expect(intent.sentence).toMatch(/codey plugin copy/i);
     expect(isGeneric(intent.title)).toBe(false);
   });
@@ -103,7 +103,7 @@ describe("describeShellIntent: only goes generic when there is truly nothing to 
   it("an unknown bare program still avoids tool-shaped noise but stays honest", () => {
     const intent = describeShellIntent("frobnicate --hard");
     // No pattern, no description: this is the one case a plain fallback is allowed.
-    expect(intent.sentence.startsWith("Claude is ")).toBe(true);
+    expect(intent.sentence.startsWith("Claude is ")).toBe(false);
     expect(intent.subject.length).toBeGreaterThan(0);
     // Even here deep stays richer than simple, so deep mode never reads like simple mode.
     expect(intent.deep).not.toBe(intent.sentence);

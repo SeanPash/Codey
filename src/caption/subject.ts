@@ -110,7 +110,7 @@ const FEATURE_WORDS: Record<string, string> = {
 export function featureArea(subject: string, area?: string): string {
   const lowArea = (area ?? "").toLowerCase();
   const stem = stemName(subject);
-  if ((stem === "index" || subject.toLowerCase() === "index.html") && (lowArea === "public" || lowArea === "serve")) {
+  if (stem === "index" || subject.toLowerCase() === "index.html") {
     return "browser timeline rendering";
   }
   if (lowArea === "serve" || lowArea === "public") return "browser timeline rendering";
@@ -123,8 +123,8 @@ export function featureArea(subject: string, area?: string): string {
     const mapped = FEATURE_WORDS[stem];
     return mapped.includes(lowArea) ? mapped : `${lowArea} ${mapped}`;
   }
-  if (lowArea) return `${lowArea} ${stem || "behavior"}`.trim();
-  return FEATURE_WORDS[stem] ?? `${stem || "target"} behavior`;
+  if (lowArea) return `${lowArea} ${stem || "implementation"}`.trim();
+  return FEATURE_WORDS[stem] ?? `${stem || "target"} implementation`;
 }
 
 // The collapsed-card headline: a short purpose label (verb + subject), 4 to 7 words. It is
@@ -177,13 +177,13 @@ export function purposeSentence(tool: string, stage: Stage, subject: string, cou
       return `Editing ${subject} to update ${feature}.`;
     }
     case "inspecting":
-      if (many) return `Reading ${subject} and the files alongside it to see how they work together.`;
+      if (many) return `Reading ${subject} and the files alongside it to map the shared code path.`;
       if (tool === "Grep" || tool === "Glob") {
         return subject === "the code"
-          ? "Searching the project for matching code paths before changing related behavior."
-          : `Searching the project for ${subject} to find existing ${subject} behavior before changing related code.`;
+          ? "Searching the project for matching code paths."
+          : `Searching the project for ${subject} to find the existing files that configure or reference ${subject}.`;
       }
-      return `Reading ${subject} to inspect ${feature} before changing related behavior.`;
+      return `Reading ${subject} to locate the ${feature} code path.`;
     case "testing":
       return `Running ${subject} to check it passes.`;
     case "debugging":
