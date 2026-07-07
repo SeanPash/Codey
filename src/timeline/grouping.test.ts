@@ -54,7 +54,7 @@ describe("groupThinking", () => {
 
   it("preserves a real decision in a trailing thinking row, keeping it explainable", () => {
     const decision = line({ tokens: 5, why: "Inspect the session files before changing the statusline.",
-      title: "Deciding the next step", subtitle: "Inspect the session files before changing the statusline.",
+      title: "Using the planning note", subtitle: "Inspect the session files before changing the statusline.",
       explainable: true });
     const out = groupThinking([line({ tokens: 4 }), decision]);
     expect(out).toHaveLength(1);

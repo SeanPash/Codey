@@ -150,7 +150,7 @@
     .dayhd .dcount { margin-left:auto; color:var(--muted); font-weight:600; font-size:9px;
       background:var(--surf); border:1px solid var(--line); border-radius:20px; padding:1px 7px; }
     .dayhd:first-of-type { margin-top:2px; }
-    .sess { position:relative; padding:8px 64px 8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
+    .sess { position:relative; padding:8px 30px 8px 11px; border-radius:8px; margin-bottom:3px; line-height:1.3; cursor:pointer; display:block; width:100%; text-align:left; border:1px solid transparent; background:transparent; color:var(--ink); font:inherit; transition:background var(--t-hover), border-color var(--t-hover); }
     /* bookmark ribbon on each session row: faint outline when unsaved, amber when saved */
     .bm { position:absolute; top:50%; right:7px; transform:translateY(-50%); width:20px; height:20px; display:grid; place-items:center; cursor:pointer; border-radius:5px; }
     .bm svg { width:14px; height:15px; display:block; }
@@ -159,10 +159,14 @@
     .bm:not(.on):hover .bmp { stroke:var(--body); }
     .bm.on .bmp { fill:var(--warn); stroke:var(--warn); }
     .bm.on:hover { box-shadow:0 0 0 1px var(--warn); }
-    /* the All / Saved filter chips above the list */
-    .railfilters { display:flex; gap:6px; margin:2px 2px 10px; }
-    .fchip { display:inline-flex; align-items:center; gap:6px; background:var(--inset); border:1px solid var(--line); color:var(--body); font-size:11.5px; padding:5px 11px; border-radius:99px; cursor:pointer; font-family:inherit; }
-    .fchip.on { background:var(--sel-dim); border-color:var(--sel); color:var(--ink); }
+    .viewbox { border-top:1px solid var(--line); padding:9px 0 10px; margin:0; }
+    .sectionhd { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 3px 7px; }
+    .sectionhd .t { font-size:9px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); font-weight:700; }
+    /* automatic Views are separate from user-created Groups */
+    .railfilters { display:flex; flex-direction:column; gap:3px; margin:0 0 1px; }
+    .fchip { display:flex; align-items:center; gap:7px; background:transparent; border:1px solid transparent; color:var(--body); font-size:11.5px; padding:5px 6px; border-radius:7px; cursor:pointer; font-family:inherit; }
+    .fchip:hover { background:var(--surf-h); border-color:var(--hair); color:var(--ink2); }
+    .fchip.on { background:var(--sel-dim); border-color:var(--sel-dim); color:var(--ink); }
     .fchip svg { width:12px; height:13px; }
     .fchip .bmp { fill:var(--warn); stroke:var(--warn); stroke-width:1.4; stroke-linejoin:round; }
     .groupbox { border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:9px 0 10px; margin:0 0 10px; }
@@ -175,17 +179,28 @@
     .gitem.on { background:var(--sel-dim); border-color:var(--sel-dim); color:var(--ink); }
     .gitem .gn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .gitem .gc { color:var(--muted); font-size:10px; }
-    .gitem .ga { border:none; background:transparent; color:var(--muted); font:inherit; font-size:12px; padding:1px 3px; border-radius:4px; cursor:pointer; }
+    .gitem .gactions { opacity:0; display:flex; gap:2px; transition:opacity var(--t-hover); }
+    .gitem:hover .gactions, .gitem:focus-within .gactions { opacity:1; }
+    .gitem .ga { border:none; background:transparent; color:var(--muted); font:inherit; font-size:13px; line-height:1; width:20px; height:20px; padding:0; border-radius:5px; cursor:pointer; }
     .gitem .ga:hover { color:var(--ink); background:var(--surf-h); }
     .gempty { font-size:11px; color:var(--muted); padding:5px 6px 1px; line-height:1.35; }
-    .spills { display:flex; flex-wrap:wrap; gap:4px; padding:5px 20px 0 15px; }
-    .sp { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:9.5px; color:var(--body); background:var(--inset); border:1px solid var(--line); border-radius:99px; padding:1px 6px; }
-    .gact { position:absolute; right:31px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:10px; border:1px solid var(--line); border-radius:6px; padding:2px 6px; background:var(--inset); }
-    .gact:hover { color:var(--ink); background:var(--surf-h); }
-    .geditor { margin:0 0 6px 10px; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--surf); }
-    .geditor .gt { font-size:10px; color:var(--muted); margin-bottom:6px; }
-    .gcheck { display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--body); padding:4px 2px; }
-    .gcheck input { accent-color:var(--sel); }
+    .sgrow { display:flex; align-items:center; gap:4px; padding:6px 4px 0 15px; min-height:19px; }
+    .sgroups { display:inline-flex; align-items:center; gap:4px; max-width:100%; color:var(--muted); font-size:10px; border-radius:6px; padding:1px 2px; cursor:pointer; }
+    .sgroups:hover { color:var(--ink); background:var(--surf-h); }
+    .sgroups.add { border:1px solid transparent; padding:2px 5px; }
+    .gpill { max-width:96px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--body); background:var(--inset); border:1px solid var(--line); border-radius:99px; padding:1px 6px; }
+    .gpill.more { color:var(--muted); }
+    .gpopover { position:fixed; z-index:60; width:238px; max-height:min(330px,calc(100vh - 24px)); overflow:auto; border:1px solid var(--line); border-radius:8px; background:var(--surf); box-shadow:0 16px 40px rgba(0,0,0,.36); padding:8px; }
+    .gpopt { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; font-weight:700; margin:1px 2px 7px; }
+    .gpopsearch { width:100%; background:var(--inset); border:1px solid var(--line); color:var(--ink); border-radius:7px; padding:6px 8px; font:inherit; font-size:11.5px; margin-bottom:6px; }
+    .gpopsearch:focus { outline:none; border-color:var(--ink); }
+    .gpoprow { display:flex; align-items:center; gap:8px; width:100%; border:1px solid transparent; background:transparent; color:var(--body); border-radius:7px; padding:5px 6px; font:inherit; font-size:11.5px; cursor:pointer; text-align:left; }
+    .gpoprow:hover { background:var(--surf-h); border-color:var(--hair); color:var(--ink2); }
+    .gpoprow.on { color:var(--ink); background:var(--sel-dim); }
+    .gpoprow .check { width:13px; color:var(--sel); }
+    .gpoprow .name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gpopcreate { width:100%; border:1px solid var(--line); border-radius:7px; background:var(--inset); color:var(--body); font:inherit; font-size:11.5px; cursor:pointer; text-align:left; padding:6px 8px; margin-top:7px; }
+    .gpopcreate:hover { color:var(--ink); background:var(--surf-h); }
     .railempty { text-align:center; padding:30px 16px; }
     .railempty .bmbig svg { width:26px; height:28px; margin:0 auto 11px; display:block; }
     .railempty .bmbig .bmp { fill:none; stroke:var(--faint); stroke-width:1.4; stroke-linejoin:round; }
@@ -915,7 +930,8 @@
     let railFilter = "";           // sidebar search text
     let savedFilter = false;       // the All / Saved chip: show only bookmarked terminals
     let activeGroupId = null;       // selected user group filter, or null for all sessions
-    let groupEditorId = null;       // session id with the inline Add to group picker open
+    let groupPickerSessionId = null;// session id with the compact group picker open
+    let groupPickerQuery = "";      // search text inside the group picker
     // Bookmarks the user just toggled, held until a poll shows the server agreeing. Without this the
     // next /api/sessions poll (still reading the pre-POST value) would clobber the optimistic state
     // and the star would flicker off, then back on a second later.
@@ -1117,7 +1133,7 @@
     }
     function renderSessionsGroup() {
       return `<div class="sgrp"><h3>Sessions</h3><p class="gdesc">How the sidebar lists your terminals.</p>`
-        + segRow("Default sort", "Recent groups by day. The others rank across all your sessions.", "sort",
+        + segRow("Default sort", "When sorted by Recent, sessions are grouped by day. Most tokens and Most tasks rank sessions across all sessions.", "sort",
             [["recent","Recent"],["tokens","Most tokens"],["tasks","Most tasks"]])
         + swRow("Confirm before delete", "Ask first when deleting a terminal.", "confirmdelete")
         + `</div>`;
@@ -1723,7 +1739,7 @@
         .map((g) => g.burst ? burstHtml(c, g, curIdx) : workLineHtml(c, g.l, g.idx, g.idx === curIdx)).join("");
       return `<div class="rcpt">`
         + `<div class="rhead js-work" role="button" tabindex="0" aria-expanded="${!collapsed}" data-id="${c.id}">`
-        + `<span class="x">${wchev}</span><span class="ttl">Work Claude did</span><span class="colh">tokens</span><span class="tot">${fmt(c.workTotal)}</span></div>`
+        + `<span class="x">${wchev}</span><span class="ttl">Task steps</span><span class="colh">tokens</span><span class="tot">${fmt(c.workTotal)}</span></div>`
         + work
         + `</div>`;
     }
@@ -2000,33 +2016,103 @@
       const active = s.id === currentId ? " active" : "";
       const live = s.running ? " live" : "";
       const proj = s.project ? ` &middot; ${esc(s.project)}` : "";
-      const pills = (s.groups || []).length
-        ? `<span class="spills">${s.groups.map((g) => `<span class="sp">${esc(g.name)}</span>`).join("")}</span>`
-        : "";
       if (s.id === renamingId) {
         return `<div class="sessrename" data-id="${esc(s.id)}">`
           + `<input class="rename-in" type="text" value="${esc(s.name)}" aria-label="New name" /></div>`;
       }
-      const row = `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
+      return `<button class="sess${active}${live}" data-id="${esc(s.id)}" type="button">`
         + `<span class="sname"><span class="cdot${s.running ? " run" : ""}" style="background:${esc(s.color || "#5fb0ff")}"></span>${esc(s.name)}</span>`
         + `<span class="smeta">${ago(s.mtime)} &middot; ${s.taskCount} task${s.taskCount === 1 ? "" : "s"}${s.tokens ? " &middot; " + kfmt(s.tokens) + " tok" : ""}${proj}</span>`
-        + pills
-        + `<span class="gact" data-groups role="button" aria-label="Add to group">Groups</span>`
+        + sessionGroupControlHtml(s)
         + `<span class="bm${s.saved ? " on" : ""}" data-bm role="button" aria-label="${s.saved ? "Remove bookmark" : "Bookmark"}" aria-pressed="${s.saved ? "true" : "false"}">${bmSvg()}</span>`
         + `</button>`;
-      return row + (groupEditorId === s.id ? groupEditorHtml(s) : "");
     }
 
-    function groupEditorHtml(s) {
-      if (!lastGroups.length) {
-        return `<div class="geditor" data-ge="${esc(s.id)}"><div class="gt">Create a group first, then add this session to it.</div>`
-          + `<button class="gcreate" data-create-group type="button" aria-label="Create group">+</button></div>`;
+    function sessionGroupControlHtml(s) {
+      const groups = s.groups || [];
+      const label = groups.length ? `Edit groups: ${groups.map((g) => g.name).join(", ")}` : "Add group";
+      if (!groups.length) {
+        return `<span class="sgrow"><span class="sgroups add" data-groups role="button" tabindex="0" aria-label="${esc(label)}">+ Add group</span></span>`;
       }
-      const checks = lastGroups.map((g) => {
-        const on = (s.groups || []).some((sg) => sg.id === g.id);
-        return `<label class="gcheck"><input type="checkbox" data-gcheck="${esc(g.id)}" data-session="${esc(s.id)}" ${on ? "checked" : ""}>${esc(g.name)}</label>`;
-      }).join("");
-      return `<div class="geditor" data-ge="${esc(s.id)}"><div class="gt">Add to group</div>${checks}</div>`;
+      const shown = groups.slice(0, 2).map((g) => `<span class="gpill">${esc(g.name)}</span>`).join("");
+      const extra = groups.length > 2 ? `<span class="gpill more">+${groups.length - 2}</span>` : "";
+      return `<span class="sgrow"><span class="sgroups has" data-groups role="button" tabindex="0" aria-label="${esc(label)}">${shown}${extra}</span></span>`;
+    }
+
+    function currentPickerSession() {
+      return groupPickerSessionId ? (lastSessions || []).find((s) => s.id === groupPickerSessionId) : null;
+    }
+
+    function closeGroupPicker() {
+      groupPickerSessionId = null;
+      groupPickerQuery = "";
+      const pop = document.getElementById("gpopover");
+      if (pop) pop.hidden = true;
+    }
+
+    function pickerAnchor() {
+      if (!groupPickerSessionId) return null;
+      const row = Array.from(document.querySelectorAll("#raillist .sess")).find((el) => el.dataset.id === groupPickerSessionId);
+      return row ? row.querySelector("[data-groups]") : null;
+    }
+
+    function renderGroupPicker(anchor) {
+      const pop = document.getElementById("gpopover");
+      if (!pop) return;
+      const session = currentPickerSession();
+      const trigger = anchor || pickerAnchor();
+      if (!session || !trigger) { pop.hidden = true; return; }
+      const assigned = new Set((session.groups || []).map((g) => g.id));
+      const q = groupPickerQuery.trim().toLowerCase();
+      const groups = q ? lastGroups.filter((g) => g.name.toLowerCase().includes(q)) : lastGroups;
+      const search = lastGroups.length > 5
+        ? `<input class="gpopsearch" data-gpopsearch type="search" placeholder="Search groups" value="${esc(groupPickerQuery)}" autocomplete="off" />`
+        : "";
+      const rows = groups.length ? groups.map((g) => {
+        const on = assigned.has(g.id);
+        return `<button class="gpoprow${on ? " on" : ""}" type="button" data-gpopgroup="${esc(g.id)}">`
+          + `<span class="check">${on ? "✓" : ""}</span><span class="name">${esc(g.name)}</span></button>`;
+      }).join("") : `<div class="gempty">${lastGroups.length ? "No matching groups." : "No groups yet."}</div>`;
+      pop.innerHTML = `<div class="gpopt">Add to group</div>${search}${rows}`
+        + `<button class="gpopcreate" type="button" data-gpopcreate>+ Create new group</button>`;
+      pop.hidden = false;
+      const r = trigger.getBoundingClientRect();
+      const h = pop.offsetHeight || 240;
+      const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - 250));
+      const below = r.bottom + 6;
+      const top = below + h > window.innerHeight ? Math.max(8, r.top - h - 6) : below;
+      pop.style.left = left + "px";
+      pop.style.top = top + "px";
+      const searchInput = pop.querySelector("[data-gpopsearch]");
+      if (searchInput && document.activeElement && document.activeElement.matches("[data-gpopsearch]")) {
+        searchInput.focus();
+        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+      }
+    }
+
+    function openGroupPicker(sessionId, anchor) {
+      groupPickerSessionId = groupPickerSessionId === sessionId ? null : sessionId;
+      groupPickerQuery = "";
+      if (groupPickerSessionId) renderGroupPicker(anchor);
+      else closeGroupPicker();
+    }
+
+    async function createGroupFromPicker() {
+      const session = currentPickerSession();
+      if (!session) return;
+      const name = prompt("Group name");
+      if (!name || !name.trim()) return;
+      try {
+        const group = await (await fetch("/api/groups", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }),
+        })).json();
+        if (group && group.id) {
+          lastGroups.push(group);
+          await setSessionGroup(session.id, group.id, true);
+          groupPickerSessionId = session.id;
+          renderRailList(lastSessions);
+        }
+      } catch { /* next poll will reconcile */ }
     }
 
     // Toggle a session's bookmark: update the list optimistically, repaint, then persist server-side.
@@ -2065,10 +2151,9 @@
       const rows = lastGroups.map((g) =>
         `<button class="gitem${activeGroupId === g.id ? " on" : ""}" type="button" data-group-id="${esc(g.id)}">`
         + `<span class="gn">${esc(g.name)}</span><span class="gc">${counts.get(g.id) || 0}</span>`
-        + `<span class="ga" data-grename="${esc(g.id)}" role="button" aria-label="Rename group">Rename</span>`
-        + `<span class="ga" data-gdelete="${esc(g.id)}" role="button" aria-label="Delete group">&times;</span></button>`).join("");
-      el.innerHTML = `<button class="gitem${activeGroupId === null ? " on" : ""}" type="button" data-group-id=""><span class="gn">All sessions</span><span class="gc">${lastSessions.length}</span></button>`
-        + (lastGroups.length ? rows : `<div class="gempty">No groups yet. Create one to collect related sessions.</div>`);
+        + `<span class="gactions"><span class="ga" data-grename="${esc(g.id)}" role="button" aria-label="Rename group">✎</span>`
+        + `<span class="ga" data-gdelete="${esc(g.id)}" role="button" aria-label="Delete group">&times;</span></span></button>`).join("");
+      el.innerHTML = lastGroups.length ? rows : `<div class="gempty">No groups yet. Create one to collect related sessions.</div>`;
     }
 
     async function createSessionGroup() {
@@ -2081,6 +2166,8 @@
         if (group && group.id) {
           lastGroups.push(group);
           activeGroupId = group.id;
+          savedFilter = false;
+          closeGroupPicker();
           renderRailList(lastSessions);
         }
       } catch { /* next poll will reconcile */ }
@@ -2159,11 +2246,12 @@
         + `<label class="dlab">From<input type="date" id="date-from" class="dinput" /></label>`
         + `<label class="dlab">To<input type="date" id="date-to" class="dinput" /></label></div>`
         + `<button class="dclear" id="date-clear" type="button">Clear dates</button></details>`
+        + `<div class="viewbox"><div class="sectionhd"><span class="t">Views</span></div>`
         + `<div class="railfilters" id="railfilters">`
-        + `<span class="fchip" data-filter="all">All</span>`
-        + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span></div>`
+        + `<span class="fchip" data-filter="all">All sessions</span>`
+        + `<span class="fchip" data-filter="saved">${bmSvg()}Saved</span></div></div>`
         + `<div class="groupbox"><div class="ghd"><span class="t">Groups</span><button class="gcreate" id="group-create" type="button" aria-label="Create group">+</button></div><div id="grouplist"></div></div>`
-        + `<div id="raillist"></div>`;
+        + `<div id="raillist"></div><div id="gpopover" class="gpopover" hidden></div>`;
 
       const search = document.getElementById("railsearch");
       search.value = railFilter;
@@ -2183,6 +2271,8 @@
         const chip = e.target.closest(".fchip[data-filter]");
         if (!chip) return;
         savedFilter = chip.dataset.filter === "saved";
+        activeGroupId = null;
+        closeGroupPicker();
         renderRailList(lastSessions);
       });
       document.getElementById("group-create").addEventListener("click", createSessionGroup);
@@ -2194,16 +2284,48 @@
         const row = e.target.closest("[data-group-id]");
         if (!row) return;
         activeGroupId = row.dataset.groupId || null;
-        groupEditorId = null;
+        savedFilter = false;
+        closeGroupPicker();
         renderRailList(lastSessions);
+      });
+      const pop = document.getElementById("gpopover");
+      pop.addEventListener("click", (e) => {
+        const row = e.target.closest("[data-gpopgroup]");
+        if (row) {
+          e.preventDefault();
+          const session = currentPickerSession();
+          if (!session) return;
+          const on = !(session.groups || []).some((g) => g.id === row.dataset.gpopgroup);
+          setSessionGroup(session.id, row.dataset.gpopgroup, on);
+          return;
+        }
+        if (e.target.closest("[data-gpopcreate]")) {
+          e.preventDefault();
+          createGroupFromPicker();
+        }
+      });
+      pop.addEventListener("input", (e) => {
+        if (!e.target.matches("[data-gpopsearch]")) return;
+        groupPickerQuery = e.target.value;
+        renderGroupPicker();
+      });
+      document.addEventListener("click", (e) => {
+        if (!groupPickerSessionId) return;
+        if (e.target.closest("#gpopover") || e.target.closest("[data-groups]")) return;
+        closeGroupPicker();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && groupPickerSessionId) closeGroupPicker();
       });
       railWired = true;
     }
 
     // Reflect the active All / Saved chip. Called on every list render.
     function updateRailFilters() {
-      document.querySelectorAll("#railfilters .fchip").forEach((c) =>
-        c.classList.toggle("on", (c.dataset.filter === "saved") === savedFilter));
+      document.querySelectorAll("#railfilters .fchip").forEach((c) => {
+        const on = !activeGroupId && ((c.dataset.filter === "saved") === savedFilter);
+        c.classList.toggle("on", on);
+      });
     }
 
     function renderRail(sessions) {
@@ -2228,7 +2350,7 @@
       // date, or Saved filter is simply not pinned, so filters still mean what they say.
       const cur = currentId ? shown.find((s) => s.id === currentId) : null;
       const rest = cur ? shown.filter((s) => s.id !== currentId) : shown;
-      const pinnedHtml = cur ? `<div class="dayhd">Current terminal</div>` + sessRowHtml(cur) : "";
+      const pinnedHtml = cur ? `<div class="dayhd">Current</div>` + sessRowHtml(cur) : "";
       let listHtml = "";
       if (settings.sort === "recent") {
         // Group by day, preserving the most-recent-first order the server already sorted by.
@@ -2255,7 +2377,7 @@
         ? `<div class="railempty"><span class="bmbig">${bmSvg()}</span><div class="et">No saved sessions yet</div>`
           + `<div class="eh">Click the bookmark on a session to save it here.</div></div>`
         : activeGroupId
-        ? `<div class="railempty"><div class="et">No sessions in this group</div><div class="eh">Use the Groups button on a session to add it here.</div></div>`
+        ? `<div class="railempty"><div class="et">No sessions in this group</div><div class="eh">Use + Add group on a session to add it here.</div></div>`
         : `<div class="railempty"><div class="et">${(q || dateFrom || dateTo) ? "No sessions match" : "No sessions yet"}</div></div>`;
       list.innerHTML = shown.length ? listHtml : emptyHtml;
 
@@ -2265,8 +2387,7 @@
           if (e.target.closest("[data-bm]")) { e.stopPropagation(); toggleBookmark(el.dataset.id); return; }
           if (e.target.closest("[data-groups]")) {
             e.stopPropagation();
-            groupEditorId = groupEditorId === el.dataset.id ? null : el.dataset.id;
-            renderRailList(lastSessions);
+            openGroupPicker(el.dataset.id, e.target.closest("[data-groups]"));
             return;
           }
           currentId = el.dataset.id; pinned = true; followLive = settings.follow === "1";
@@ -2274,10 +2395,15 @@
         });
       });
 
-      list.querySelectorAll("[data-create-group]").forEach((btn) => btn.addEventListener("click", createSessionGroup));
-      list.querySelectorAll("[data-gcheck]").forEach((box) => box.addEventListener("change", (e) => {
-        setSessionGroup(box.dataset.session, box.dataset.gcheck, e.target.checked);
-      }));
+      list.querySelectorAll("[data-groups]").forEach((el) => {
+        el.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          e.stopPropagation();
+          const row = e.target.closest(".sess");
+          if (row) openGroupPicker(row.dataset.id, el);
+        });
+      });
 
       const input = list.querySelector(".rename-in");
       if (input) {
@@ -2290,6 +2416,7 @@
         });
         input.addEventListener("blur", commit);
       }
+      renderGroupPicker();
     }
 
     function startRename(id) { renamingId = id; renderRailList(lastSessions); }

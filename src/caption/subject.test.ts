@@ -145,6 +145,16 @@ describe("purposeSentence", () => {
     expect(purposeSentence("Edit", "editing", "banned.ts", 1)).not.toMatch(/adjust how it works/i);
   });
 
+  it("does not explain reads and searches with generic related-code filler", () => {
+    const read = purposeSentence("Read", "inspecting", "render.ts", 1, "statusline");
+    const search = purposeSentence("Grep", "inspecting", "bookmark and star", 1);
+    expect(read).toMatch(/render\.ts/);
+    expect(read).toMatch(/statusline/);
+    expect(search).toMatch(/bookmark and star/);
+    expect(read).not.toMatch(/related behavior|before changing/i);
+    expect(search).not.toMatch(/related code|existing .* behavior/i);
+  });
+
   it("phrases a no-subject search without the banned 'for the code' tail", () => {
     expect(purposeSentence("Grep", "inspecting", "the code", 1)).not.toMatch(/searching the project for the code/i);
   });

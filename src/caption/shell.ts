@@ -10,7 +10,7 @@ import { featureArea } from "./subject.js";
 export interface ShellIntent {
   subject: string;   // a plain noun phrase: "the installed plugin config", "the project tests"
   title: string;     // a short purpose headline: "Checking installed plugin config"
-  sentence: string;  // one sentence, always starting "Claude is ...": the simple "what"
+  sentence: string;  // one action-first sentence: the simple "what"
   deep: string;      // the sentence plus the why: what this step verifies, changes, or protects
   teach: string;     // the deep line plus one sentence teaching the concept behind it
 }
@@ -24,18 +24,26 @@ function stem(sentence: string): string {
 // Specific intents pass their own; this is the safe floor for commands we did not special-case,
 // so deep never reads identical to simple even for an unrecognised command.
 function defaultDeep(sentence: string, subject: string): string {
-  return `${stem(sentence)} to confirm ${subject} is in the state the next step needs.`;
+  return `${stem(sentence)} so the command output shows the current ${subject}.`;
 }
 
 // The concept floor for teach: one plain sentence about what a shell step is for. Specific
 // intents teach their own concept (what a build does, what a test proves); this backs the rest.
 const DEFAULT_CONCEPT =
-  "A shell command runs a program in the project, so Claude can inspect or change things the editor itself cannot.";
+  "A shell command runs a program in the project, so Codey can inspect or change things the editor itself cannot.";
+
+function actionFirst(text: string): string {
+  const trimmed = text.trim();
+  const m = /^Claude is ([a-z])(.+)$/i.exec(trimmed);
+  if (!m) return trimmed;
+  return m[1].toUpperCase() + m[2];
+}
 
 function intent(subject: string, title: string, sentence: string, deep?: string, teach?: string): ShellIntent {
-  const d = deep ?? defaultDeep(sentence, subject);
+  const s = actionFirst(sentence);
+  const d = actionFirst(deep ?? defaultDeep(s, subject));
   const t = teach ?? `${d} ${DEFAULT_CONCEPT}`;
-  return { subject, title, sentence, deep: d, teach: t };
+  return { subject, title, sentence: s, deep: d, teach: actionFirst(t) };
 }
 
 function firstWord(cmd: string): string {
@@ -57,9 +65,9 @@ function targetedTestIntent(cmd: string): ShellIntent | null {
   return intent(
     `the ${feature} tests`,
     `Running ${feature} tests`,
-    `Claude is running the ${feature} tests to confirm ${feature} still behaves correctly.`,
-    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes.`,
-    `Claude is running the ${feature} tests to confirm the targeted behavior still works after the latest changes. A targeted test focuses on one slice of the project, so a failure points close to the code that changed.`,
+    `Claude is running the ${feature} tests to check ${feature} with the targeted test file.`,
+    `Claude is running the ${feature} tests to check ${feature} with the targeted test file after the latest changes.`,
+    `Claude is running the ${feature} tests to check ${feature} with the targeted test file after the latest changes. A targeted test focuses on one slice of the project, so a failure points close to the code that changed.`,
   );
 }
 
@@ -242,17 +250,20 @@ function descriptionIntent(desc: string): ShellIntent {
     const verb = GERUND[m[1].toLowerCase()] ?? gerundize(m[1]);
     const Verb = verb.charAt(0).toUpperCase() + verb.slice(1);
     const tail = m[2].trim();
-    const sentence = tail ? `Claude is ${verb} ${tail}.` : `Claude is ${verb} something.`;
+    let sentence = tail ? `${Verb} ${tail}.` : `${Verb} something.`;
     // A tidy purpose label, not the whole description echoed back as a heading.
     const title = tail ? `${Verb} ${clampWords(nounStart(tail), 4)}` : `${Verb} this step`;
+    if (sentence.toLowerCase().replace(/[.\s]+$/, "") === title.toLowerCase().replace(/[.\s]+$/, "")) {
+      sentence = tail ? `${Verb} ${tail} with the command output.` : `${Verb} something with the command output.`;
+    }
     const subject = tidySubject(nounStart(tail), 4) || "the result";
     // The deep line keeps the description's own subject but reframes the verb as a purpose, so it
     // never reads as the title repeated back. The teach line adds the shell concept on top.
-    const deep = `${stem(sentence)} to confirm the result before moving on.`;
+    const deep = `${stem(sentence)} so the command output can guide the next action.`;
     return intent(subject, title, sentence, deep, `${deep} ${DEFAULT_CONCEPT}`);
   }
   // No leading word to read as a verb: keep the description as a faithful sentence rather than guessing.
-  const fallback = `Claude is working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
+  const fallback = `Working on this: ${clean.charAt(0).toLowerCase() + clean.slice(1)}.`;
   const title = clampWords(clean.charAt(0).toUpperCase() + clean.slice(1), 5);
   return intent(tidySubject(nounStart(clean)) || clean, title, fallback);
 }

@@ -26,12 +26,12 @@ describe("describeAction", () => {
     expect(describeAction("mcp__unity__execute_menu_item", { menu: "x" })).toBe("Execute menu item via unity");
   });
   it("labels a thinking turn by the planning beat, never the banned filler", () => {
-    expect(describeAction(null, null)).toBe("Planning the next step");
-    expect(describeAction("thinking", null)).toBe("Planning the next step");
+    expect(describeAction(null, null)).toBe("Planning the next action");
+    expect(describeAction("thinking", null)).toBe("Planning the next action");
     expect(hasBannedPhrase(describeAction("thinking", null))).toBe(false);
   });
   it("labels a thinking turn with real decision text as a decision", () => {
-    expect(describeAction("thinking", null, "I should inspect the session files first.")).toBe("Deciding the next step");
+    expect(describeAction("thinking", null, "I should inspect the session files first.")).toBe("Using the planning note");
   });
   it("phrases a search pattern instead of a flat 'searched the code'", () => {
     expect(describeAction("Grep", { pattern: "validateUser" })).toBe("Searched for validateUser");
@@ -54,8 +54,8 @@ describe("actionTitle", () => {
     expect(actionTitle("Bash", { command: "git status" })).not.toMatch(/ran a command|a command/i);
   });
   it("titles a thinking turn as a planning beat, never the banned filler", () => {
-    expect(actionTitle("thinking", null)).toBe("Planning the next step");
-    expect(actionTitle(null, null)).toBe("Planning the next step");
+    expect(actionTitle("thinking", null)).toBe("Planning the next action");
+    expect(actionTitle(null, null)).toBe("Planning the next action");
     expect(hasBannedPhrase(actionTitle("thinking", null))).toBe(false);
   });
 });
@@ -64,9 +64,15 @@ describe("actionSubtitle", () => {
   it("phrases a shell command as a sentence, distinct from the description-derived title", () => {
     const input = { command: "node test.js", description: "Run the demo math tests" };
     const sub = actionSubtitle("Bash", input);
-    expect(sub).toBe("Claude is running the demo math tests.");
+    expect(sub).toBe("Running the demo math tests.");
     // The subtitle must not just echo the title back at the reader.
     expect(sub.toLowerCase()).not.toBe(actionTitle("Bash", input).toLowerCase() + ".");
+  });
+
+  it("does not use generic shell deep filler for command descriptions", () => {
+    const sub = actionSubtitle("Bash", { command: "git status", description: "Check git status and backup branch" });
+    expect(sub).toBe("Checking git status and backup branch.");
+    expect(hasBannedPhrase(sub)).toBe(false);
   });
 
   it("never repeats the title verbatim as the subtitle for a described command", () => {
@@ -150,7 +156,7 @@ describe("actionSubtitle", () => {
   it("connects searches to existing behavior that a change may need to reuse", () => {
     const sub = actionSubtitle("Grep", { pattern: "bookmark|star" });
     expect(sub).toMatch(/bookmark and star/i);
-    expect(sub).toMatch(/existing/i);
+    expect(sub).toMatch(/existing files/i);
     expect(sub).not.toMatch(/to follow how it works|for the relevant code/i);
   });
 

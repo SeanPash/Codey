@@ -130,7 +130,7 @@ describe("composeView live phase", () => {
     // caption instead of describing last turn's work under this turn's stage.
     const view = composeView(events, snap({ promptAt: 150, why: null }), 5000, whys);
     expect(view.sentence).not.toBe("explanation of the previous prompt");
-    expect(view.sentence).toContain("Claude is reading");
+    expect(view.sentence).toContain("Reading b.ts");
   });
 
   it("does not leak the still-set snap.why from the previous prompt into a new turn", () => {
@@ -143,7 +143,7 @@ describe("composeView live phase", () => {
     const whys = [{ ts: 10, why: stale }];
     const view = composeView(events, snap({ promptAt: 150, why: stale }), 5000, whys);
     expect(view.sentence).not.toBe(stale);
-    expect(view.sentence).toContain("Claude is reading");
+    expect(view.sentence).toContain("Reading explain-prompt.ts");
   });
 
   it("drops to a complete deterministic sentence when the live why is too long to show whole", () => {
@@ -153,7 +153,7 @@ describe("composeView live phase", () => {
     expect(view.sentence).not.toBe(runOn);
     expect(view.sentence).not.toMatch(/…$/);
     expect(view.sentence.endsWith(".")).toBe(true);
-    expect(view.sentence).toContain("Claude is reading");
+    expect(view.sentence).toContain("Reading a.ts");
   });
 
   it("keeps a short live why whole rather than padding it", () => {

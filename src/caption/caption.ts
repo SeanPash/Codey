@@ -114,33 +114,33 @@ function describe(chunk: WorkChunk): Described {
         const where = chunk.targets.length ? namedTargets(chunk) : "the project";
         return {
           title: chunk.targets.length ? `Searching ${humanFile(chunk.targets[0])}` : "Searching the project",
-          simple: `Claude is searching ${where} for ${searches}.`,
-          deep: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code.`,
-          teach: `Claude is searching ${where} for ${searches} to find the existing behavior before changing related code. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
+          simple: `Searching ${where} for ${searches}.`,
+          deep: `Searching ${where} for ${searches} to find the files and call sites that use those names.`,
+          teach: `Searching ${where} for ${searches} to find the files and call sites that use those names. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
         };
       }
       if (chunk.tool === "Grep" || chunk.tool === "Glob") {
         return {
           title,
-          simple: `Claude is searching ${subject === "the code" ? "the project" : `the project for ${subject}`}.`,
-          deep: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used.`,
-          teach: `Claude is searching the project to find where ${subject === "the code" ? "the relevant code" : subject} is used. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
+          simple: `Searching ${subject === "the code" ? "the project" : `the project for ${subject}`}.`,
+          deep: `Searching the project to find the files that match ${subject === "the code" ? "the current pattern" : subject}.`,
+          teach: `Searching the project to find the files that match ${subject === "the code" ? "the current pattern" : subject}. Searching first shows every spot a change would touch, so nothing nearby breaks by surprise.`,
         };
       }
       if (single) {
         const feature = featureArea(names);
         return {
           title,
-          simple: `Claude is reading ${names}.`,
-          deep: `Claude is reading ${names} to inspect ${feature} before changing related behavior.`,
-          teach: `Claude is reading ${names} to inspect ${feature} before changing related behavior. Reading the existing code first is how you avoid breaking something you did not know was there.`,
+          simple: `Reading ${names}.`,
+          deep: `Reading ${names} to locate the ${feature} code path.`,
+          teach: `Reading ${names} to locate the ${feature} code path. Reading the existing code first is how you avoid breaking something you did not know was there.`,
         };
       }
       return {
         title,
-        simple: `Claude is reading ${names}.`,
-        deep: `Claude is reading ${names} to trace how they work together before editing them.`,
-        teach: `Claude is reading ${names} to trace how they work together before editing them. Reading the existing code first is how you avoid breaking something you did not know was there.`,
+        simple: `Reading ${names}.`,
+        deep: `Reading ${names} to trace the shared code path before editing it.`,
+        teach: `Reading ${names} to trace the shared code path before editing it. Reading the existing code first is how you avoid breaking something you did not know was there.`,
       };
     }
     case "editing": {
@@ -153,100 +153,100 @@ function describe(chunk: WorkChunk): Described {
           if (sym) {
             return {
               title,
-              simple: `Claude is creating ${names}, starting with ${sym}.`,
-              deep: `Claude is creating ${names} and writing ${sym} into it.`,
-              teach: `Claude is creating ${names} and writing ${sym} into it. A new file does nothing until something imports or runs it.`,
+              simple: `Creating ${names}, starting with ${sym}.`,
+              deep: `Creating ${names} and writing ${sym} into it.`,
+              teach: `Creating ${names} and writing ${sym} into it. A new file does nothing until something imports or runs it.`,
             };
           }
           return {
             title,
-            simple: `Claude is creating ${names}.`,
-            deep: `Claude is creating ${names} and writing its initial contents.`,
-            teach: `Claude is creating ${names} and writing its initial contents. A new file does nothing until something imports or runs it.`,
+            simple: `Creating ${names}.`,
+            deep: `Creating ${names} and writing its initial contents.`,
+            teach: `Creating ${names} and writing its initial contents. A new file does nothing until something imports or runs it.`,
           };
         }
         // A change to a test file is best described by the behavior it now covers.
         if (sym && mod) {
           return {
             title,
-            simple: `Claude is adding a ${sym} test to the ${mod} tests.`,
-            deep: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}.`,
-            teach: `Claude is adding a ${sym} test so the ${mod} module verifies ${sym}. A test is a small program that checks the real code, so a problem with ${sym} shows up right away.`,
+            simple: `Adding a ${sym} test to the ${mod} tests.`,
+            deep: `Adding a ${sym} test so the ${mod} module verifies ${sym}.`,
+            teach: `Adding a ${sym} test so the ${mod} module verifies ${sym}. A test is a small program that checks the real code, so a problem with ${sym} shows up right away.`,
           };
         }
         if (sym) {
           return {
             title,
-            simple: `Claude is updating ${sym} in ${names}.`,
-            deep: `Claude is updating ${sym} in ${names} to change how it behaves.`,
-            teach: `Claude is updating ${sym} in ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`,
+            simple: `Updating ${sym} in ${names}.`,
+            deep: `Updating ${sym} in ${names} to change how it behaves.`,
+            teach: `Updating ${sym} in ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`,
           };
         }
         return {
           title,
-          simple: `Claude is updating ${names}.`,
-          deep: `Claude is updating ${names} to change how it behaves.`,
-          teach: `Claude is updating ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`,
+          simple: `Updating ${names}.`,
+          deep: `Updating ${names} to change how it behaves.`,
+          teach: `Updating ${names} to change how it behaves. An edit only takes effect once the code runs or is rebuilt.`,
         };
       }
       if (adds) {
         return {
           title,
-          simple: `Claude is creating ${names}.`,
-          deep: `Claude is creating ${names} as a set of new files for one piece of work.`,
-          teach: `Claude is creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`,
+          simple: `Creating ${names}.`,
+          deep: `Creating ${names} as a set of new files for one piece of work.`,
+          teach: `Creating ${names} as a set of new files for one piece of work. A new file does nothing until something imports or runs it.`,
         };
       }
       if (syms) {
         return {
           title,
-          simple: `Claude is updating ${names} around ${syms}.`,
-          deep: `Claude is updating ${names} together so ${syms} stay consistent.`,
-          teach: `Claude is updating ${names} together so ${syms} stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`,
+          simple: `Updating ${names} around ${syms}.`,
+          deep: `Updating ${names} together so ${syms} stay consistent.`,
+          teach: `Updating ${names} together so ${syms} stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`,
         };
       }
       return {
         title,
-        simple: `Claude is updating ${names}.`,
-        deep: `Claude is updating ${names} together so they stay consistent.`,
-        teach: `Claude is updating ${names} together so they stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`,
+        simple: `Updating ${names}.`,
+        deep: `Updating ${names} together so they stay consistent.`,
+        teach: `Updating ${names} together so they stay consistent. Keeping related files aligned is what stops a change in one place from breaking another.`,
       };
     }
     case "testing":
       return {
         title,
-        simple: `Claude is running ${subject} to check its work.`,
-        deep: `Claude is running ${subject} to confirm the changes work and nothing else broke.`,
-        teach: `Claude is running ${subject} to confirm the changes work and nothing else broke. Tests are small programs that check the real code behaves as expected, so a problem shows up right away.`,
+        simple: `Running ${subject} to check the changed code.`,
+        deep: `Running ${subject} to confirm the changed code passes its checks.`,
+        teach: `Running ${subject} to confirm the changed code passes its checks. Tests are small programs that check the real code behaves as expected, so a problem shows up right away.`,
       };
     case "debugging":
       return {
         title,
-        simple: "Claude hit an error and is working out what went wrong.",
-        deep: "Claude is debugging, reading the error from a failed action and trying a different approach.",
-        teach: "Claude is debugging, reading the error from a failed action and trying a different approach. Debugging is the loop of reading an error, guessing the cause, and testing a fix until it holds.",
+        simple: "Reading the failed action and narrowing down what went wrong.",
+        deep: "Debugging by reading the error from a failed action and trying a different approach.",
+        teach: "Debugging by reading the error from a failed action and trying a different approach. Debugging is the loop of reading an error, guessing the cause, and testing a fix until it holds.",
       };
     case "planning":
       return {
         title,
-        simple: "Claude is thinking through what to do next.",
-        deep: "Claude is planning its next step before changing any files.",
-        teach: "Claude is planning its next step before changing any files. Thinking the work through first keeps the changes deliberate instead of guesswork.",
+        simple: "Planning the next recorded action.",
+        deep: "Planning the next recorded action from the current task state.",
+        teach: "Planning the next recorded action from the current task state. A short planning beat keeps the next edit or command tied to the task instead of guesswork.",
       };
     case "summarizing":
       return {
         title,
-        simple: "Claude is wrapping up and pulling together what it did.",
-        deep: "Claude is summarizing the work so the result is easy to follow.",
-        teach: "Claude is summarizing the work so the result is easy to follow. A clear recap is what turns a pile of edits into something a person can review.",
+        simple: "Wrapping up and pulling together the changed files and checks.",
+        deep: "Summarizing the changed files and verification so the result is reviewable.",
+        teach: "Summarizing the changed files and verification so the result is reviewable. A clear recap is what turns a pile of edits into something a person can review.",
       };
     case "waiting":
     default:
       return {
         title,
-        simple: "Claude is getting started.",
-        deep: "Claude is getting started on your request.",
-        teach: "Claude is getting started on your request.",
+        simple: "Starting the request.",
+        deep: "Starting the request and waiting for the first recorded action.",
+        teach: "Starting the request and waiting for the first recorded action.",
       };
   }
 }
