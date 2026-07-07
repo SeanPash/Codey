@@ -2,7 +2,7 @@
 
 # Codey
 
-### Stores every Claude Code session, breaks down every step, and explains any of it whenever you want.
+<p>Stores every Claude Code session, breaks down every step, and explains any of it whenever you want.</p>
 
 I made a plugin for Claude Code that stores all your previous sessions and lays them out as a timeline, with a breakdown of every step Claude takes during a prompt and explanations whenever you want them. While you work it can also follow along and narrate what Claude is doing, live, right in your terminal.
 
@@ -12,7 +12,7 @@ I made a plugin for Claude Code that stores all your previous sessions and lays 
   <img src="assets/timeline.png" alt="The Codey timeline: a full session laid out as a storyboard, each step showing what Claude did and why, with per-step token costs and a live breakdown of where the tokens went" width="900">
 </p>
 
-<p align="center"><a href="SCREENSHOTS.md"><b>See more screenshots</b></a></p>
+<p align="center"><a href="SCREENSHOTS.md">See more screenshots</a></p>
 
 ## What it does
 
@@ -51,7 +51,7 @@ The best part in my opinion: the timeline runs in the background for every sessi
   <img src="assets/timeline-live.png" alt="The live strip at the top of the timeline shows what Claude is doing this moment, with Follow Live pinning the page to the latest step as the storyboard fills in below" width="900">
 </p>
 
-Session stats give you the shape of a run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step makes you curious, there's an **Explain this step** button right on it, and you can recap a whole prompt the same way. You only spend a few tokens on the things you actually choose to dig into.
+Session stats give you the shape of a run at a glance, and a token-breakdown chart shows exactly where your tokens went, split across reading, writing, searching, running commands, and thinking, with the priciest task called out. When a step makes you curious, there's an Explain this step button right on it, and you can recap a whole prompt the same way. You only spend a few tokens on the things you actually choose to dig into.
 
 <p align="center">
   <img src="assets/explain-step.png" alt="A step expanded with Explain this step, showing what Claude did and the exact command behind it, next to a full recap of what the task got done" width="900">
@@ -59,19 +59,29 @@ Session stats give you the shape of a run at a glance, and a token-breakdown cha
 
 ## Saved sessions
 
-The timeline isn't just for the run happening right now. A sessions sidebar lists every recent session grouped by day, so you can flip back to any of them and replay it step by step long after it finished. Search across them by name, filter by date, and star the ones worth keeping so a tap on **Saved** brings back just those.
+The timeline isn't just for the run happening right now. A sessions sidebar lists every recent session grouped by day, so you can flip back to any of them and replay it step by step long after it finished. Search across them by name, filter by date, and star the ones you want to keep so the Saved view brings back just those.
 
 <p align="center">
   <img src="assets/sessions-saved.png" alt="The sessions sidebar: a search box, a filter-by-date control, All and Saved tabs, and recent sessions grouped by day with a star to bookmark each one" width="300">
+</p>
+
+## Groups
+
+Saved is for the sessions you want to keep. Groups are for the sessions that belong together.
+
+Create a group from the sidebar, then add any session from the Groups button or the group pills on the session row. A session can sit in more than one group, so one run can belong to a project, a bug, and a release pass without being copied anywhere. The group list shows how many sessions are inside each one, and opening a group gives you the same timeline replay, stats, and explanations as the full session list.
+
+<p align="center">
+  <img src="assets/session-groups.png" alt="The sessions sidebar in Groups view: All, Saved, and Groups tabs, user-created groups with session counts, and the selected Codey group listing its sessions below" width="360">
 </p>
 
 ## Three modes: simple, deep, teach
 
 Codey comes with three modes, and they're really one knob: how much you want to understand versus how many tokens you want to spend. Each one gives you a different depth of breakdown on the exact step Claude is doing, both in the terminal narration and on the timeline recaps.
 
-- **simple** keeps it to one calm line and costs almost nothing.
-- **deep** adds the why behind each step.
-- **teach** explains the work and the ideas behind it, so you learn as you read.
+- `simple` keeps it to one calm line and costs almost nothing.
+- `deep` adds the why behind each step.
+- `teach` explains the work and the ideas behind it, so you learn as you read.
 
 Flip the depth toggle on the timeline and every recap rewrites itself to match, from a single honest line to a full teardown with the concept behind it. Here's the same session at each depth.
 
@@ -92,7 +102,7 @@ Flip the depth toggle on the timeline and every recap rewrites itself to match, 
 
 ## Rich or Budget detail
 
-There's a second knob that sits next to every explanation and summary: **Detail**, set to either **Rich** or **Budget**. Where the mode decides how a recap is shaped, Detail decides how much goes into it. **Rich** grounds each explanation in the actual edits and searches Claude ran, so it names the real change instead of talking in general terms, and it spends a bit more to do that. **Budget** keeps things leaner and cheaper. Rich is the default, and you can flip it from the header or right where you click to generate, so the tradeoff is in front of you at the moment you're about to spend. Token Saver quietly drops to Budget for you.
+There's a second knob that sits next to every explanation and summary: Detail, set to either Rich or Budget. Where the mode decides how a recap is shaped, Detail decides how much goes into it. Rich grounds each explanation in the actual edits and searches Claude ran, so it names the real change instead of talking in general terms, and it spends a bit more to do that. Budget keeps things leaner and cheaper. Rich is the default, and you can flip it from the header or right where you click to generate, so the tradeoff is in front of you at the moment you're about to spend. Token Saver quietly drops to Budget for you.
 
 ## Live narration in your terminal
 
@@ -112,7 +122,7 @@ If you run Claude Code in two or three terminals at once, it's easy to lose trac
 
 ## Knows when Claude is stuck
 
-Some of the most useful stuff Codey does is completely free. Plain, AI-free detectors watch the live run and flag trouble the moment it shows up: **looping** on the same input, **repeating** the same error, or **hanging** far past a reasonable time.
+Some of the most useful stuff Codey does is completely free. Plain, AI-free detectors watch the live run and flag trouble the moment it shows up: looping on the same input, repeating the same error, or hanging far past a reasonable time.
 
 When something fires, the stuck task gets an amber bar with three choices: nudge it to move on, push it toward a different approach, or stop and hand control back to you. One click feeds Claude a short reason it reads and acts on. Codey only ever observes and suggests, and never acts without your click.
 
@@ -124,13 +134,13 @@ When something fires, the stuck task gets an amber bar with three choices: nudge
 
 There's a settings panel behind the gear in the top corner for tuning how the timeline looks and behaves, all saved on your machine.
 
-**Appearance** covers the basics: dark or light theme, reduce motion to kill the live pulse and glow, relaxed or compact density, and a text-size scale for the whole page.
+Appearance covers the basics: dark or light theme, reduce motion to kill the live pulse and glow, relaxed or compact density, and a text-size scale for the whole page.
 
 <p align="center">
   <img src="assets/settings-appearance.png" alt="The Settings Appearance panel: theme, reduce motion, density, and text size controls" width="760">
 </p>
 
-**Live and tokens** is where **Token Saver** lives, and it's worth calling out. Follow Live auto-scrolls to the newest step and refreshes fast, which is great to watch but does a bit more work. Token Saver flips that around: it stays quiet, holds off on auto-summaries, and reveals the whole prompt and its steps once the turn finishes. So you still get the full breakdown, just for fewer tokens, read after the fact instead of live.
+Live and tokens is where Token Saver lives. Follow Live auto-scrolls to the newest step and refreshes fast, which is great to watch but does a bit more work. Token Saver flips that around: it stays quiet, holds off on auto-summaries, and reveals the whole prompt and its steps once the turn finishes. So you still get the full breakdown, just for fewer tokens, read after the fact instead of live.
 
 <p align="center">
   <img src="assets/settings-live-tokens.png" alt="The Settings Live and tokens panel: Follow live versus Token saver, and an auto-open the live task toggle" width="760">
@@ -140,17 +150,17 @@ There are more panels for narration, sessions, and stats too, so you can dial in
 
 ## What it costs
 
-I tried to be honest about tokens, because that's the whole point. Part of Codey is genuinely free, and the rest is cheap, throttled to the mode you picked, and always added up in plain sight.
+I tried to be honest about tokens, because that's the whole point. Part of Codey is free, and the rest is cheap, throttled to the mode you picked, and always added up in plain sight.
 
-**Free:**
+Free:
 
-- **Reading the timeline.** The page reads a local log of what already happened, so scrolling any session, past or live, makes no model calls.
-- **Stuck detection.** The loop, repeat-error, and hang checks are plain code with no model behind them.
+- Reading the timeline. The page reads a local log of what already happened, so scrolling any session, past or live, makes no model calls.
+- Stuck detection. The loop, repeat-error, and hang checks are plain code with no model behind them.
 
-**What you pay for, while you follow along:**
+What you pay for, while you follow along:
 
-- **Live narration**, whenever a mode is on. It runs on the cheapest model in short throttled bursts. `simple` is near-zero, while `deep` and `teach` spend a little more to explain the why.
-- **On-demand explanations.** Clicking Explain this step, or recapping a whole prompt, only spends on the step you chose.
+- Live narration, whenever a mode is on. It runs on the cheapest model in short throttled bursts. `simple` is near-zero, while `deep` and `teach` spend a little more to explain the why.
+- On-demand explanations. Clicking Explain this step, or recapping a whole prompt, only spends on the step you chose.
 
 Codey keeps its own tab, split across narration, timeline, and summaries, so you always see exactly what it added on top of your session. It all runs on the Claude plan you already have.
 
@@ -178,14 +188,14 @@ Type `/codey` in Claude Code and the picker lists everything.
 
 Codey is young and I'm still moving on it fast. A few things on the roadmap:
 
-- **Codex support**, so the timeline and narration work no matter which agent you run.
-- **Better budget controls**, with per-session caps you set up front so the deeper modes stay predictable.
-- **A sharper timeline**: faster, cleaner, and easier to scan.
-- **Smarter narration** that says more in fewer tokens.
+- Codex support, so the timeline and narration work no matter which agent you run.
+- Better budget controls, with per-session caps you set up front so the deeper modes stay predictable.
+- A sharper timeline: faster, cleaner, and easier to scan.
+- Smarter narration that says more in fewer tokens.
 
 ## Feedback and bugs
 
-I'd really appreciate anyone giving it a try and letting me know what to improve or anything that breaks. Open an issue on the [GitHub issue tracker](https://github.com/SeanPash/Codey/issues) with a quick note on what you were doing, what you expected, and what actually happened. Codey is new, so reports genuinely help.
+I'd really appreciate anyone giving it a try and letting me know what to improve or anything that breaks. Open an issue on the [GitHub issue tracker](https://github.com/SeanPash/Codey/issues) with a quick note on what you were doing, what you expected, and what actually happened. Codey is new, so reports help.
 
 And if you find it useful, a star on the repo would mean a lot and helps more people find it. Ty!
 
