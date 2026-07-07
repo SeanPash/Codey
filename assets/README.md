@@ -10,6 +10,7 @@ Screenshots used by the top-level [README](../README.md) and the [screenshot gal
 - `explain-step.png` - a step expanded with Explain this step, showing the raw command and a recap.
 - `sessions.png` - the sessions sidebar, recent sessions grouped by day.
 - `sessions-saved.png` - the sessions sidebar with search, filter-by-date, and the All/Saved (starred) tabs.
+- `session-groups.png` - the sessions sidebar in Groups view, with user-created groups, counts, and grouped sessions.
 - `settings-appearance.png` - the Settings Appearance panel (theme, reduce motion, density, text size).
 - `settings-live-tokens.png` - the Settings Live & tokens panel (Follow live vs Token saver, auto-open live task).
 - `active-terminals.png` - the Active Terminals view with two live session timelines side by side.
