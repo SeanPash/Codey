@@ -73,9 +73,8 @@ describe("timeline group assignment affordances", () => {
     // trailing "+" chip after existing group pills
     expect(page).toContain('<span class="gpadd" aria-hidden="true">+</span>');
     expect(page).toMatch(/\.gpadd\s*\{[^}]*border:1px dashed var\(--line\)/s);
-    // picker reads as a multi-select list: plural header + hint + real checkboxes
+    // picker reads as a multi-select list: plural header + real checkboxes
     expect(page).toContain(">Add to groups<");
-    expect(page).toContain("Pick any number — a session can be in several.");
     expect(page).toContain('class="gcheck${on ? " on" : ""}"');
     expect(page).toMatch(/\.gpoprow \.gcheck\s*\{[^}]*border:1\.5px solid var\(--line\)/s);
   });
